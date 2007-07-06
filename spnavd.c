@@ -24,6 +24,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include <sys/time.h>
 
 #include <linux/types.h>
@@ -33,11 +37,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef REL_RX
 #define REL_RX	3
 #endif
-
 #ifndef REL_RY
 #define REL_RY	4
 #endif
-
 #ifndef REL_RZ
 #define REL_RZ	5
 #endif
@@ -59,12 +61,11 @@ enum {CLIENT_X11, CLIENT_UNIX};
 
 struct client {
 	int type;
-	union {
-		int sock;		/* UNIX domain socket */
+
+	int sock;		/* UNIX domain socket */
 #ifdef USE_X11
-		Window win;		/* X11 client window */
+	Window win;		/* X11 client window */
 #endif
-	} c;
 
 	float sens;			/* sensitivity */
 
@@ -73,7 +74,12 @@ struct client {
 
 
 void daemonize(void);
+int select_all(fd_set *rd_set, fd_set *except_set);
+void handle_events(fd_set *rd_set, fd_set *except_set);
+int add_client(int type, void *cdata);
 int init_dev(void);
+int init_unix(void);
+void send_uevent(struct input_event *inp);
 
 #ifdef USE_X11
 int init_x11(void);
@@ -101,10 +107,19 @@ unsigned char evtype_mask[(EV_MAX + 7) / 8];
 int evrel[6];
 int evbut[24];
 
+int lsock;
+
 #ifdef USE_X11
 Display *dpy;
 Window win;
 Atom event_motion, event_bpress, event_brelease, event_cmd;
+
+float x11_sens = 1.0;	/* XXX This stands in for the client sensitivity. Due
+						 * to the bad design of the original magellan protocol,
+						 * we can't know which client requested the sensitivity
+						 * change, so we have to keep it global for all X
+						 * clients.
+						 */
 #endif
 
 struct client *client_list;
@@ -164,18 +179,14 @@ int main(int argc, char **argv)
 	if(init_dev() == -1) {
 		return 1;
 	}
+	init_unix();
 #ifdef USE_X11
 	init_x11();
 #endif
 
 	/* event handling loop */
 	while(1) {
-		int rdbytes = 0;
-		int max_fd, xcon;
 		fd_set rd_set, except_set;
-		struct input_event inp;
-		static struct input_event prev_inp;
-		static int inp_events_pending;
 
 		if(dev_fd == -1) {
 			if(init_dev() == -1) {
@@ -184,142 +195,8 @@ int main(int argc, char **argv)
 			}
 		}
 
-
-		FD_ZERO(&rd_set);
-		FD_SET(dev_fd, &rd_set);
-		
-		FD_ZERO(&except_set);
-		FD_SET(dev_fd, &except_set);
-
-		max_fd = dev_fd;
-
-#ifdef USE_X11
-		if(dpy) {
-			xcon = ConnectionNumber(dpy);
-			FD_SET(xcon, &rd_set);
-			FD_SET(xcon, &except_set);
-			
-			max_fd = xcon > dev_fd ? xcon : dev_fd;
-		}
-#endif
-
-		/* wait indefinitely for input from the device or X11 events */
-		if(select(max_fd + 1, &rd_set, 0, &except_set, 0) == -1) {
-			if(errno == EINTR) {
-				continue;
-			}
-		}
-
-#ifdef USE_X11
-		/* process any pending X events */
-		if(dpy && FD_ISSET(xcon, &rd_set)) {
-			while(XPending(dpy)) {
-				XEvent xev;
-				XNextEvent(dpy, &xev);
-
-				if(xev.type == ClientMessage && xev.xclient.message_type == event_cmd) {
-					unsigned int win_id;
-					float sens;
-
-					switch(xev.xclient.data.s[2]) {
-					case CMD_APP_WINDOW:
-						win_id = xev.xclient.data.s[1];
-						win_id |= (unsigned int)xev.xclient.data.s[0] << 16;
-
-						set_client_window((Window)win_id);
-						break;
-
-					case CMD_APP_SENS:
-						sens = *(float*)xev.xclient.data.s;
-						printf("sens: %.3f\n", sens);
-						break;
-
-					default:
-						break;
-					}
-				}
-			}
-		}
-
-		/* detect errors in the X11 connection */
-		if(dpy && FD_ISSET(xcon, &except_set)) {
-			fprintf(stderr, "X11 socket exception?\n");
-			close_x11();
-			dpy = 0;
-		}
-#endif
-
-		/* read any pending data from the device */
-		if(FD_ISSET(dev_fd, &rd_set)) {
-			do {
-				rdbytes = read(dev_fd, &inp, sizeof inp);
-			} while(rdbytes == -1 && errno == EINTR);
-		}
-
-		/* and detect exceptions on the device (disconnect?) */
-		if(FD_ISSET(dev_fd, &except_set) || rdbytes == -1) {
-			perror("read error");
-			close(dev_fd);
-			dev_fd = -1;
-		}
-
-		/* if we actually got an event, update our state, and send the appropriate X events */
-		if(rdbytes > 0) {
-			int val;
-			int idx, sign = -1;
-
-			switch(inp.type) {
-			case EV_REL:
-				if(abs(inp.value) < dead_threshold) {
-					break;
-				}
-
-				idx = inp.code - REL_X;
-				val = inp.value;
-				if(sensitivity != 1.0) {
-					val = (int)((float)inp.value * sensitivity);
-				}
-
-				switch(idx) {
-				case REL_RY:
-					idx = REL_RZ; break;
-				case REL_RZ:
-					idx = REL_RY; break;
-				case REL_Y:
-					idx = REL_Z; break;
-				case REL_Z:
-					idx = REL_Y; break;
-				default:
-					sign = 1;
-					break;
-				}
-
-				evrel[idx] = sign * val;
-				prev_inp = inp;
-				inp_events_pending = 1;
-				break;
-
-			case EV_KEY:
-				idx = inp.code - BTN_0;
-				evbut[idx] = inp.value;
-				prev_inp = inp;
-				inp_events_pending = 1;
-				break;
-
-			case EV_SYN:
-				if(inp_events_pending) {
-					inp_events_pending = 0;
-#ifdef USE_X11
-					/* if we are connected to an X server, send the appropriate X event */
-					send_xevent(&prev_inp);
-#endif	/* USE_X11 */
-				}
-				break;
-
-			default:
-				continue;
-			}
-
+		if(select_all(&rd_set, &except_set) >= 0) {
+			handle_events(&rd_set, &except_set);
 		}
 	}
 
@@ -358,11 +235,265 @@ void daemonize(void)
 	setvbuf(stderr, 0, _IONBF, 0);
 }
 
+int select_all(fd_set *rd_set, fd_set *except_set)
+{
+	int ret;
+	int max_fd, xcon;
+	struct client *cptr;
+
+	FD_ZERO(rd_set);
+	FD_ZERO(except_set);
+
+	/* set the device file descriptors */
+	FD_SET(dev_fd, rd_set);
+	FD_SET(dev_fd, except_set);
+	max_fd = dev_fd;
+
+	/* if we have a listening socket... */
+	if(lsock) {
+		/* ... set the listening socket itself for incoming connections */
+		FD_SET(lsock, rd_set);
+		if(lsock > max_fd) max_fd = lsock;
+
+		/* ... and set all the client's sockets too */
+		cptr = client_list->next;
+		while(cptr) {
+			if(cptr->type == CLIENT_UNIX) {
+				FD_SET(cptr->sock, rd_set);
+				FD_SET(cptr->sock, except_set);
+
+				if(cptr->sock > max_fd) {
+					max_fd = cptr->sock;
+				}
+			}
+			cptr = cptr->next;
+		}
+	}
+
+	/* also if we have an X11 connection, select that as well */
+#ifdef USE_X11
+	if(dpy) {
+		xcon = ConnectionNumber(dpy);
+		FD_SET(xcon, rd_set);
+		FD_SET(xcon, except_set);
+		
+		if(xcon > max_fd) {
+			max_fd = xcon;
+		}
+	}
+#endif
+
+	/* wait indefinitely */
+	do {
+		ret = select(max_fd + 1, rd_set, 0, except_set, 0);
+	} while(ret == -1 && errno == EINTR);
+
+	return ret;
+}
+
+void handle_events(fd_set *rd_set, fd_set *except_set)
+{
+	int xcon, rdbytes = 0;
+	struct input_event inp;
+	static struct input_event prev_inp;
+	static int inp_events_pending;
+	struct client *cptr;
+
+	if(lsock) {
+		if(FD_ISSET(lsock, rd_set)) {
+			/* got incoming connection */
+			int s;
+
+			if((s = accept(lsock, 0, 0)) == -1) {
+				perror("error while accepting connection");
+			} else {
+				if(add_client(CLIENT_UNIX, &s) == -1) {
+					perror("failed to add client");
+				}
+			}
+		}
+
+		/* check all UNIX clients */
+		cptr = client_list;
+		while(cptr->next) {
+			struct client *client = cptr->next;
+
+			if(client->type == CLIENT_UNIX) {
+				if(FD_ISSET(client->sock, rd_set)) {
+					/* Got data from a client. Currently the only thing the client may set
+					 * is sensitivity. So get it directly.
+					 */
+					while((rdbytes = read(client->sock, &client->sens, sizeof client->sens)) <= 0 && errno == EINTR);
+					if(rdbytes <= 0) {	/* something went wrong... disconnect client */
+						cptr->next = client->next;
+						close(client->sock);
+						free(client);
+					}
+				}
+
+				if(FD_ISSET(client->sock, except_set)) {
+					/* got an exception on that socket, disconnect... */
+					cptr->next = client->next;
+					close(client->sock);
+					free(client);
+				}
+			}
+			cptr = cptr->next;
+		}
+	}
+
+#ifdef USE_X11
+	xcon =  ConnectionNumber(dpy);
+
+	/* process any pending X events */
+	if(dpy && FD_ISSET(xcon, rd_set)) {
+		while(XPending(dpy)) {
+			XEvent xev;
+			XNextEvent(dpy, &xev);
+
+			if(xev.type == ClientMessage && xev.xclient.message_type == event_cmd) {
+				unsigned int win_id;
+
+				switch(xev.xclient.data.s[2]) {
+				case CMD_APP_WINDOW:
+					win_id = xev.xclient.data.s[1];
+					win_id |= (unsigned int)xev.xclient.data.s[0] << 16;
+
+					set_client_window((Window)win_id);
+					break;
+
+				case CMD_APP_SENS:
+					x11_sens = *(float*)xev.xclient.data.s;	/* see decl of x11_sens for details */
+					break;
+
+				default:
+					break;
+				}
+			}
+		}
+	}
+
+	/* detect errors in the X11 connection */
+	if(dpy && FD_ISSET(xcon, except_set)) {
+		fprintf(stderr, "X11 socket exception?\n");
+		close_x11();
+		dpy = 0;
+	}
+#endif
+
+	/* read any pending data from the device */
+	if(FD_ISSET(dev_fd, rd_set)) {
+		do {
+			rdbytes = read(dev_fd, &inp, sizeof inp);
+		} while(rdbytes == -1 && errno == EINTR);
+	}
+
+	/* and detect exceptions on the device (disconnect?) */
+	if(FD_ISSET(dev_fd, except_set) || rdbytes == -1) {
+		perror("read error");
+		close(dev_fd);
+		dev_fd = -1;
+	}
+
+	/* if we actually got an event, update our state, and send the appropriate events to all clients */
+	if(rdbytes > 0) {
+		int val;
+		int idx, sign = -1;
+
+		switch(inp.type) {
+		case EV_REL:
+			if(abs(inp.value) < dead_threshold) {
+				break;
+			}
+
+			idx = inp.code - REL_X;
+			val = inp.value;
+			if(sensitivity != 1.0) {
+				val = (int)((float)inp.value * sensitivity);
+			}
+
+			switch(idx) {
+			case REL_RY:
+				idx = REL_RZ; break;
+			case REL_RZ:
+				idx = REL_RY; break;
+			case REL_Y:
+				idx = REL_Z; break;
+			case REL_Z:
+				idx = REL_Y; break;
+			default:
+				sign = 1;
+				break;
+			}
+
+			evrel[idx] = sign * val;
+			prev_inp = inp;
+			inp_events_pending = 1;
+			break;
+
+		case EV_KEY:
+			idx = inp.code - BTN_0;
+			evbut[idx] = inp.value;
+			prev_inp = inp;
+			inp_events_pending = 1;
+			break;
+
+		case EV_SYN:
+			if(inp_events_pending) {
+				inp_events_pending = 0;
+
+				send_uevent(&prev_inp);
+#ifdef USE_X11
+				/* if we are connected to an X server, send the appropriate X event */
+				send_xevent(&prev_inp);
+#endif/* USE_X11 */
+			}
+			break;
+
+		default:
+			break;
+		}
+
+	}
+
+}
+
+int add_client(int type, void *cdata)
+{
+	struct client *client;
+
+#ifdef USE_X11
+	if(!cdata || (type != CLIENT_UNIX && type != CLIENT_X11)) 
+#else
+	if(!cdata || type != CLIENT_UNIX) 
+#endif
+	{
+		return -1;
+	}
+
+	if(!(client = malloc(sizeof *client))) {
+		return -1;
+	}
+
+	client->type = type;
+	if(type == CLIENT_UNIX) {
+		client->sock = *(int*)cdata;
+#ifdef USE_X11
+	} else {
+		client->win = *(Window*)cdata;
+#endif
+	}
+
+	client->sens = 1.0f;
+	client->next = client_list->next;
+	client_list->next = client;
+
+	return 0;
+}
+
 int init_dev(void)
 {
 	char *dev_path;
-
-	printf("-- spacenav daemon initialization --\n");
 
 	if(!(dev_path = get_dev_path())) {
 		fprintf(stderr, "failed to find the spaceball device file\n");
@@ -377,6 +508,100 @@ int init_dev(void)
 
 	return 0;
 }
+
+#define SOCK_NAME	"/tmp/spacenav_usock"
+int init_unix(void)
+{
+	int s;
+	mode_t prev_umask;
+	struct sockaddr_un addr;
+
+	if(lsock) return 0;
+
+	if((s = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
+		perror("failed to create socket");
+		return -1;
+	}
+
+	unlink(SOCK_NAME);	/* in case it already exists */
+
+	memset(&addr, 0, sizeof addr);
+	addr.sun_family = AF_UNIX;
+	strcpy(addr.sun_path, SOCK_NAME);
+
+	prev_umask = umask(0);
+
+	if(bind(s, (struct sockaddr*)&addr, sizeof addr) == -1) {
+		fprintf(stderr, "failed to bind unix socket: %s: %s\n", SOCK_NAME, strerror(errno));
+		return -1;
+	}
+
+	umask(prev_umask);
+
+	if(listen(s, 8) == -1) {
+		perror("listen failed");
+		return -1;
+	}
+
+	lsock = s;
+	return 0;
+}
+
+
+enum {
+	UEV_TYPE_MOTION,
+	UEV_TYPE_PRESS,
+	UEV_TYPE_RELEASE
+};
+
+/* send an event to all UNIX clients */
+void send_uevent(struct input_event *inp)
+{
+	static struct timeval prev_motion_time;
+	struct client *citer;
+	int i, data[8];
+	unsigned int period;
+
+	if(!lsock) return;
+
+	if(inp->type == EV_REL) {
+		period = msec_dif(inp->time, prev_motion_time);
+		prev_motion_time = inp->time;
+	}
+
+	citer = client_list->next;
+	while(citer) {
+		if(citer->type == CLIENT_UNIX) {
+			float motion_mul;
+
+			switch(inp->type) {
+			case EV_REL:
+				data[0] = UEV_TYPE_MOTION;
+
+				motion_mul = citer->sens * sensitivity;
+				for(i=0; i<6; i++) {
+					float val = (float)evrel[i] * motion_mul;
+					data[i + 1] = (int)val;
+				}
+				data[7] = period;
+				break;
+
+			case EV_KEY:
+				data[0] = inp->value ? UEV_TYPE_PRESS : UEV_TYPE_RELEASE;
+				data[1] = inp->code - BTN_0;
+				break;
+
+			default:
+				fprintf(stderr, "BUG! this shouldn't happen\n");
+				exit(1);
+			}
+
+			while(write(citer->sock, data, sizeof data) == -1 && errno == EINTR);
+		}
+		citer = citer->next;
+	}
+}
+
 
 #ifdef USE_X11
 int init_x11(void)
@@ -492,7 +717,7 @@ void send_xevent(struct input_event *inp)
 			continue;
 		}
 
-		xevent.xclient.window = citer->c.win;
+		xevent.xclient.window = citer->win;
 
 		switch(inp->type) {
 		case EV_REL:
@@ -500,7 +725,7 @@ void send_xevent(struct input_event *inp)
 			xevent.xclient.format = 16;
 
 			for(i=0; i<6; i++) {
-				float val = (float)evrel[i]/* * citer->sens*/;
+				float val = (float)evrel[i] * x11_sens * sensitivity;
 				xevent.xclient.data.s[i + 2] = (short)val;
 			}
 			xevent.xclient.data.s[0] = xevent.xclient.data.s[1] = 0;
@@ -518,7 +743,7 @@ void send_xevent(struct input_event *inp)
 			exit(1);
 		}
 
-		XSendEvent(dpy, citer->c.win, False, 0, &xevent);
+		XSendEvent(dpy, citer->win, False, 0, &xevent);
 		citer = citer->next;
 	}
 
@@ -561,21 +786,13 @@ void set_client_window(Window win)
 
 	cnode = client_list->next;
 	while(cnode) {
-		if(cnode->c.win == win) {
+		if(cnode->win == win) {
 			return;
 		}
 		cnode = cnode->next;
 	}
 
-	if(!(cnode = malloc(sizeof *cnode))) {
-		perror("set_client_window failed to allocate memory");
-		return;
-	}
-	cnode->type = CLIENT_X11;
-	cnode->c.win = win;
-	cnode->sens = 1.0;
-	cnode->next = client_list->next;
-	client_list->next = cnode;
+	add_client(CLIENT_X11, &win);
 }
 
 void remove_client_window(Window win)
@@ -584,7 +801,7 @@ void remove_client_window(Window win)
 
 	cnode = client_list;
 	while(cnode->next) {
-		if(cnode->next->c.win == win) {
+		if(cnode->next->win == win) {
 			tmp = cnode->next;
 			cnode->next = tmp->next;
 			free(tmp);
