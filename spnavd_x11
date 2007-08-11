@@ -28,7 +28,15 @@ fi
 pid="`pidof spacenavd`"
 if [ -n "$pid" ]; then
 	kill $sig $pid
-	echo "signalled spacenavd, it should now start sending X events."
+	if [ $? = 0 ]; then
+		if [ $sig = '-usr1' ]; then
+			echo "signalled spacenavd, it should now start sending X events."
+		else
+			echo "signalled spacenavd, stopped sending X events."
+		fi
+	else
+		echo "sending signal to spacenavd failed."
+	fi
 else
 	echo "spacenavd daemon is not running, nothing to do."
 fi
