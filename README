@@ -1,7 +1,7 @@
-freespaced - 0.1
+spacenavd - 0.1
 ----------------
 
-Freespaced, is a free software replacement user-space driver (daemon), for
+Spacenavd, is a free software replacement user-space driver (daemon), for
 3Dconnexion's space-something input devices. It's made compatible to the
 original 3dxsrv proprietary daemon provided by 3Dconnexion, in order to work
 flawlessly with any program that is based on the accompanying Magellan SDK.

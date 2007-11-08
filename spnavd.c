@@ -509,7 +509,7 @@ int init_dev(void)
 	return 0;
 }
 
-#define SOCK_NAME	"/tmp/spacenav_usock"
+#define SOCK_NAME	"/tmp/.spnav.sock"
 int init_unix(void)
 {
 	int s;
