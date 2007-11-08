@@ -1,0 +1,21 @@
+#!/bin/sh
+
+DAEMON=/usr/local/bin/spacenavd
+
+[ -x "$DAEMON" ] || exit 0
+
+case "$1" in
+start)
+	echo 'Starting spacenavd daemon'
+	$DAEMON
+	;;
+
+stop)
+	echo 'Stopping spacenavd daemon'
+	kill `pidof spacenavd`
+	;;
+
+reload|restart|force-reload)
+	$0 stop && $0 start
+	;;
+esac
