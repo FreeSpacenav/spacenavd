@@ -74,8 +74,8 @@ struct client {
 
 
 void daemonize(void);
-int select_all(fd_set *rd_set, fd_set *except_set);
-void handle_events(fd_set *rd_set, fd_set *except_set);
+int select_all(fd_set *rd_set);
+void handle_events(fd_set *rd_set);
 int add_client(int type, void *cdata);
 int init_dev(void);
 int init_unix(void);
@@ -186,7 +186,7 @@ int main(int argc, char **argv)
 
 	/* event handling loop */
 	while(1) {
-		fd_set rd_set, except_set;
+		fd_set rd_set;
 
 		if(dev_fd == -1) {
 			if(init_dev() == -1) {
@@ -195,8 +195,8 @@ int main(int argc, char **argv)
 			}
 		}
 
-		if(select_all(&rd_set, &except_set) >= 0) {
-			handle_events(&rd_set, &except_set);
+		if(select_all(&rd_set) >= 0) {
+			handle_events(&rd_set);
 		}
 	}
 
@@ -235,18 +235,16 @@ void daemonize(void)
 	setvbuf(stderr, 0, _IONBF, 0);
 }
 
-int select_all(fd_set *rd_set, fd_set *except_set)
+int select_all(fd_set *rd_set)
 {
 	int ret;
 	int max_fd, xcon;
 	struct client *cptr;
 
 	FD_ZERO(rd_set);
-	FD_ZERO(except_set);
 
 	/* set the device file descriptors */
 	FD_SET(dev_fd, rd_set);
-	FD_SET(dev_fd, except_set);
 	max_fd = dev_fd;
 
 	/* if we have a listening socket... */
@@ -260,7 +258,6 @@ int select_all(fd_set *rd_set, fd_set *except_set)
 		while(cptr) {
 			if(cptr->type == CLIENT_UNIX) {
 				FD_SET(cptr->sock, rd_set);
-				FD_SET(cptr->sock, except_set);
 
 				if(cptr->sock > max_fd) {
 					max_fd = cptr->sock;
@@ -275,7 +272,6 @@ int select_all(fd_set *rd_set, fd_set *except_set)
 	if(dpy) {
 		xcon = ConnectionNumber(dpy);
 		FD_SET(xcon, rd_set);
-		FD_SET(xcon, except_set);
 		
 		if(xcon > max_fd) {
 			max_fd = xcon;
@@ -285,13 +281,13 @@ int select_all(fd_set *rd_set, fd_set *except_set)
 
 	/* wait indefinitely */
 	do {
-		ret = select(max_fd + 1, rd_set, 0, except_set, 0);
+		ret = select(max_fd + 1, rd_set, 0, 0, 0);
 	} while(ret == -1 && errno == EINTR);
 
 	return ret;
 }
 
-void handle_events(fd_set *rd_set, fd_set *except_set)
+void handle_events(fd_set *rd_set)
 {
 	int xcon, rdbytes = 0;
 	struct input_event inp;
@@ -328,14 +324,8 @@ void handle_events(fd_set *rd_set, fd_set *except_set)
 						cptr->next = client->next;
 						close(client->sock);
 						free(client);
+						continue;
 					}
-				}
-
-				if(FD_ISSET(client->sock, except_set)) {
-					/* got an exception on that socket, disconnect... */
-					cptr->next = client->next;
-					close(client->sock);
-					free(client);
 				}
 			}
 			cptr = cptr->next;
@@ -372,13 +362,6 @@ void handle_events(fd_set *rd_set, fd_set *except_set)
 			}
 		}
 	}
-
-	/* detect errors in the X11 connection */
-	if(dpy && FD_ISSET(xcon, except_set)) {
-		fprintf(stderr, "X11 socket exception?\n");
-		close_x11();
-		dpy = 0;
-	}
 #endif
 
 	/* read any pending data from the device */
@@ -388,8 +371,8 @@ void handle_events(fd_set *rd_set, fd_set *except_set)
 		} while(rdbytes == -1 && errno == EINTR);
 	}
 
-	/* and detect exceptions on the device (disconnect?) */
-	if(FD_ISSET(dev_fd, except_set) || rdbytes == -1) {
+	/* disconnect? */
+	if(rdbytes == -1) {
 		perror("read error");
 		close(dev_fd);
 		dev_fd = -1;
