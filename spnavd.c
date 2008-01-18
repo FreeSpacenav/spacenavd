@@ -92,6 +92,8 @@ void remove_client_window(Window win);
 
 char *get_dev_path(void);
 int open_dev(const char *path);
+void close_dev(void);
+void set_led(int state);
 void sig_handler(int s);
 
 unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
@@ -171,6 +173,7 @@ int main(int argc, char **argv)
 
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
+	signal(SIGSEGV, sig_handler);
 	signal(SIGHUP, sig_handler);
 	signal(SIGUSR1, sig_handler);
 	signal(SIGUSR2, sig_handler);
@@ -200,9 +203,11 @@ int main(int argc, char **argv)
 		}
 	}
 
+	/* just for the sense of symmetry, execution can't reach this :) */
 #ifdef USE_X11
 	close_x11();
 #endif
+	close_dev();
 	return 0;
 }
 
@@ -289,7 +294,7 @@ int select_all(fd_set *rd_set)
 
 void handle_events(fd_set *rd_set)
 {
-	int xcon, rdbytes = 0;
+	int rdbytes = 0;
 	struct input_event inp;
 	static struct input_event prev_inp;
 	static int inp_events_pending;
@@ -333,10 +338,8 @@ void handle_events(fd_set *rd_set)
 	}
 
 #ifdef USE_X11
-	xcon =  ConnectionNumber(dpy);
-
 	/* process any pending X events */
-	if(dpy && FD_ISSET(xcon, rd_set)) {
+	if(dpy && FD_ISSET(ConnectionNumber(dpy), rd_set)) {
 		while(XPending(dpy)) {
 			XEvent xev;
 			XNextEvent(dpy, &xev);
@@ -491,6 +494,7 @@ int init_dev(void)
 
 	return 0;
 }
+
 
 #define SOCK_NAME	"/tmp/.spnav.sock"
 int init_unix(void)
@@ -819,7 +823,36 @@ int open_dev(const char *path)
 		fprintf(stderr, "Wrong device, no relative events reported!\n");
 		return -1;
 	}
+
+	set_led(1);
 	return 0;
+}
+
+void close_dev(void)
+{
+	if(dev_fd != -1) {
+		set_led(0);
+	}
+	close(dev_fd);
+	dev_fd = -1;
+}
+
+void set_led(int state)
+{
+	struct input_event ev;
+
+	if(dev_fd == -1) {
+		fprintf(stderr, "set_led failed, invalid dev_fd\n");
+		return;
+	}
+
+	ev.type = EV_LED;
+	ev.code = LED_MISC;
+	ev.value = state;
+
+	if(write(dev_fd, &ev, sizeof ev) == -1) {
+		fprintf(stderr, "failed to turn LED %s\n", state ? "on" : "off");
+	}
 }
 
 
@@ -877,9 +910,12 @@ void sig_handler(int s)
 		init_dev();
 		break;
 
+	case SIGSEGV:
+		fprintf(stderr, "Segmentation fault caught, trying to exit gracefully\n");
 	case SIGINT:
 	case SIGTERM:
 		close_x11();	/* call to avoid leaving garbage in the X server's root windows */
+		close_dev();
 		exit(0);
 
 #ifdef USE_X11

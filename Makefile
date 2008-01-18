@@ -7,7 +7,7 @@ bin = spacenavd
 CC = gcc
 INSTALL = install
 CFLAGS = -pedantic -Wall -g -DUSE_X11
-LDFLAGS = -lX11
+LDFLAGS = -lX11 -lm
 
 $(bin): $(obj)
 	$(CC) $(CFLAGS) -o $@ $(obj) $(LDFLAGS)
