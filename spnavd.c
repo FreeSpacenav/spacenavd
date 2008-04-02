@@ -882,11 +882,15 @@ char *get_dev_path(void)
 		case 'H':
 			if(valid_str && valid_vendor) {
 				char *ptr, *start;
-			
+
 				if(!(start = strchr(buf, '='))) {
 					continue;
 				}
 				start++;
+
+				if((ptr = strstr(start, "event"))) {
+					start = ptr;
+				}
 
 				if((ptr = strchr(start, ' '))) {
 					*ptr = 0;
