@@ -811,7 +811,7 @@ int open_dev(const char *path)
 
 	if(ioctl(dev_fd, EVIOCGNAME(sizeof(dev_name)), dev_name) == -1) {
 		perror("EVIOCGNAME ioctl failed\n");
-		return -1;
+		strcpy(dev_name, "unknown");
 	}
 
 	if(ioctl(dev_fd, EVIOCGBIT(0, sizeof(evtype_mask)), evtype_mask) == -1) {
@@ -870,28 +870,43 @@ char *get_dev_path(void)
 	}
 
 	while(fgets(buf, sizeof buf, fp)) {
-		if(buf[0] == 'I') {
+		switch(buf[0]) {
+		case 'I':
 			valid_vendor = strstr(buf, "Vendor=046d") != 0;
-		} else if(buf[0] == 'N') {
+			break;
+
+		case 'N':
 			valid_str = strstr(buf, "3Dconnexion") != 0;
-		} else if(buf[0] == 'H' && valid_str && valid_vendor) {
-			char *ptr, *start;
+			break;
+
+		case 'H':
+			if(valid_str && valid_vendor) {
+				char *ptr, *start;
 			
-			if(!(start = strchr(buf, '='))) {
-				continue;
-			}
-			start++;
+				if(!(start = strchr(buf, '='))) {
+					continue;
+				}
+				start++;
 
-			if((ptr = strchr(start, ' '))) {
-				*ptr = 0;
-			}
-			if((ptr = strchr(start, '\n'))) {
-				*ptr = 0;
-			}
+				if((ptr = strchr(start, ' '))) {
+					*ptr = 0;
+				}
+				if((ptr = strchr(start, '\n'))) {
+					*ptr = 0;
+				}
 
-			snprintf(path, sizeof(path), "/dev/input/%s", start);
-			fclose(fp);
-			return path;
+				snprintf(path, sizeof(path), "/dev/input/%s", start);
+				fclose(fp);
+				return path;
+			}
+			break;
+
+		case '\n':
+			valid_vendor = valid_str = 0;
+			break;
+
+		default:
+			break;
 		}
 	}
 

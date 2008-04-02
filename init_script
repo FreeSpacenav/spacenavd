@@ -1,4 +1,10 @@
 #!/bin/sh
+#
+# spacenavd      free driver for 3Dconnexion 6dof devices
+#
+# chkconfig: 2345 99 99
+# description: A free user space driver for 3Dconnexion input devices,\
+#              compatible with the proprietary 3dxsrv daemon.
 
 DAEMON=/usr/local/bin/spacenavd
 
