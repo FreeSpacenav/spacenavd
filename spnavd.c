@@ -130,6 +130,7 @@ struct client *client_list;
 float sensitivity = 1.0;
 int dead_threshold = 2;
 
+int verbose = 0;
 
 int main(int argc, char **argv)
 {
@@ -142,10 +143,15 @@ int main(int argc, char **argv)
 				become_daemon = !become_daemon;
 				break;
 
+			case 'v':
+				verbose = 1;
+				break;
+
 			case 'h':
 				printf("usage: %s [options]\n", argv[0]);
 				printf("options:\n");
 				printf("  -d\tdo not daemonize\n");
+				printf("  -v\tverbose output\n");
 				printf("  -h\tprint this usage information\n");
 				return 0;
 
@@ -654,6 +660,7 @@ int init_x11(void)
 void close_x11(void)
 {
 	int i, scr_count;
+	struct client *cnode;
 
 	if(!dpy) return;
 
@@ -667,6 +674,18 @@ void close_x11(void)
 	XDestroyWindow(dpy, win);
 	XCloseDisplay(dpy);
 	dpy = 0;
+
+	/* also remove all x11 clients from the client list */
+	cnode = client_list;
+	while(cnode->next) {
+		if(cnode->next->type == CLIENT_X11) {
+			struct client *tmp = cnode->next;
+			cnode->next = tmp->next;
+			free(tmp);
+		} else {
+			cnode = cnode->next;
+		}
+	}
 }
 
 void send_xevent(struct input_event *inp)
@@ -860,61 +879,110 @@ void set_led(int state)
 char *get_dev_path(void)
 {
 	static char path[128];
-	int valid_vendor = 0, valid_str = 0;
+	int i, valid_vendor = 0, valid_str = 0;
 	char buf[1024];
 	FILE *fp;
 
-	if(!(fp = fopen(PROC_DEV, "r"))) {
-		perror("failed to open " PROC_DEV ":");
-		return 0;
+	if(verbose) {
+		printf("Device detection, parsing " PROC_DEV "\n");
 	}
 
-	while(fgets(buf, sizeof buf, fp)) {
-		switch(buf[0]) {
-		case 'I':
-			valid_vendor = strstr(buf, "Vendor=046d") != 0;
-			break;
+	if((fp = fopen(PROC_DEV, "r"))) {
+		while(fgets(buf, sizeof buf, fp)) {
+			switch(buf[0]) {
+			case 'I':
+				valid_vendor = strstr(buf, "Vendor=046d") != 0;
+				break;
 
-		case 'N':
-			valid_str = strstr(buf, "3Dconnexion") != 0;
-			break;
+			case 'N':
+				valid_str = strstr(buf, "3Dconnexion") != 0;
+				break;
 
-		case 'H':
-			if(valid_str && valid_vendor) {
-				char *ptr, *start;
+			case 'H':
+				if(valid_str && valid_vendor) {
+					char *ptr, *start;
 
-				if(!(start = strchr(buf, '='))) {
-					continue;
+					if(!(start = strchr(buf, '='))) {
+						continue;
+					}
+					start++;
+
+					if((ptr = strstr(start, "event"))) {
+						start = ptr;
+					}
+
+					if((ptr = strchr(start, ' '))) {
+						*ptr = 0;
+					}
+					if((ptr = strchr(start, '\n'))) {
+						*ptr = 0;
+					}
+
+					snprintf(path, sizeof path, "/dev/input/%s", start);
+					fclose(fp);
+					return path;
 				}
-				start++;
+				break;
 
-				if((ptr = strstr(start, "event"))) {
-					start = ptr;
-				}
+			case '\n':
+				valid_vendor = valid_str = 0;
+				break;
 
-				if((ptr = strchr(start, ' '))) {
-					*ptr = 0;
-				}
-				if((ptr = strchr(start, '\n'))) {
-					*ptr = 0;
-				}
-
-				snprintf(path, sizeof(path), "/dev/input/%s", start);
-				fclose(fp);
-				return path;
+			default:
+				break;
 			}
-			break;
-
-		case '\n':
-			valid_vendor = valid_str = 0;
-			break;
-
-		default:
-			break;
+		}
+		fclose(fp);
+	} else {
+		if(verbose) {
+			perror("failed to open " PROC_DEV);
 		}
 	}
 
-	fclose(fp);
+	if(verbose) {
+		fprintf(stderr, "trying alternative detection, querying /dev/input/eventX device names...\n");
+	}
+
+	/* if for some reason we can't open the /proc/bus/input/devices file, or we
+	 * couldn't find our device there, we'll try opening all /dev/input/eventX
+	 * devices, and see if anyone is named: 3Dconnexion whatever
+	 */
+	i = 0;
+	for(;;) {
+		int fd;
+
+		snprintf(path, sizeof path, "/dev/input/event%d", ++i);
+
+		if(verbose) {
+			fprintf(stderr, "  trying \"%s\" ... ", path);
+		}
+
+		if((fd = open(path, O_RDONLY)) == -1) {
+			if(errno != ENOENT) {
+				fprintf(stderr, "failed to open %s: %s. this might hinder device detection\n",
+						path, strerror(errno));
+			} else {
+				break;
+			}
+		}
+
+		if(ioctl(fd, EVIOCGNAME(sizeof buf), buf) == -1) {
+			fprintf(stderr, "failed to get device name for device %s: %s. this might hinder device detection\n",
+					path, strerror(errno));
+			buf[0] = 0;
+		}
+
+		if(verbose) {
+			fprintf(stderr, "%s\n", buf[0] ? buf : "unknown");
+		}
+
+		if(strstr(buf, "3Dconnexion")) {
+			close(fd);
+			return path;
+		}
+		close(fd);
+	}
+
 	return 0;
 }
 
