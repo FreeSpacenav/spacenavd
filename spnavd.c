@@ -609,8 +609,19 @@ int init_x11(void)
 
 	if(dpy) return 0;
 
-	if(!(dpy = XOpenDisplay(":0"))) {
-		fprintf(stderr, "failed to open X11 display: \":0\"\n");
+	/* if the server started from init, it probably won't have a DISPLAY env var
+	 * so we go on and add a default one.
+	 */
+	if(!getenv("DISPLAY")) {
+		putenv("DISPLAY=:0.0");
+	}
+
+	if(verbose) {
+		printf("trying to open X11 display \"%s\"\n", getenv("DISPLAY"));
+	}
+
+	if(!(dpy = XOpenDisplay(0))) {
+		fprintf(stderr, "failed to open X11 display \"%s\"\n", getenv("DISPLAY"));
 		return -1;
 	}
 	scr_count = ScreenCount(dpy);
