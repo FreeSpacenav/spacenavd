@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <sys/time.h>
+#include "cfgfile.h"
 
 #include <linux/types.h>
 #include <linux/input.h>
@@ -74,6 +75,7 @@ struct client {
 
 
 void daemonize(void);
+int write_pid_file(void);
 int select_all(fd_set *rd_set);
 void handle_events(fd_set *rd_set);
 int add_client(int type, void *cdata);
@@ -97,9 +99,6 @@ void set_led(int state);
 void sig_handler(int s);
 
 unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
-
-int read_cfg(const char *fname);
-
 
 int dev_fd;
 char dev_name[128];
@@ -126,9 +125,8 @@ float x11_sens = 1.0;	/* XXX This stands in for the client sensitivity. Due
 
 struct client *client_list;
 
-/* global configuration options */
-float sensitivity = 1.0;
-int dead_threshold = 2;
+/* configuration options */
+struct cfg cfg;
 
 int verbose = 0;
 
@@ -168,8 +166,9 @@ int main(int argc, char **argv)
 	if(become_daemon) {
 		daemonize();
 	}
+	write_pid_file();
 
-	read_cfg("/etc/spnavrc");
+	read_cfg("/etc/spnavrc", &cfg);
 
 	if(!(client_list = malloc(sizeof *client_list))) {
 		perror("failed to allocate client list");
@@ -244,6 +243,19 @@ void daemonize(void)
 
 	setvbuf(stdout, 0, _IOLBF, 0);
 	setvbuf(stderr, 0, _IONBF, 0);
+}
+
+int write_pid_file(void)
+{
+	FILE *fp;
+	int pid = getpid();
+
+	if(!(fp = fopen("/tmp/.spnavd.pid", "w"))) {
+		return -1;
+	}
+	fprintf(fp, "%d\n", pid);
+	fclose(fp);
+	return 0;
 }
 
 int select_all(fd_set *rd_set)
@@ -394,14 +406,14 @@ void handle_events(fd_set *rd_set)
 
 		switch(inp.type) {
 		case EV_REL:
-			if(abs(inp.value) < dead_threshold) {
+			if(abs(inp.value) < cfg.dead_threshold) {
 				break;
 			}
 
 			idx = inp.code - REL_X;
 			val = inp.value;
-			if(sensitivity != 1.0) {
-				val = (int)((float)inp.value * sensitivity);
+			if(cfg.sensitivity != 1.0) {
+				val = (int)((float)inp.value * cfg.sensitivity);
 			}
 
 			switch(idx) {
@@ -416,6 +428,10 @@ void handle_events(fd_set *rd_set)
 			default:
 				sign = 1;
 				break;
+			}
+
+			if(cfg.invert[idx]) {
+				sign = -sign;
 			}
 
 			evrel[idx] = sign * val;
@@ -571,7 +587,7 @@ void send_uevent(struct input_event *inp)
 			case EV_REL:
 				data[0] = UEV_TYPE_MOTION;
 
-				motion_mul = citer->sens * sensitivity;
+				motion_mul = citer->sens * cfg.sensitivity;
 				for(i=0; i<6; i++) {
 					float val = (float)evrel[i] * motion_mul;
 					data[i + 1] = (int)val;
@@ -610,7 +626,7 @@ int init_x11(void)
 	if(dpy) return 0;
 
 	/* if the server started from init, it probably won't have a DISPLAY env var
-	 * so we go on and add a default one.
+	 * so let's add a default one.
 	 */
 	if(!getenv("DISPLAY")) {
 		putenv("DISPLAY=:0.0");
@@ -742,7 +758,7 @@ void send_xevent(struct input_event *inp)
 			xevent.xclient.format = 16;
 
 			for(i=0; i<6; i++) {
-				float val = (float)evrel[i] * x11_sens * sensitivity;
+				float val = (float)evrel[i] * x11_sens * cfg.sensitivity;
 				xevent.xclient.data.s[i + 2] = (short)val;
 			}
 			xevent.xclient.data.s[0] = xevent.xclient.data.s[1] = 0;
@@ -1005,7 +1021,7 @@ void sig_handler(int s)
 {
 	switch(s) {
 	case SIGHUP:
-		init_dev();
+		read_cfg("/etc/spnavrc", &cfg);
 		break;
 
 	case SIGSEGV:
@@ -1038,51 +1054,4 @@ unsigned int msec_dif(struct timeval tv1, struct timeval tv2)
 	ds = tv2.tv_sec - tv1.tv_sec;
 	du = tv2.tv_usec - tv1.tv_usec;
 	return ds * 1000 + du / 1000;
-}
-
-int read_cfg(const char *fname)
-{
-	FILE *fp;
-	char buf[512];
-
-	if(!(fp = fopen(fname, "r"))) {
-		fprintf(stderr, "failed to open config file %s: %s. using defaults.\n", fname, strerror(errno));
-		return -1;
-	}
-
-	while(fgets(buf, sizeof buf, fp)) {
-		char *key_str, *val_str, *line = buf;
-		while(*line == ' ' || *line == '\t') line++;
-
-		if(!*line || *line == '\n' || *line == '\r' || *line == '#') {
-			continue;
-		}
-
-		if(!(key_str = strtok(line, " :=\n\t\r"))) {
-			fprintf(stderr, "invalid config line: %s, skipping.\n", line);
-			continue;
-		}
-		if(!(val_str = strtok(0, " :=\n\t\r"))) {
-			fprintf(stderr, "missing value for config key: %s\n", key_str);
-			continue;
-		}
-
-		if(!isdigit(val_str[0])) {
-			fprintf(stderr, "invalid value (%s), for key: %s. expected a number.\n", val_str, key_str);
-			continue;
-		}
-
-		if(strcmp(key_str, "dead-zone") == 0) {
-			dead_threshold = atoi(val_str);
-			printf("config: dead-zone = %d\n", dead_threshold);
-		} else if(strcmp(key_str, "sensitivity") == 0) {
-			sensitivity = atof(val_str);
-			printf("config: sensitivity = %.3f\n", sensitivity);
-		} else {
-			fprintf(stderr, "unrecognized config option: %s\n", key_str);
-		}
-	}
-
-	fclose(fp);
-	return 0;
 }

@@ -1,0 +1,42 @@
+#!/bin/sh
+
+setup_sysv_init() {
+	echo 'setting up sysv init'
+
+	rlvl=`cat /etc/inittab | grep initdefault | sed 's/^id://; s/:init.*$//'`
+	if [ $? != 0 -o -z "$rlvl" ]; then
+		echo 'default runlevel detection failed.'
+		rlvl=2
+	fi
+	echo "selected runlevel: $rlvl"
+	
+	if [ "$2" = 'remove' ]; then
+		rm -f /etc/init.d/spacenavd
+		rm -f /etc/rc${rlvl}.d/S99spacenavd
+	else
+		install -m 755 init_script /etc/init.d/spacenavd
+		cd /etc/rc${rlvl}.d
+		rm -f S99spacenavd
+		ln -s ../init.d/spacenavd S99spacenavd
+	fi
+}
+
+setup_bsd_init() {
+	echo 'setting up bsd init'
+	echo "BSD init setup not implemented yet, you'll have to do it manually."
+}
+
+(stat /etc/init.d && stat /etc/rc0.d) >/dev/null 2>/dev/null
+if [ $? = 0 ]; then
+	setup_sysv_init
+	exit 0
+fi
+
+(stat /etc/rc && stat /etc/rc.d) >/dev/null 2>/dev/null
+if [ $? = 0]; then
+	setup_bsd_init
+	exit 0
+fi
+
+echo "You're either using a non-standard init or this detection failed."
+echo "You'll have to setup your init, to start spacenavd, manually."
