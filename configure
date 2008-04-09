@@ -1,0 +1,82 @@
+#!/bin/sh
+
+echo 'configuring spacenavd...'
+
+PREFIX=/usr/local
+OPT=yes
+DBG=yes
+X11=yes
+
+for arg; do
+	case "$arg" in
+	--prefix=*)
+		value=`echo $arg | sed 's/--prefix=//'`
+		PREFIX=${value:-$prefix}
+		;;
+	
+	--enable-opt)
+		OPT=yes;;
+	--disable-opt)
+		OPT=no;;
+
+	--enable-debug)
+		DBG=yes;;
+	--disable-debug)
+		DBG=no;;
+	
+	--enable-x11)
+		X11=yes;;
+	--disable-x11)
+		X11=no;;
+
+	--help)
+		echo 'usage: ./configure [options]'
+		echo 'options:'
+		echo '  --prefix=<path>: installation path (default: /usr/local)'
+		echo '  --enable-x11: enable X11 communication mode (default)'
+		echo '  --disable-x11: disable X11 communication mode'
+		echo '  --enable-opt: enable speed optimizations (default)'
+		echo '  --disable-opt: disable speed optimizations'
+		echo '  --enable-debug: include debugging symbols (default)'
+		echo '  --disable-debug: do not include debugging symbols'
+		echo 'all invalid options are silently ignored'
+		exit 0
+		;;
+	esac
+done
+
+echo "  prefix: $PREFIX"
+echo "  optimize for speed: $OPT"
+echo "  include debugging symbols: $DBG"
+echo "  x11 communication method: $X11"
+echo ""
+
+if [ "$X11" = "no" ]; then
+	echo "WARNING: you have disabled the X11 interface, the resulting daemon \
+won't be compatible with applications written for the proprietary 3Dconnexion \
+daemon (3dxserv)!"
+	echo
+fi
+
+# create makefile
+echo 'creating makefile ...'
+echo "PREFIX = $PREFIX" >Makefile
+
+if [ "$DBG" = 'yes' ]; then
+	echo 'dbg = -g' >>Makefile
+fi
+
+if [ "$OPT" = 'yes' ]; then
+	echo 'opt = -O3' >>Makefile
+fi
+
+if [ "$X11" = 'yes' ]; then
+	echo 'x11 = -DUSE_X11' >>Makefile
+	echo 'xlib = -lX11' >>Makefile
+fi
+
+cat Makefile.in >>Makefile
+
+echo ''
+echo 'Done. You can now type make (or gmake) to compile spacenavd.'
+echo ''

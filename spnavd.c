@@ -566,7 +566,7 @@ void send_uevent(struct input_event *inp)
 	static struct timeval prev_motion_time;
 	struct client *citer;
 	int i, data[8];
-	unsigned int period;
+	unsigned int period = 0;
 
 	if(!lsock) return;
 
@@ -719,7 +719,7 @@ void send_xevent(struct input_event *inp)
 	int (*prev_xerr_handler)(Display*, XErrorEvent*);
 	int i;
 	XEvent xevent;
-	unsigned int period;
+	unsigned int period = 0;
 
 	if(!dpy) return;
 

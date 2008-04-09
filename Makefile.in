@@ -1,0 +1,28 @@
+obj = spnavd.o cfgfile.o
+bin = spacenavd
+ctl = spnavd_ctl
+
+CC = gcc
+INSTALL = install
+CFLAGS = -pedantic -Wall $(dbg) $(opt) $(x11)
+LDFLAGS = $(xlib) -lm
+
+$(bin): $(obj)
+	$(CC) $(CFLAGS) -o $@ $(obj) $(LDFLAGS)
+
+.PHONY: clean
+clean:
+	rm -f $(obj) $(bin)
+
+.PHONY: install
+install: $(bin)
+	$(INSTALL) -d $(PREFIX)/bin
+	$(INSTALL) -m 755 $(bin) $(PREFIX)/bin/$(bin)
+	$(INSTALL) -m 755 $(ctl) $(PREFIX)/bin/$(ctl)
+	./setup_init
+
+.PHONY: uninstall
+uninstall:
+	rm -f $(PREFIX)/bin/$(bin)
+	rm -f $(PREFIX)/bin/$(ctl)
+	./setup_init remove

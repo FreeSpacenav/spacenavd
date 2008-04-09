@@ -22,10 +22,10 @@ spacenavd - 0.3
   go through the X window system.
 
 3. Installation
-  If you have the dependencies installed, just run ``make'' to compile the
-  daemon, and ``make install'', to install it. The default installation prefix
-  is ``/usr/local''. If you wish to install somewhere else, just change the
-  PREFIX variable in the first line of the Makefile.
+  If you have the dependencies installed, just run ``./configure'' and then
+  ``make'' to compile the daemon, and ``make install'', to install it. The
+  default installation prefix is ``/usr/local''. If you wish to install
+  somewhere else, you may pass --prefix=/whatever to the configure script.
 
 4. Running spacenavd
   If your system uses SysV init, then everything should be set up to have
