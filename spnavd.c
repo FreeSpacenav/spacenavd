@@ -100,7 +100,7 @@ void sig_handler(int s);
 
 unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
 
-int dev_fd;
+int dev_fd = -1;
 char dev_name[128];
 unsigned char evtype_mask[(EV_MAX + 7) / 8];
 #define TEST_BIT(b, ar)	(ar[b / 8] & (1 << (b % 8)))
@@ -183,10 +183,7 @@ int main(int argc, char **argv)
 	signal(SIGUSR1, sig_handler);
 	signal(SIGUSR2, sig_handler);
 
-	/* initialize the input device and the X11 connection (if available) */
-	if(init_dev() == -1) {
-		return 1;
-	}
+	init_dev();
 	init_unix();
 #ifdef USE_X11
 	init_x11();
@@ -862,11 +859,15 @@ int open_dev(const char *path)
 
 	if(ioctl(dev_fd, EVIOCGBIT(0, sizeof(evtype_mask)), evtype_mask) == -1) {
 		perror("EVIOCGBIT ioctl failed\n");
+		close(dev_fd);
+		dev_fd = -1;
 		return -1;
 	}
 
 	if(!TEST_BIT(EV_REL, evtype_mask)) {
 		fprintf(stderr, "Wrong device, no relative events reported!\n");
+		close(dev_fd);
+		dev_fd = -1;
 		return -1;
 	}
 
@@ -1030,6 +1031,7 @@ void sig_handler(int s)
 	case SIGTERM:
 		close_x11();	/* call to avoid leaving garbage in the X server's root windows */
 		close_dev();
+		remove("/tmp/.spnavd.pid");
 		exit(0);
 
 #ifdef USE_X11

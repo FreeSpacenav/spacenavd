@@ -18,7 +18,16 @@ start)
 
 stop)
 	echo 'Stopping spacenavd daemon'
-	kill `pidof spacenavd`
+	# detect daemon's process id
+	pid=`cat /tmp/.spnavd.pid 2>/dev/null`
+	if [ $? != 0 ]; then
+		pid=`ps -e | grep spacenavd | awk '{ print $1 }'`
+		if [ -z "$pid" ]; then
+			echo 'spacenavd daemon is not running, nothing to do.'
+			exit 1
+		fi
+	fi
+	kill $pid
 	;;
 
 reload|restart|force-reload)

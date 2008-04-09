@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <ctype.h>
 #include <errno.h>
+#include <fcntl.h>
 #include "cfgfile.h"
 
 enum {TX, TY, TZ, RX, RY, RZ};
@@ -35,6 +36,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 {
 	FILE *fp;
 	char buf[512];
+	struct flock flk;
 
 	default_cfg(cfg);
 
@@ -42,6 +44,12 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		fprintf(stderr, "failed to open config file %s: %s. using defaults.\n", fname, strerror(errno));
 		return -1;
 	}
+
+	/* aquire shared read lock */
+	flk.l_type = F_RDLCK;
+	flk.l_start = flk.l_len = 0;
+	flk.l_whence = SEEK_SET;
+	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
 	while(fgets(buf, sizeof buf, fp)) {
 		int isnum;
@@ -104,6 +112,12 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		}
 	}
 
+	/* unlock */
+	flk.l_type = F_UNLCK;
+	flk.l_start = flk.l_len = 0;
+	flk.l_whence = SEEK_SET;
+	fcntl(fileno(fp), F_SETLK, &flk);
+
 	fclose(fp);
 	return 0;
 }
@@ -111,11 +125,18 @@ int read_cfg(const char *fname, struct cfg *cfg)
 int write_cfg(const char *fname, struct cfg *cfg)
 {
 	FILE *fp;
+	struct flock flk;
 
 	if(!(fp = fopen(fname, "w"))) {
 		fprintf(stderr, "failed to write config file %s: %s\n", fname, strerror(errno));
 		return -1;
 	}
+
+	/* aquire exclusive write lock */
+	flk.l_type = F_WRLCK;
+	flk.l_start = flk.l_len = 0;
+	flk.l_whence = SEEK_SET;
+	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
 	fprintf(fp, "# sensitivity is multiplied with every motion (1.0 normal).\n");
 	fprintf(fp, "sensitivity = %.3f\n\n", cfg->sensitivity);
@@ -140,6 +161,13 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		if(cfg->invert[5]) fputc('z', fp);
 		fputs("\n\n", fp);
 	}
+
+	/* unlock */
+	flk.l_type = F_UNLCK;
+	flk.l_start = flk.l_len = 0;
+	flk.l_whence = SEEK_SET;
+	fcntl(fileno(fp), F_SETLK, &flk);
+
 	fclose(fp);
 	return 0;
 }
