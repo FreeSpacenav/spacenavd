@@ -22,6 +22,7 @@ struct cfg {
 	float sensitivity;
 	int dead_threshold;
 	int invert[6];
+	int led;
 };
 
 void default_cfg(struct cfg *cfg);

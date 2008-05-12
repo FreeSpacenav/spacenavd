@@ -871,7 +871,9 @@ int open_dev(const char *path)
 		return -1;
 	}
 
-	set_led(1);
+	if(cfg.led) {
+		set_led(1);
+	}
 	return 0;
 }
 
@@ -1020,9 +1022,15 @@ char *get_dev_path(void)
  */
 void sig_handler(int s)
 {
+	int tmp;
+
 	switch(s) {
 	case SIGHUP:
+		tmp = cfg.led;
 		read_cfg("/etc/spnavrc", &cfg);
+		if(cfg.led != tmp) {
+			set_led(cfg.led);
+		}
 		break;
 
 	case SIGSEGV:

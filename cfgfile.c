@@ -29,6 +29,7 @@ void default_cfg(struct cfg *cfg)
 {
 	cfg->sensitivity = 1.0;
 	cfg->dead_threshold = 2;
+	cfg->led = 1;
 	memset(cfg->invert, 0, sizeof cfg->invert);
 }
 
@@ -107,6 +108,20 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				cfg->invert[TZ] = 1;
 			}
 
+		} else if(strcmp(key_str, "led") == 0) {
+			if(isnum) {
+				cfg->led = atoi(val_str);
+			} else {
+				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
+					cfg->led = 1;
+				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
+					cfg->led = 0;
+				} else {
+					fprintf(stderr, "invalid configuration value for %s, expected a boolean value.\n", key_str);
+					continue;
+				}
+			}
+
 		} else {
 			fprintf(stderr, "unrecognized config option: %s\n", key_str);
 		}
@@ -160,6 +175,11 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		if(cfg->invert[4]) fputc('y', fp);
 		if(cfg->invert[5]) fputc('z', fp);
 		fputs("\n\n", fp);
+	}
+
+	if(!cfg->led) {
+		fprintf(fp, "# disable led\n");
+		fprintf(fp, "led = 0\n\n");
 	}
 
 	/* unlock */
