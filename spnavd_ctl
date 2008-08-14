@@ -3,17 +3,17 @@
 # this script, starts and stops the communication between spacenavd and the
 # local X server. (:0).
 
-if [ $1 != 'x11' ]; then
+if [ "$1" != 'x11' ]; then
 	echo "the only valid control for the moment is x11 ($0 x11 start/stop)."
 	exit 1
 fi
 
-if [ -z $2 ]; then
+if [ -z "$2" ]; then
 	echo 'you must specify either "start" or "stop".'
 	exit 1
 fi
 
-if [ $2 = 'start' ]; then
+if [ "$2" = 'start' ]; then
 	# check to see there is a local X server running.
 	DISPLAY=":0"
 	xdpyinfo >/dev/null 2>/dev/null
@@ -23,7 +23,7 @@ if [ $2 = 'start' ]; then
 	fi
 	sig=-usr1
 
-elif [ $2 = "stop" ]; then
+elif [ "$2" = "stop" ]; then
 	sig=-usr2
 
 else
@@ -46,7 +46,7 @@ if [ $? = 0 ]; then
 	if [ $sig = '-usr1' ]; then
 		echo 'signalled spacenavd, it should now start sending X events.'
 	else
-		echo 'signalled spacenavd, stopped sending X events.'
+		echo 'signalled spacenavd to stop sending X events.'
 	fi
 else
 	echo 'sending signal to spacenavd failed.'

@@ -7,6 +7,8 @@ OPT=yes
 DBG=yes
 X11=yes
 
+srcdir="`dirname "$0"`"
+
 for arg; do
 	case "$arg" in
 	--prefix=*)
@@ -58,9 +60,10 @@ daemon (3dxserv)!"
 	echo
 fi
 
-# create makefile
-echo 'creating makefile ...'
+# create Makefile
+echo 'creating Makefile ...'
 echo "PREFIX = $PREFIX" >Makefile
+echo "srcdir = $srcdir" >>Makefile
 
 if [ "$DBG" = 'yes' ]; then
 	echo 'dbg = -g' >>Makefile
@@ -75,7 +78,7 @@ if [ "$X11" = 'yes' ]; then
 	echo 'xlib = -lX11' >>Makefile
 fi
 
-cat Makefile.in >>Makefile
+cat "$srcdir/Makefile.in" >>Makefile
 
 echo ''
 echo 'Done. You can now type make (or gmake) to compile spacenavd.'

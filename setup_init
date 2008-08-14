@@ -26,6 +26,18 @@ setup_bsd_init() {
 	echo "BSD init setup not implemented yet, you'll have to do it manually."
 }
 
+
+if [ "$1" = '--no-install' ]; then
+	echo
+	echo --- Spacenavd installation complete ---
+	echo To have spacenavd start automatically at bootup, you must add an appropriate
+	echo "init script. Refer to your system's manual for details on how to do that."
+	echo An example init script is available in the spacenavd source directory.
+	echo If you wish to attempt and install an init script automatically, run ./setup_init
+	echo
+	exit 0
+fi
+
 (stat /etc/init.d && stat /etc/rc0.d) >/dev/null 2>/dev/null
 if [ $? = 0 ]; then
 	setup_sysv_init
@@ -33,7 +45,7 @@ if [ $? = 0 ]; then
 fi
 
 (stat /etc/rc && stat /etc/rc.d) >/dev/null 2>/dev/null
-if [ $? = 0]; then
+if [ $? = 0 ]; then
 	setup_bsd_init
 	exit 0
 fi

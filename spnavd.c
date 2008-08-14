@@ -688,6 +688,10 @@ void close_x11(void)
 
 	if(!dpy) return;
 
+	if(verbose) {
+		printf("closing X11 connection to display \"%s\"\n", getenv("DISPLAY"));
+	}
+
 	/* first delete all the CommandEvent properties from all root windows */
 	scr_count = ScreenCount(dpy);
 	for(i=0; i<scr_count; i++) {
