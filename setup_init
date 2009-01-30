@@ -1,7 +1,6 @@
 #!/bin/sh
 
 setup_sysv_init() {
-	echo 'setting up sysv init'
 
 	rlvl=`cat /etc/inittab | grep initdefault | sed 's/^id://; s/:init.*$//'`
 	if [ $? != 0 -o -z "$rlvl" ]; then
@@ -10,10 +9,12 @@ setup_sysv_init() {
 	fi
 	echo "selected runlevel: $rlvl"
 	
-	if [ "$2" = 'remove' ]; then
+	if [ "$1" = 'remove' ]; then
+		echo 'removing sysv init script'
 		rm -f /etc/init.d/spacenavd
 		rm -f /etc/rc${rlvl}.d/S99spacenavd
 	else
+		echo 'setting up sysv init script'
 		install -m 755 init_script /etc/init.d/spacenavd
 		cd /etc/rc${rlvl}.d
 		rm -f S99spacenavd
@@ -38,15 +39,13 @@ if [ "$1" = '--no-install' ]; then
 	exit 0
 fi
 
-(stat /etc/init.d && stat /etc/rc0.d) >/dev/null 2>/dev/null
-if [ $? = 0 ]; then
-	setup_sysv_init
+if [ -d /etc/init.d -a -d /etc/rc0.d ]; then
+	setup_sysv_init $*
 	exit 0
 fi
 
-(stat /etc/rc && stat /etc/rc.d) >/dev/null 2>/dev/null
-if [ $? = 0 ]; then
-	setup_bsd_init
+if [ -f /etc/rc -a -d /etc/rc.d ]; then
+	setup_bsd_init $*
 	exit 0
 fi
 

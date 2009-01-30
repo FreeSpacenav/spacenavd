@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007 John Tsiombikas <nuclear@siggraph.org>
+Copyright (C) 2007-2009 John Tsiombikas <nuclear@siggraph.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -33,6 +33,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <linux/types.h>
 #include <linux/input.h>
+
+#define SOCK_NAME	"/var/run/spnav.sock"
+#define PIDFILE		"/var/run/spnavd.pid"
+#define LOGFILE		"/var/log/spnavd.log"
 
 /* sometimes the rotation events are missing from linux/input.h */
 #ifndef REL_RX
@@ -233,7 +237,7 @@ void daemonize(void)
 	}
 
 	open("/dev/zero", O_RDONLY);
-	if(open("/tmp/spnav.log", O_WRONLY | O_CREAT | O_TRUNC, 0644) == -1) {
+	if(open(LOGFILE, O_WRONLY | O_CREAT | O_TRUNC, 0644) == -1) {
 		open("/dev/null", O_WRONLY);
 	}
 	dup(1);
@@ -247,7 +251,7 @@ int write_pid_file(void)
 	FILE *fp;
 	int pid = getpid();
 
-	if(!(fp = fopen("/tmp/.spnavd.pid", "w"))) {
+	if(!(fp = fopen(PIDFILE, "w"))) {
 		return -1;
 	}
 	fprintf(fp, "%d\n", pid);
@@ -515,7 +519,6 @@ int init_dev(void)
 }
 
 
-#define SOCK_NAME	"/tmp/.spnav.sock"
 int init_unix(void)
 {
 	int s;
@@ -1043,7 +1046,7 @@ void sig_handler(int s)
 	case SIGTERM:
 		close_x11();	/* call to avoid leaving garbage in the X server's root windows */
 		close_dev();
-		remove("/tmp/.spnavd.pid");
+		remove(PIDFILE);
 		exit(0);
 
 #ifdef USE_X11

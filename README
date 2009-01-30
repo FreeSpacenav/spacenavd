@@ -1,4 +1,4 @@
-spacenavd - 0.3
+spacenavd - 0.4
 ---------------
 
 1. About
@@ -28,10 +28,10 @@ spacenavd - 0.3
   somewhere else, you may pass --prefix=/whatever to the configure script.
 
 4. Running spacenavd
-  If your system uses SysV init, then everything should be set up to have
-  spacenavd start automatically during system startup. However, for now, you
-  won't have to reboot, just type ``/etc/init.d/spacenavd start'' as root, to
-  start the daemon immediately.
+  If your system uses SysV init, then you may run the supplied ``setup_init''
+  script, and everything should be set up to have spacenavd start automatically
+  during system startup. However, for now, you won't have to reboot, just type
+  ``/etc/init.d/spacenavd start'' as root, to start the daemon immediately.
 
   If your system uses BSD init (you can tell if you *don't* have a series of
   directories called rc0.d, rc1.d, and so on, in /etc), then you'll have to
@@ -59,6 +59,11 @@ spacenavd - 0.3
   If you're having trouble running spacenavd, read the up to date FAQ on the
   spacenav website: http://spacenav.sourceforge.net/faq.html
 
-  If you're still having trouble, send a description of your problem at
-  nuclear@member.fsf.org along with a copy of your /tmp/spnav.log and any other
-  relevant information.
+  If you're still having trouble, send a description of your problem to the
+  spacenav-users mailing list: spacenav-users@lists.sourceforge.net
+  along with a copy of your /var/log/spnavd.log and any other relevant
+  information.
+
+7. License
+  This program is released under the terms of the GNU GPLv3, see COPYING for
+  details.
