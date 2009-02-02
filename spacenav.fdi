@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="ISO-8859-1"?>
+<deviceinfo version="0.2">
+    <device>
+        <match key="info.product" contains="3Dconnexion">
+            <remove key="input.x11_driver"/>
+        </match>
+    </device>
+</deviceinfo>
