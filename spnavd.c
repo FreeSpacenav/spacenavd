@@ -998,6 +998,7 @@ char *get_dev_path(void)
 			if(errno != ENOENT) {
 				fprintf(stderr, "failed to open %s: %s. this might hinder device detection\n",
 						path, strerror(errno));
+				continue;
 			} else {
 				break;
 			}
