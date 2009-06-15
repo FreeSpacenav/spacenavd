@@ -1045,7 +1045,9 @@ void sig_handler(int s)
 		fprintf(stderr, "Segmentation fault caught, trying to exit gracefully\n");
 	case SIGINT:
 	case SIGTERM:
+#ifdef USE_X11
 		close_x11();	/* call to avoid leaving garbage in the X server's root windows */
+#endif
 		close_dev();
 		remove(PIDFILE);
 		exit(0);
