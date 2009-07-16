@@ -851,6 +851,8 @@ void remove_client_window(Window win)
 
 int open_dev(const char *path)
 {
+	int grab = 1;
+
 	if((dev_fd = open(path, O_RDWR)) == -1) {
 		if((dev_fd = open(path, O_RDONLY)) == -1) {
 			perror("failed to open device");
@@ -876,6 +878,11 @@ int open_dev(const char *path)
 		close(dev_fd);
 		dev_fd = -1;
 		return -1;
+	}
+
+	/* try to grab the device */
+	if(ioctl(dev_fd, EVIOCGRAB, &grab) == -1) {
+		perror("failed to grab the spacenav device");
 	}
 
 	if(cfg.led) {
