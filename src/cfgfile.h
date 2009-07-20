@@ -18,10 +18,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CFGFILE_H_
 #define CFGFILE_H_
 
+#define MAX_BUTTONS		64
+
 struct cfg {
 	float sensitivity;
 	int dead_threshold;
 	int invert[6];
+	int map_axis[6];
+	int map_button[MAX_BUTTONS];
 	int led;
 };
 

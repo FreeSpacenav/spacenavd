@@ -1,4 +1,5 @@
-obj = spnavd.o cfgfile.o
+src = $(wildcard src/*.c)
+obj = $(src:.c=.o)
 bin = spacenavd
 ctl = spnavd_ctl
 

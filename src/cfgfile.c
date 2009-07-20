@@ -27,10 +27,22 @@ enum {TX, TY, TZ, RX, RY, RZ};
 
 void default_cfg(struct cfg *cfg)
 {
+	int i;
+	static const int axmap[] = {0, 2, 1, 3, 5, 4};
+	static const int axinv[] = {0, 1, 1, 0, 1, 1};
+
 	cfg->sensitivity = 1.0;
 	cfg->dead_threshold = 2;
 	cfg->led = 1;
-	memset(cfg->invert, 0, sizeof cfg->invert);
+
+	for(i=0; i<6; i++) {
+		cfg->invert[i] = axinv[i];
+		cfg->map_axis[i] = axmap[i];
+	}
+
+	for(i=0; i<MAX_BUTTONS; i++) {
+		cfg->map_button[i] = i;
+	}
 }
 
 int read_cfg(const char *fname, struct cfg *cfg)
@@ -88,24 +100,24 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			if(strchr(val_str, 'x')) {
-				cfg->invert[RX] = 1;
+				cfg->invert[RX] = !cfg->invert[RX];
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[RY] = 1;
+				cfg->invert[RY] = !cfg->invert[RY];
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[RZ] = 1;
+				cfg->invert[RZ] = !cfg->invert[RZ];
 			}
 
 		} else if(strcmp(key_str, "invert-trans") == 0) {
 			if(strchr(val_str, 'x')) {
-				cfg->invert[TX] = 1;
+				cfg->invert[TX] = !cfg->invert[TX];
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[TY] = 1;
+				cfg->invert[TY] = !cfg->invert[TY];
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[TZ] = 1;
+				cfg->invert[TZ] = !cfg->invert[TZ];
 			}
 
 		} else if(strcmp(key_str, "led") == 0) {
