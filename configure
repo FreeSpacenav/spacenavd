@@ -6,6 +6,10 @@ DBG=yes
 X11=yes
 VER=`head -1 README | sed 's/^.*- //'`
 
+if echo $VER | grep '$Rev' >/dev/null; then
+	VER=svn-r`echo $VER | awk '{print $2}' | sed 's/$//g'`
+fi
+
 echo "configuring spacenavd - $VER"
 
 srcdir="`dirname "$0"`"
