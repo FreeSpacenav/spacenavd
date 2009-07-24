@@ -15,7 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
+#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -30,6 +30,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto_unix.h"
 #include "proto_x11.h"
 
+static void cleanup(void);
 static void daemonize(void);
 static int write_pid_file(void);
 static void handle_events(fd_set *rset);
@@ -74,6 +75,8 @@ int main(int argc, char **argv)
 	}
 	write_pid_file();
 
+	puts("Spacenav daemon " VERSION);
+
 	read_cfg("/etc/spnavrc", &cfg);
 
 	if(init_clients() == -1) {
@@ -94,6 +97,8 @@ int main(int argc, char **argv)
 #ifdef USE_X11
 	init_x11();
 #endif
+
+	atexit(cleanup);
 
 	for(;;) {
 		fd_set rset;
@@ -146,6 +151,16 @@ int main(int argc, char **argv)
 		}
 	}
 	return 0;	/* unreachable */
+}
+
+static void cleanup(void)
+{
+#ifdef USE_X11
+	close_x11();	/* call to avoid leaving garbage in the X server's root windows */
+#endif
+	close_unix();
+	shutdown_dev();
+	remove(PIDFILE);
 }
 
 static void daemonize(void)
@@ -241,11 +256,6 @@ static void sig_handler(int s)
 		fprintf(stderr, "Segmentation fault caught, trying to exit gracefully\n");
 	case SIGINT:
 	case SIGTERM:
-#ifdef USE_X11
-		close_x11();	/* call to avoid leaving garbage in the X server's root windows */
-#endif
-		shutdown_dev();
-		remove(PIDFILE);
 		exit(0);
 
 #ifdef USE_X11

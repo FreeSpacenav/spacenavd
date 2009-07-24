@@ -5,7 +5,7 @@ ctl = spnavd_ctl
 
 CC = gcc
 INSTALL = install
-CFLAGS = -pedantic -Wall $(dbg) $(opt) $(x11)
+CFLAGS = -pedantic -Wall $(dbg) $(opt)
 LDFLAGS = $(xlib)
 
 $(bin): $(obj)
@@ -23,13 +23,15 @@ install: $(bin)
 	$(INSTALL) -d $(PREFIX)/bin
 	$(INSTALL) -m 755 $(bin) $(PREFIX)/bin/$(bin)
 	$(INSTALL) -m 755 $(srcdir)/$(ctl) $(PREFIX)/bin/$(ctl)
-	[ -d /etc/hal/fdi/policy ] && \
-		$(INSTALL) -m 644 spacenav.fdi /etc/hal/fdi/policy/spacenav.fdi
 	cd $(srcdir) && ./setup_init --no-install
+
+#	[ -d /etc/hal/fdi/policy ] && \
+#		$(INSTALL) -m 644 spacenav.fdi /etc/hal/fdi/policy/spacenav.fdi
 
 .PHONY: uninstall
 uninstall:
 	rm -f $(PREFIX)/bin/$(bin)
 	rm -f $(PREFIX)/bin/$(ctl)
 	rm -f /etc/hal/fdi/policy/spacenav.fdi
+
 #	cd $(srcdir) && ./setup_init remove

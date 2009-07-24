@@ -1,11 +1,12 @@
 #!/bin/sh
 
-echo 'configuring spacenavd...'
-
 PREFIX=/usr/local
 OPT=yes
 DBG=yes
 X11=yes
+VER=`head -1 README | sed 's/^.*- //'`
+
+echo "configuring spacenavd - $VER"
 
 srcdir="`dirname "$0"`"
 
@@ -64,6 +65,7 @@ fi
 echo 'creating Makefile ...'
 echo "PREFIX = $PREFIX" >Makefile
 echo "srcdir = $srcdir" >>Makefile
+echo "ver = $VER" >>Makefile
 
 if [ "$DBG" = 'yes' ]; then
 	echo 'dbg = -g' >>Makefile
@@ -74,11 +76,24 @@ if [ "$OPT" = 'yes' ]; then
 fi
 
 if [ "$X11" = 'yes' ]; then
-	echo 'x11 = -DUSE_X11' >>Makefile
 	echo 'xlib = -lX11' >>Makefile
 fi
 
 cat "$srcdir/Makefile.in" >>Makefile
+
+
+# create config.h
+echo 'creating config.h'
+echo '#ifndef CONFIG_H_' >src/config.h
+echo '#define CONFIG_H_' >>src/config.h
+echo >>src/config.h
+if [ "$X11" = yes ]; then
+	echo '#define USE_X11' >>src/config.h
+	echo >>src/config.h
+fi
+echo '#define VERSION "'$VER'"' >>src/config.h
+echo >>src/config.h
+echo '#endif	/* CONFIG_H_ */' >>src/config.h
 
 echo ''
 echo 'Done. You can now type make (or gmake) to compile spacenavd.'

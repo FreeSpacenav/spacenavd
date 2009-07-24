@@ -1,4 +1,4 @@
-spacenavd - 0.4
+spacenavd - $Rev$
 ---------------
 
 1. About
@@ -37,16 +37,6 @@ spacenavd - 0.4
   directories called rc0.d, rc1.d, and so on, in /etc), then you'll have to
   follow your init documentation and set this up yourself. You may be able to
   use the provided init_script file as a starting point.
-
-  Depending on how your system startup process is set up, it might be the case
-  that the spacenavd daemon starts before the X server (for instance if you
-  don't use a graphical login). In that case the daemon will start properly, but
-  won't connect to the X server until explicitly told to do so. You can do that
-  by running ``spnavd_ctl x11 start'' as root, or by using the graphical
-  spnavcfg program. You don't really want to have to do that all the time
-  though, so it's a better idea to add the aforementioned spnavd_ctl command to
-  either your ~/.xsession or ~/.xinitrd file, or the system-wide
-  /etc/X11/Xsession file.
 
 5. Configuration
   The spacenavd daemon reads a number of options from the /etc/spnavrc file. If
