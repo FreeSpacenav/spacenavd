@@ -1,9 +1,36 @@
 #!/bin/sh
 
+test_kver() {
+	req_major=`echo $1 | awk -F . '{ print $1 }'`
+	req_minor=`echo $1 | awk -F . '{ print $2 }'`
+	req_rev=`echo $1 | awk -F . '{ print $3 }'`
+
+	linux_rev=`uname -r`
+	kver_major=`echo $linux_rev | awk -F . '{ print $1 }'`
+	kver_minor=`echo $linux_rev | awk -F . '{ print $2 }'`
+	kver_rev=`echo $linux_rev | awk -F . '{ print $3 }'`
+
+	if [ "$kver_major" -lt "$req_major" ]; then
+		return 1
+	fi
+	if [ "$kver_major" = "$req_major" ]; then
+		if [ "$kver_minor" -lt "$req_minor" ]; then
+			return 1
+		fi
+
+		if [ "$kver_minor" = "$req_minor" -a "$kver_rev" -lt "$req_rev" ]; then
+			return 1
+		fi
+	fi
+	return 0
+}
+
+
 PREFIX=/usr/local
 OPT=yes
 DBG=yes
 X11=yes
+HOTPLUG=yes
 VER=`head -1 README | sed 's/^.*- //'`
 
 if echo $VER | grep '$Rev' >/dev/null; then
@@ -12,8 +39,25 @@ fi
 
 echo "configuring spacenavd - $VER"
 
+# linux check
+if [ `uname -s` != Linux ]; then
+	echo 'This spacenav driver only works on linux at the moment.'
+	echo "If you would like to help porting it to " `uname -s` ", your help is \
+most welcome. Please check out the README file for details on how you can join \
+us and contribute to the project."
+	exit 1
+fi
+
+# NETLINK_KOBJECT_UEVENT used for hotplug detection requires 2.6.10
+if test_kver 2.6.10; then
+	HOTPLUG=yes
+else
+	HOTPLUG=no
+fi
+
 srcdir="`dirname "$0"`"
 
+# process arguments
 for arg; do
 	case "$arg" in
 	--prefix=*)
@@ -36,12 +80,19 @@ for arg; do
 	--disable-x11)
 		X11=no;;
 
+	--enable-hotplug)
+		HOTPLUG=yes;;
+	--disable-hotplug)
+		HOTPLUG=no;;
+
 	--help)
 		echo 'usage: ./configure [options]'
 		echo 'options:'
 		echo '  --prefix=<path>: installation path (default: /usr/local)'
 		echo '  --enable-x11: enable X11 communication mode (default)'
 		echo '  --disable-x11: disable X11 communication mode'
+		echo '  --enable-hotplug: enable hotplug using NETLINK_KOBJECT_UEVENT (default)'
+		echo '  --disable-hotplug: disable hotplug, fallback to polling for the device'
 		echo '  --enable-opt: enable speed optimizations (default)'
 		echo '  --disable-opt: disable speed optimizations'
 		echo '  --enable-debug: include debugging symbols (default)'
@@ -56,6 +107,7 @@ echo "  prefix: $PREFIX"
 echo "  optimize for speed: $OPT"
 echo "  include debugging symbols: $DBG"
 echo "  x11 communication method: $X11"
+echo "  use hotplug: $HOTPLUG"
 echo ""
 
 if [ "$X11" = "no" ]; then
@@ -93,6 +145,10 @@ echo '#define CONFIG_H_' >>src/config.h
 echo >>src/config.h
 if [ "$X11" = yes ]; then
 	echo '#define USE_X11' >>src/config.h
+	echo >>src/config.h
+fi
+if [ "$HOTPLUG" = yes ]; then
+	echo '#define USE_NETLINK' >>src/config.h
 	echo >>src/config.h
 fi
 echo '#define VERSION "'$VER'"' >>src/config.h

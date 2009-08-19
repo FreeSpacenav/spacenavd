@@ -28,7 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <sys/wait.h>
 #include <sys/time.h>
+#ifdef USE_NETLINK
 #include <linux/netlink.h>
+#endif
 #include <linux/types.h>
 #include <linux/input.h>
 #include "dev.h"
@@ -126,7 +128,9 @@ int handle_hotplug(void)
 
 static int con_hotplug(void)
 {
-	int s;
+	int s = -1;
+
+#ifdef USE_NETLINK
 	struct sockaddr_nl addr;
 
 	if((s = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT)) == -1) {
@@ -144,6 +148,7 @@ static int con_hotplug(void)
 		close(s);
 		return -1;
 	}
+#endif	/* USE_NETLINK */
 
 	return s;
 }
