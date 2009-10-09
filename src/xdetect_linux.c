@@ -17,6 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "config.h"
+
+#ifdef USE_X11
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -145,3 +147,7 @@ int handle_xdet_events(fd_set *rset)
 
 	return -1;
 }
+
+#else
+int spacenavd_xdetect_linux_shut_up_empty_source_warning;
+#endif	/* USE_X11 */

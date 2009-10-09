@@ -17,6 +17,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "config.h"
+
+#ifdef USE_X11
 #include <stdio.h>
 #include <stdlib.h>
 #include "proto_x11.h"
@@ -313,3 +315,6 @@ static int catch_badwin(Display *dpy, XErrorEvent *err)
 	return 0;
 }
 
+#else
+int spacenavd_proto_x11_shut_up_empty_source_warning;
+#endif	/* USE_X11 */

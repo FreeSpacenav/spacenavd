@@ -28,7 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dev.h"
 #include "client.h"
 #include "proto_unix.h"
+#ifdef USE_X11
 #include "proto_x11.h"
+#endif
 
 static void cleanup(void);
 static void daemonize(void);
