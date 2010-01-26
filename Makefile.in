@@ -5,7 +5,7 @@ ctl = spnavd_ctl
 
 CC = gcc
 INSTALL = install
-CFLAGS = -pedantic -Wall $(dbg) $(opt)
+CFLAGS = -pedantic -Wall $(dbg) $(opt) -fno-strict-aliasing
 LDFLAGS = $(xlib)
 
 $(bin): $(obj)

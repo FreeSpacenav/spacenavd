@@ -5,7 +5,7 @@ test_kver() {
 	req_minor=`echo $1 | awk -F . '{ print $2 }'`
 	req_rev=`echo $1 | awk -F . '{ print $3 }'`
 
-	linux_rev=`uname -r`
+	linux_rev=`uname -r | sed 's/-.*//'`
 	kver_major=`echo $linux_rev | awk -F . '{ print $1 }'`
 	kver_minor=`echo $linux_rev | awk -F . '{ print $2 }'`
 	kver_rev=`echo $linux_rev | awk -F . '{ print $3 }'`
