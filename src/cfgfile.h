@@ -19,12 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef CFGFILE_H_
 #define CFGFILE_H_
 
-#include "config.h"
-
 #define MAX_BUTTONS		64
 
 struct cfg {
-	float sensitivity;
+	float sensitivity, sens_trans, sens_rot;
 	int dead_threshold;
 	int invert[6];
 	int map_axis[6];

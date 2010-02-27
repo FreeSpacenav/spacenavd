@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef USE_X11
 #include <stdio.h>
 #include <stdlib.h>
+#include <setjmp.h>
 #include "proto_x11.h"
 #include "client.h"
 #include "spnavd.h"
@@ -34,7 +35,8 @@ enum cmd_msg {
 };
 
 
-static int catch_badwin(Display *dpy, XErrorEvent *err);
+static int xerr(Display *dpy, XErrorEvent *err);
+static int xioerr(Display *dpy);
 
 static Display *dpy;
 static Window win;
@@ -46,6 +48,8 @@ static Atom xa_event_motion, xa_event_bpress, xa_event_brelease, xa_event_cmd;
  * to keep it global for all X clients.
  */
 static float x11_sens = 1.0;
+
+static jmp_buf jbuf;
 
 
 int init_x11(void)
@@ -77,6 +81,14 @@ int init_x11(void)
 		xdet_start();
 		return -1;
 	}
+
+	XSetErrorHandler(xerr);
+	XSetIOErrorHandler(xioerr);
+
+	if(setjmp(jbuf)) {
+		return -1;
+	}
+
 	scr_count = ScreenCount(dpy);
 	screen = DefaultScreen(dpy);
 	root = RootWindow(dpy, screen);
@@ -127,22 +139,22 @@ void close_x11(void)
 	int i, scr_count;
 	struct client *cnode;
 
-	if(!dpy) return;
+	if(dpy && setjmp(jbuf) == 0) {
+		if(verbose) {
+			printf("closing X11 connection to display \"%s\"\n", getenv("DISPLAY"));
+		}
 
-	if(verbose) {
-		printf("closing X11 connection to display \"%s\"\n", getenv("DISPLAY"));
+		/* first delete all the CommandEvent properties from all root windows */
+		scr_count = ScreenCount(dpy);
+		for(i=0; i<scr_count; i++) {
+			Window root = RootWindow(dpy, i);
+			XDeleteProperty(dpy, root, xa_event_cmd);
+		}
+
+		XDestroyWindow(dpy, win);
+		XCloseDisplay(dpy);
+		dpy = 0;
 	}
-
-	/* first delete all the CommandEvent properties from all root windows */
-	scr_count = ScreenCount(dpy);
-	for(i=0; i<scr_count; i++) {
-		Window root = RootWindow(dpy, i);
-		XDeleteProperty(dpy, root, xa_event_cmd);
-	}
-
-	XDestroyWindow(dpy, win);
-	XCloseDisplay(dpy);
-	dpy = 0;
 
 	/* also remove all x11 clients from the client list */
 	cnode = first_client();
@@ -164,18 +176,13 @@ int get_x11_socket(void)
 void send_xevent(spnav_event *ev, struct client *c)
 {
 	int i;
-	int (*prev_xerr_handler)(Display*, XErrorEvent*);
 	XEvent xevent;
 
 	if(!dpy) return;
 
-	/* If any of the registered clients exit without notice, we can get a
-	 * BadWindow exception. Thus we must install a custom handler to avoid
-	 * crashing the daemon when that happens. Also catch_badwin (see below)
-	 * removes that client from the list, to avoid perpetually trying to send
-	 * events to an invalid window.
-	 */
-	prev_xerr_handler = XSetErrorHandler(catch_badwin);
+	if(setjmp(jbuf)) {
+		return;
+	}
 
 	xevent.type = ClientMessage;
 	xevent.xclient.send_event = False;
@@ -206,12 +213,7 @@ void send_xevent(spnav_event *ev, struct client *c)
 	}
 
 	XSendEvent(dpy, get_client_window(c), False, 0, &xevent);
-
-	/* we *must* sync at this point, otherwise, a potential error may arrive
-	 * after we remove the error handler and crash the daemon.
-	 */
-	XSync(dpy, False);
-	XSetErrorHandler(prev_xerr_handler);
+	XFlush(dpy);
 }
 
 int handle_xevents(fd_set *rset)
@@ -225,6 +227,10 @@ int handle_xevents(fd_set *rset)
 
 	/* process any pending X events */
 	if(FD_ISSET(ConnectionNumber(dpy), rset)) {
+		if(setjmp(jbuf)) {
+			return 0;
+		}
+
 		while(XPending(dpy)) {
 			XEvent xev;
 			XNextEvent(dpy, &xev);
@@ -301,17 +307,39 @@ void remove_client_window(Window win)
 }
 
 
-/* X11 error handler for bad-windows */
-static int catch_badwin(Display *dpy, XErrorEvent *err)
+/* X11 error handler */
+static int xerr(Display *dpy, XErrorEvent *err)
 {
-	char buf[256];
+	char buf[512];
+
+	if(verbose) {
+		fprintf(stderr, "xerr(%p, %p)\n", (void*)dpy, (void*)err);
+	}
 
 	if(err->error_code == BadWindow) {
+		/* we may get a BadWindow error when trying to send events to
+		 * clients that have disconnected in the meanwhile.
+		 */
 		remove_client_window((Window)err->resourceid);
 	} else {
 		XGetErrorText(dpy, err->error_code, buf, sizeof buf);
 		fprintf(stderr, "Caught unexpected X error: %s\n", buf);
 	}
+	return 0;
+}
+
+/* X11 I/O error handler
+ * This function must not return or xlib will abort.
+ */
+static int xioerr(Display *display)
+{
+	fprintf(stderr, "Lost the X server!\n");
+	dpy = 0;
+	close_x11();
+	xdet_start();
+
+	longjmp(jbuf, 1);
+
 	return 0;
 }
 

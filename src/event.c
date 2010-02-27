@@ -55,9 +55,7 @@ void process_input(struct dev_input *inp)
 		inp->idx = cfg.map_axis[inp->idx];
 		sign = cfg.invert[inp->idx] ? -1 : 1;
 
-		if(cfg.sensitivity != 1.0) {
-			inp->val = (int)((float)inp->val * cfg.sensitivity);
-		}
+		inp->val = (int)((float)inp->val * cfg.sensitivity * (inp->idx < 3 ? cfg.sens_trans : cfg.sens_rot));
 
 		ev.type = EVENT_MOTION;
 		ev.motion.data = (int*)&ev.motion.x;
@@ -71,7 +69,7 @@ void process_input(struct dev_input *inp)
 			ev_pending = 0;
 		}
 		inp->idx = cfg.map_button[inp->idx];
-		
+
 		ev.type = EVENT_BUTTON;
 		ev.button.press = inp->val;
 		ev.button.bnum = inp->idx;

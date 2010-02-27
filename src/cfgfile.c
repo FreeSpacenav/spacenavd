@@ -16,7 +16,6 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -27,19 +26,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 enum {TX, TY, TZ, RX, RY, RZ};
 
+static const int def_axmap[] = {0, 2, 1, 3, 5, 4};
+static const int def_axinv[] = {0, 1, 1, 0, 1, 1};
+
 void default_cfg(struct cfg *cfg)
 {
 	int i;
-	static const int axmap[] = {0, 2, 1, 3, 5, 4};
-	static const int axinv[] = {0, 1, 1, 0, 1, 1};
 
-	cfg->sensitivity = 1.0;
+	cfg->sensitivity = cfg->sens_trans = cfg->sens_rot = 1.0;
 	cfg->dead_threshold = 2;
 	cfg->led = 1;
 
 	for(i=0; i<6; i++) {
-		cfg->invert[i] = axinv[i];
-		cfg->map_axis[i] = axmap[i];
+		cfg->invert[i] = def_axinv[i];
+		cfg->map_axis[i] = def_axmap[i];
 	}
 
 	for(i=0; i<MAX_BUTTONS; i++) {
@@ -100,6 +100,20 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			cfg->sensitivity = atof(val_str);
 
+		} else if(strcmp(key_str, "sensitivity-translation") == 0) {
+			if(!isnum) {
+				fprintf(stderr, "invalid configuration value for %s, expected a number.\n", key_str);
+				continue;
+			}
+			cfg->sens_trans = atof(val_str);
+
+		} else if(strcmp(key_str, "sensitivity-rotation") == 0) {
+			if(!isnum) {
+				fprintf(stderr, "invalid configuration value for %s, expected a number.\n", key_str);
+				continue;
+			}
+			cfg->sens_rot = atof(val_str);
+
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			if(strchr(val_str, 'x')) {
 				cfg->invert[RX] = !cfg->invert[RX];
@@ -120,6 +134,30 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			if(strchr(val_str, 'z')) {
 				cfg->invert[TZ] = !cfg->invert[TZ];
+			}
+
+		} else if(strcmp(key_str, "swap-yz") == 0) {
+			int i, swap_yz = 0;
+
+			if(isnum) {
+				swap_yz = atoi(val_str);
+			} else {
+				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
+					swap_yz = 1;
+				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
+					swap_yz = 0;
+				} else {
+					fprintf(stderr, "invalid configuration value for %s, expected a boolean value.\n", key_str);
+					continue;
+				}
+			}
+
+			for(i=0; i<6; i++) {
+				if(swap_yz) {
+					cfg->map_axis[i] = i;
+				} else {
+					cfg->map_axis[i] = def_axmap[i];
+				}
 			}
 
 		} else if(strcmp(key_str, "led") == 0) {
@@ -170,26 +208,33 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	fprintf(fp, "# sensitivity is multiplied with every motion (1.0 normal).\n");
 	fprintf(fp, "sensitivity = %.3f\n\n", cfg->sensitivity);
 
+	fprintf(fp, "# separate sensitivity for rotation and translation.\n");
+	fprintf(fp, "sensitivity-translation = %.3f\n", cfg->sens_trans);
+	fprintf(fp, "sensitivity-rotation = %.3f\n\n", cfg->sens_rot);
+
 	fprintf(fp, "# dead zone; any motion less than this number, is discarded as noise.\n");
 	fprintf(fp, "dead-zone = %d\n\n", cfg->dead_threshold);
 
 	if(cfg->invert[0] || cfg->invert[1] || cfg->invert[2]) {
 		fprintf(fp, "# invert translations on some axes.\n");
 		fprintf(fp, "invert-trans = ");
-		if(cfg->invert[0]) fputc('x', fp);
-		if(cfg->invert[1]) fputc('y', fp);
-		if(cfg->invert[2]) fputc('z', fp);
+		if(cfg->invert[0] != def_axinv[0]) fputc('x', fp);
+		if(cfg->invert[1] != def_axinv[1]) fputc('y', fp);
+		if(cfg->invert[2] != def_axinv[2]) fputc('z', fp);
 		fputs("\n\n", fp);
 	}
 
 	if(cfg->invert[3] || cfg->invert[4] || cfg->invert[5]) {
 		fprintf(fp, "# invert rotations around some axes.\n");
 		fprintf(fp, "invert-rot = ");
-		if(cfg->invert[3]) fputc('x', fp);
-		if(cfg->invert[4]) fputc('y', fp);
-		if(cfg->invert[5]) fputc('z', fp);
+		if(cfg->invert[3] != def_axinv[3]) fputc('x', fp);
+		if(cfg->invert[4] != def_axinv[4]) fputc('y', fp);
+		if(cfg->invert[5] != def_axinv[5]) fputc('z', fp);
 		fputs("\n\n", fp);
 	}
+
+	fprintf(fp, "# swap translation along Y and Z axes\n");
+	fprintf(fp, "swap-yz = %s\n\n", cfg->map_axis[1] == def_axmap[1] ? "false" : "true");
 
 	if(!cfg->led) {
 		fprintf(fp, "# disable led\n");
