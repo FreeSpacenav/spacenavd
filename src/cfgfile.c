@@ -116,24 +116,24 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			if(strchr(val_str, 'x')) {
-				cfg->invert[RX] = !cfg->invert[RX];
+				cfg->invert[RX] = !def_axinv[RX];
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[RY] = !cfg->invert[RY];
+				cfg->invert[RY] = !def_axinv[RY];
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[RZ] = !cfg->invert[RZ];
+				cfg->invert[RZ] = !def_axinv[RZ];
 			}
 
 		} else if(strcmp(key_str, "invert-trans") == 0) {
 			if(strchr(val_str, 'x')) {
-				cfg->invert[TX] = !cfg->invert[TX];
+				cfg->invert[TX] = !def_axinv[TX];
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[TY] = !cfg->invert[TY];
+				cfg->invert[TY] = !def_axinv[TY];
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[TZ] = !cfg->invert[TZ];
+				cfg->invert[TZ] = !def_axinv[TZ];
 			}
 
 		} else if(strcmp(key_str, "swap-yz") == 0) {
@@ -153,11 +153,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 
 			for(i=0; i<6; i++) {
-				if(swap_yz) {
-					cfg->map_axis[i] = i;
-				} else {
-					cfg->map_axis[i] = def_axmap[i];
-				}
+				cfg->map_axis[i] = swap_yz && i < 3 ? i : def_axmap[i];
 			}
 
 		} else if(strcmp(key_str, "led") == 0) {
@@ -215,7 +211,7 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	fprintf(fp, "# dead zone; any motion less than this number, is discarded as noise.\n");
 	fprintf(fp, "dead-zone = %d\n\n", cfg->dead_threshold);
 
-	if(cfg->invert[0] || cfg->invert[1] || cfg->invert[2]) {
+	if(cfg->invert[0] != def_axinv[0] || cfg->invert[1] != def_axinv[1] || cfg->invert[2] != def_axinv[2]) {
 		fprintf(fp, "# invert translations on some axes.\n");
 		fprintf(fp, "invert-trans = ");
 		if(cfg->invert[0] != def_axinv[0]) fputc('x', fp);
@@ -224,7 +220,7 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		fputs("\n\n", fp);
 	}
 
-	if(cfg->invert[3] || cfg->invert[4] || cfg->invert[5]) {
+	if(cfg->invert[3] != def_axinv[3] || cfg->invert[4] != def_axinv[4] || cfg->invert[5] != def_axinv[5]) {
 		fprintf(fp, "# invert rotations around some axes.\n");
 		fprintf(fp, "invert-rot = ");
 		if(cfg->invert[3] != def_axinv[3]) fputc('x', fp);
