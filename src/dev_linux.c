@@ -230,6 +230,12 @@ int read_dev(struct dev_input *inp)
 			inp->val = iev.value;
 			break;
 
+		case EV_ABS:
+			inp->type = INP_MOTION;
+			inp->idx = iev.code - ABS_X;
+			inp->val = iev.value;
+			break;
+
 		case EV_KEY:
 			inp->type = INP_BUTTON;
 			inp->idx = iev.code - BTN_0;
@@ -286,13 +292,6 @@ static int open_dev(const char *path)
 
 	if(ioctl(dev_fd, EVIOCGBIT(0, sizeof(evtype_mask)), evtype_mask) == -1) {
 		perror("EVIOCGBIT ioctl failed\n");
-		close(dev_fd);
-		dev_fd = -1;
-		return -1;
-	}
-
-	if(!TEST_BIT(EV_REL, evtype_mask)) {
-		fprintf(stderr, "Wrong device, no relative events reported!\n");
 		close(dev_fd);
 		dev_fd = -1;
 		return -1;
