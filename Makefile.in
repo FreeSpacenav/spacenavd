@@ -1,15 +1,19 @@
-src = $(wildcard src/*.c)
+src = $(wildcard src/*.c) $(wildcard src/serial/*.c)
+hdr = $(wildcard src/*.h) $(wildcard src/serial/*.h)
 obj = $(src:.c=.o)
 bin = spacenavd
 ctl = spnavd_ctl
 
 CC = gcc
 INSTALL = install
-CFLAGS = -pedantic -Wall $(dbg) $(opt) -fno-strict-aliasing
+CFLAGS = -pedantic -Wall $(dbg) $(opt) -fno-strict-aliasing -I$(srcdir)/src
 LDFLAGS = $(xlib)
 
 $(bin): $(obj)
 	$(CC) -o $@ $(obj) $(LDFLAGS)
+
+tags: $(src) $(hdr)
+	ctags $(src) $(hdr)
 
 %.o: $(srcdir)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@

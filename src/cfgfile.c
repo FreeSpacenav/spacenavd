@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2009 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -153,7 +153,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 
 			for(i=0; i<6; i++) {
-				cfg->map_axis[i] = swap_yz && i < 3 ? i : def_axmap[i];
+				cfg->map_axis[i] = swap_yz ? i : def_axmap[i];
 			}
 
 		} else if(strcmp(key_str, "led") == 0) {
@@ -169,6 +169,9 @@ int read_cfg(const char *fname, struct cfg *cfg)
 					continue;
 				}
 			}
+
+		} else if(strcmp(key_str, "serial") == 0) {
+			strncpy(cfg->serial_dev, val_str, PATH_MAX);
 
 		} else {
 			fprintf(stderr, "unrecognized config option: %s\n", key_str);
@@ -235,6 +238,11 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	if(!cfg->led) {
 		fprintf(fp, "# disable led\n");
 		fprintf(fp, "led = 0\n\n");
+	}
+
+	if(cfg->serial_dev[0]) {
+		fprintf(fp, "# serial device\n");
+		fprintf(fp, "serial = %s\n\n", cfg->serial_dev);
 	}
 
 	/* unlock */

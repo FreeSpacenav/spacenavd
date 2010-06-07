@@ -16,19 +16,13 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef PROTO_UNIX_H_
-#define PROTO_UNIX_H_
+#ifndef DEV_SERIAL_H_
+#define DEV_SERIAL_H_
 
-#include "config.h"
 #include "event.h"
-#include "client.h"
 
-int init_unix(void);
-void close_unix(void);
-int get_unix_socket(void);
+int open_dev_serial(const char *devfile);
+void close_dev_serial(void);
+int read_dev_serial(struct dev_input *inp);
 
-void send_uevent(spnav_event *ev, struct client *c);
-
-int handle_uevents(fd_set *rset);
-
-#endif	/* PROTO_UNIX_H_ */
+#endif	/* DEV_SERIAL_H_ */

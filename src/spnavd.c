@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2009 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -130,8 +130,6 @@ int main(int argc, char **argv)
 
 				FD_SET(s, &rset);
 				if(s > max_fd) max_fd = s;
-
-				printf("listen to client: %d\n", s);
 			}
 			c = next_client();
 		}
@@ -225,7 +223,7 @@ static void handle_events(fd_set *rset)
 			struct dev_input inp;
 
 			/* read an event from the device ... */
-			if(read_dev(&inp) != -1) {
+			while(read_dev(&inp) != -1) {
 				/* ... and process it, possibly dispatching a spacenav event to clients */
 				process_input(&inp);
 			}

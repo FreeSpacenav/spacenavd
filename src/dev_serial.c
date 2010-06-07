@@ -16,19 +16,28 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-#ifndef PROTO_UNIX_H_
-#define PROTO_UNIX_H_
+#include "dev_serial.h"
+#include "serial/sball.h"
 
-#include "config.h"
-#include "event.h"
-#include "client.h"
+static void *dev;
 
-int init_unix(void);
-void close_unix(void);
-int get_unix_socket(void);
+int open_dev_serial(const char *devfile)
+{
+	if(!(dev = sball_open(devfile))) {
+		return -1;
+	}
+	return sball_get_fd(dev);
+}
 
-void send_uevent(spnav_event *ev, struct client *c);
+void close_dev_serial(void)
+{
+	sball_close(dev);
+}
 
-int handle_uevents(fd_set *rset);
-
-#endif	/* PROTO_UNIX_H_ */
+int read_dev_serial(struct dev_input *inp)
+{
+	if(!sball_get_input(dev, inp)) {
+		return -1;
+	}
+	return 0;
+}

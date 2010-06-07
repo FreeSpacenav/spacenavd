@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2009 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -36,6 +36,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dev.h"
 #include "cfgfile.h"
 #include "spnavd.h"
+#include "dev_serial.h"
 
 #define DEV_POLL_INTERVAL	30
 
@@ -52,8 +53,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 
-static int open_dev(const char *path);
-static void close_dev(void);
+static int open_dev_usb(const char *path);
+static int read_dev_usb(struct dev_input *inp);
 static char *get_dev_path(void);
 static int con_hotplug(void);
 static void poll_timeout(int sig);
@@ -66,6 +67,8 @@ static unsigned char evtype_mask[(EV_MAX + 7) / 8];
 static int hotplug_fd = -1;
 static int poll_time, poll_pipe;
 #define MAX_POLL_TIME	30
+
+static int dev_is_serial;
 
 /* hotplug stuff */
 
@@ -171,25 +174,44 @@ static void poll_timeout(int sig)
 
 int init_dev(void)
 {
-	char *dev_path;
+	if(cfg.serial_dev[0]) {
+		/* try to open a serial device if specified in the config file */
+		printf("using device: %s\n", cfg.serial_dev);
 
-	if(!(dev_path = get_dev_path())) {
-		fprintf(stderr, "failed to find the spaceball device file\n");
-		return -1;
+		if((dev_fd = open_dev_serial(cfg.serial_dev)) == -1) {
+			return -1;
+		}
+		dev_is_serial = 1;
+
+	} else {
+		char *dev_path;
+		if(!(dev_path = get_dev_path())) {
+			fprintf(stderr, "failed to find the spaceball device file\n");
+			return -1;
+		}
+		printf("using device: %s\n", dev_path);
+
+		if((dev_fd = open_dev_usb(dev_path)) == -1) {
+			return -1;
+		}
+		dev_is_serial = 0;
+
+		printf("device name: %s\n", dev_name);
 	}
-	printf("using device: %s\n", dev_path);
-
-	if(open_dev(dev_path) == -1) {
-		return -1;
-	}
-	printf("device name: %s\n", dev_name);
-
 	return 0;
 }
 
 void shutdown_dev(void)
 {
-	close_dev();
+	if(dev_is_serial) {
+		close_dev_serial();
+	} else {
+		if(dev_fd != -1) {
+			set_led(0);
+			close(dev_fd);
+		}
+	}
+	dev_fd = -1;
 }
 
 int get_dev_fd(void)
@@ -198,6 +220,11 @@ int get_dev_fd(void)
 }
 
 int read_dev(struct dev_input *inp)
+{
+	return dev_is_serial ? read_dev_serial(inp) : read_dev_usb(inp);
+}
+
+static int read_dev_usb(struct dev_input *inp)
 {
 	struct input_event iev;
 	int rdbytes;
@@ -212,11 +239,13 @@ int read_dev(struct dev_input *inp)
 
 	/* disconnect? */
 	if(rdbytes == -1) {
-		perror("read error");
-		close(dev_fd);
-		dev_fd = -1;
+		if(errno != EAGAIN) {
+			perror("read error");
+			close(dev_fd);
+			dev_fd = -1;
 
-		init_hotplug();
+			init_hotplug();
+		}
 		return -1;
 	}
 
@@ -273,7 +302,7 @@ void set_led(int state)
 	}
 }
 
-static int open_dev(const char *path)
+static int open_dev_usb(const char *path)
 {
 	int grab = 1;
 
@@ -293,7 +322,6 @@ static int open_dev(const char *path)
 	if(ioctl(dev_fd, EVIOCGBIT(0, sizeof(evtype_mask)), evtype_mask) == -1) {
 		perror("EVIOCGBIT ioctl failed\n");
 		close(dev_fd);
-		dev_fd = -1;
 		return -1;
 	}
 
@@ -302,19 +330,13 @@ static int open_dev(const char *path)
 		perror("failed to grab the spacenav device");
 	}
 
+	/* set non-blocking */
+	fcntl(dev_fd, F_SETFL, fcntl(dev_fd, F_GETFL) | O_NONBLOCK);
+
 	if(cfg.led) {
 		set_led(1);
 	}
-	return 0;
-}
-
-static void close_dev(void)
-{
-	if(dev_fd != -1) {
-		set_led(0);
-		close(dev_fd);
-		dev_fd = -1;
-	}
+	return dev_fd;
 }
 
 
