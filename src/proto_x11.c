@@ -21,7 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef USE_X11
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <setjmp.h>
+#include <alloca.h>
+#include <unistd.h>
+#include <pwd.h>
 #include "proto_x11.h"
 #include "client.h"
 #include "spnavd.h"
@@ -71,8 +75,18 @@ int init_x11(void)
 		putenv("DISPLAY=:0.0");
 	}
 
+	/* ... also there won't be an XAUTHORITY env var, so set one up */
+	if(!getenv("XAUTHORITY")) {
+		struct passwd *p = getpwuid(getuid());
+		char *home = p->pw_dir ? p->pw_dir : "/tmp";
+		char *buf = alloca(strlen("XAUTHORITY=") + strlen(home) + strlen("/.Xauthority") + 1);
+		sprintf(buf, "XAUTHORITY=%s/.Xauthority", home);
+		putenv(buf);
+	}
+
 	if(verbose) {
 		printf("trying to open X11 display \"%s\"\n", getenv("DISPLAY"));
+		printf("   XAUTHORITY=%s\n", getenv("XAUTHORITY"));
 	}
 
 	if(!(dpy = XOpenDisplay(0))) {
