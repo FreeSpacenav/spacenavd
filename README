@@ -44,6 +44,7 @@ spacenavd - 0.5
   use the graphical spnavcfg program to interactively set any of these options.
   The daemon should respond immediately to your changes, and also the
   configuration file should be updated automatically.
+  An example configuration file is included in the doc subdirectory.
 
 6. Troubleshooting
   If you're having trouble running spacenavd, read the up to date FAQ on the
