@@ -240,9 +240,13 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		fprintf(fp, "led = 0\n\n");
 	}
 
+	fprintf(fp, "# serial device\n");
+	fprintf(fp, "#   Set this only if you have a serial device, and make sure you specify the\n");
+	fprintf(fp, "#   correct device file (On linux usually: /dev/ttyS0, /dev/ttyS1, /dev/ttyUSB0 ... etc).\n");
 	if(cfg->serial_dev[0]) {
-		fprintf(fp, "# serial device\n");
 		fprintf(fp, "serial = %s\n\n", cfg->serial_dev);
+	} else {
+		fprintf(fp, "#serial = /dev/ttyS0\n");
 	}
 
 	/* unlock */
