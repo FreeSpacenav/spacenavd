@@ -36,7 +36,7 @@ static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
 static spnav_event ev;
 static int ev_pending;
 
-/* process_input processes an device input event, and dispatches 
+/* process_input processes an device input event, and dispatches
  * spacenav events to the clients by calling dispatch_event.
  * relative inputs (INP_MOTION) are accumulated, and dispatched when
  * we get an INP_FLUSH event. Button events are dispatched immediately
@@ -130,9 +130,9 @@ static void send_event(spnav_event *ev, struct client *c)
 
 static unsigned int msec_dif(struct timeval tv1, struct timeval tv2)
 {
-	unsigned int ds, du;
+	unsigned int ms1, ms2;
 
-	ds = tv2.tv_sec - tv1.tv_sec;
-	du = tv2.tv_usec - tv1.tv_usec;
-	return ds * 1000 + du / 1000;
+	ms1 = tv1.tv_sec * 1000 + tv1.tv_usec / 1000;
+	ms2 = tv2.tv_sec * 1000 + tv2.tv_usec / 1000;
+	return ms1 - ms2;
 }
