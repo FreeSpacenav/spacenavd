@@ -15,6 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef __linux__
 
 #include "config.h"
 
@@ -53,7 +54,7 @@ int xdet_start(void)
 	}
 
 	if(verbose) {
-		printf("waiting for X socket file to appear\n");
+		printf("waiting for the X socket file to appear\n");
 	}
 
 	return fd;
@@ -147,7 +148,8 @@ int handle_xdet_events(fd_set *rset)
 
 	return -1;
 }
+#endif	/* USE_X11 */
 
 #else
 int spacenavd_xdetect_linux_shut_up_empty_source_warning;
-#endif	/* USE_X11 */
+#endif	/* __linux__ */

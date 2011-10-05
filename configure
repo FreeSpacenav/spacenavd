@@ -25,6 +25,14 @@ test_kver() {
 	return 0
 }
 
+check_header() {
+	echo "#include <$1>" >.chkhdr.c
+	if cpp .chkhdr.c >/dev/null 2>&1; then
+		echo "#define HAVE_`echo $1 | tr '[:lower:]' '[:upper:]' | sed 's/\./_/g'`"
+	fi
+	rm -f .chkhdr.c
+}
+
 
 PREFIX=/usr/local
 OPT=yes
@@ -39,19 +47,16 @@ fi
 
 echo "configuring spacenavd - $VER"
 
-# linux check
-if [ `uname -s` != Linux ]; then
-	echo 'This spacenav driver only works on linux at the moment.'
-	echo "If you would like to help porting it to " `uname -s` ", your help is \
-most welcome. Please check out the README file for details on how you can join \
-us and contribute to the project."
-	exit 1
-fi
-
-# NETLINK_KOBJECT_UEVENT used for hotplug detection requires 2.6.10
-if test_kver 2.6.10; then
-	HOTPLUG=yes
+if [ `uname -s` = Linux ]; then
+	# NETLINK_KOBJECT_UEVENT used for hotplug detection requires 2.6.10
+	if test_kver 2.6.10; then
+		HOTPLUG=yes
+	else
+		HOTPLUG=no
+	fi
 else
+	echo "Currently support for systems other than Linux is experimental."
+	# TODO implement hotplug for other systems then switch this on
 	HOTPLUG=no
 fi
 
@@ -152,6 +157,11 @@ if [ "$HOTPLUG" = yes ]; then
 	echo >>src/config.h
 fi
 echo '#define VERSION "'$VER'"' >>src/config.h
+echo >>src/config.h
+
+# check for alloca.h
+check_header alloca.h >>src/config.h
+
 echo >>src/config.h
 echo '#endif	/* CONFIG_H_ */' >>src/config.h
 
