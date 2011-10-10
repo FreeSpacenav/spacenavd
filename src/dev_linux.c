@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2011 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -56,6 +56,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define REL_RZ	5
 #endif
 
+/* apparently some old versions of input.h doesn't define EV_SYN */
+#ifndef EV_SYN
+#define EV_SYN	0
+#endif
 
 static int open_dev_usb(const char *path);
 static int read_dev_usb(struct dev_input *inp);
