@@ -24,7 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_BUTTONS		64
 
 struct cfg {
-	float sensitivity, sens_trans, sens_rot;
+	float sensitivity, sens_trans[3], sens_rot[3];
 	int dead_threshold;
 	int invert[6];
 	int map_axis[6];

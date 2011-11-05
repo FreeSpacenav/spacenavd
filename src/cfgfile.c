@@ -33,7 +33,11 @@ void default_cfg(struct cfg *cfg)
 {
 	int i;
 
-	cfg->sensitivity = cfg->sens_trans = cfg->sens_rot = 1.0;
+	cfg->sensitivity = 1.0;
+	for(i=0; i<3; i++) {
+		cfg->sens_trans[i] = cfg->sens_rot[i] = 1.0;
+	}
+
 	cfg->dead_threshold = 2;
 	cfg->led = 1;
 
@@ -46,6 +50,14 @@ void default_cfg(struct cfg *cfg)
 		cfg->map_button[i] = i;
 	}
 }
+
+#define EXPECT(cond) \
+	do { \
+		if(!(cond)) { \
+			fprintf(stderr, "%s: invalid value for %s\n", __func__, key_str); \
+			continue; \
+		} \
+	} while(0)
 
 int read_cfg(const char *fname, struct cfg *cfg)
 {
@@ -87,32 +99,44 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		isnum = isdigit(val_str[0]);
 
 		if(strcmp(key_str, "dead-zone") == 0) {
-			if(!isnum) {
-				fprintf(stderr, "invalid configuration value for %s, expected a number.\n", key_str);
-				continue;
-			}
+			EXPECT(isnum);
 			cfg->dead_threshold = atoi(val_str);
 
 		} else if(strcmp(key_str, "sensitivity") == 0) {
-			if(!isnum) {
-				fprintf(stderr, "invalid configuration value for %s, expected a number.\n", key_str);
-				continue;
-			}
+			EXPECT(isnum);
 			cfg->sensitivity = atof(val_str);
 
 		} else if(strcmp(key_str, "sensitivity-translation") == 0) {
-			if(!isnum) {
-				fprintf(stderr, "invalid configuration value for %s, expected a number.\n", key_str);
-				continue;
-			}
-			cfg->sens_trans = atof(val_str);
+			EXPECT(isnum);
+			cfg->sens_trans[0] = cfg->sens_trans[1] = cfg->sens_trans[2] = atof(val_str);
+
+		} else if(strcmp(key_str, "sensitivity-translation-x") == 0) {
+			EXPECT(isnum);
+			cfg->sens_trans[0] = atof(val_str);
+
+		} else if(strcmp(key_str, "sensitivity-translation-y") == 0) {
+			EXPECT(isnum);
+			cfg->sens_trans[1] = atof(val_str);
+
+		} else if(strcmp(key_str, "sensitivity-translation-z") == 0) {
+			EXPECT(isnum);
+			cfg->sens_trans[2] = atof(val_str);
 
 		} else if(strcmp(key_str, "sensitivity-rotation") == 0) {
-			if(!isnum) {
-				fprintf(stderr, "invalid configuration value for %s, expected a number.\n", key_str);
-				continue;
-			}
-			cfg->sens_rot = atof(val_str);
+			EXPECT(isnum);
+			cfg->sens_rot[0] = cfg->sens_rot[1] = cfg->sens_rot[2] = atof(val_str);
+
+		} else if(strcmp(key_str, "sensitivity-rotation-x") == 0) {
+			EXPECT(isnum);
+			cfg->sens_rot[0] = atof(val_str);
+
+		} else if(strcmp(key_str, "sensitivity-rotation-y") == 0) {
+			EXPECT(isnum);
+			cfg->sens_rot[1] = atof(val_str);
+
+		} else if(strcmp(key_str, "sensitivity-rotation-z") == 0) {
+			EXPECT(isnum);
+			cfg->sens_rot[2] = atof(val_str);
 
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			if(strchr(val_str, 'x')) {
@@ -208,8 +232,23 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	fprintf(fp, "sensitivity = %.3f\n\n", cfg->sensitivity);
 
 	fprintf(fp, "# separate sensitivity for rotation and translation.\n");
-	fprintf(fp, "sensitivity-translation = %.3f\n", cfg->sens_trans);
-	fprintf(fp, "sensitivity-rotation = %.3f\n\n", cfg->sens_rot);
+
+	if(cfg->sens_trans[0] == cfg->sens_trans[1] && cfg->sens_trans[1] == cfg->sens_trans[2]) {
+		fprintf(fp, "sensitivity-translation = %.3f\n", cfg->sens_trans[0]);
+	} else {
+		fprintf(fp, "sensitivity-translation-x = %.3f\n", cfg->sens_trans[0]);
+		fprintf(fp, "sensitivity-translation-y = %.3f\n", cfg->sens_trans[1]);
+		fprintf(fp, "sensitivity-translation-z = %.3f\n", cfg->sens_trans[2]);
+	}
+
+	if(cfg->sens_rot[0] == cfg->sens_rot[1] && cfg->sens_rot[1] == cfg->sens_rot[2]) {
+		fprintf(fp, "sensitivity-rotation = %.3f\n", cfg->sens_rot[0]);
+	} else {
+		fprintf(fp, "sensitivity-rotation-x = %.3f\n", cfg->sens_rot[0]);
+		fprintf(fp, "sensitivity-rotation-y = %.3f\n", cfg->sens_rot[1]);
+		fprintf(fp, "sensitivity-rotation-z = %.3f\n", cfg->sens_rot[2]);
+	}
+	fputc('\n', fp);
 
 	fprintf(fp, "# dead zone; any motion less than this number, is discarded as noise.\n");
 	fprintf(fp, "dead-zone = %d\n\n", cfg->dead_threshold);

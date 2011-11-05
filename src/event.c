@@ -55,7 +55,7 @@ void process_input(struct dev_input *inp)
 		inp->idx = cfg.map_axis[inp->idx];
 		sign = cfg.invert[inp->idx] ? -1 : 1;
 
-		inp->val = (int)((float)inp->val * cfg.sensitivity * (inp->idx < 3 ? cfg.sens_trans : cfg.sens_rot));
+		inp->val = (int)((float)inp->val * cfg.sensitivity * (inp->idx < 3 ? cfg.sens_trans[inp->idx] : cfg.sens_rot[inp->idx - 3]));
 
 		ev.type = EVENT_MOTION;
 		ev.motion.data = (int*)&ev.motion.x;

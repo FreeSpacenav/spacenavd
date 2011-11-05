@@ -1,6 +1,7 @@
 src = $(wildcard src/*.c) $(wildcard src/serial/*.c)
 hdr = $(wildcard src/*.h) $(wildcard src/serial/*.h)
 obj = $(src:.c=.o)
+dep = $(obj:.o=.d)
 bin = spacenavd
 ctl = spnavd_ctl
 
@@ -12,11 +13,16 @@ LDFLAGS = -L/usr/local/lib $(xlib)
 $(bin): $(obj)
 	$(CC) -o $@ $(obj) $(LDFLAGS)
 
+-include $(dep)
+
 tags: $(src) $(hdr)
 	ctags $(src) $(hdr)
 
 %.o: $(srcdir)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
+
+%.d: $(srcdir)/%.c
+	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: clean
 clean:
