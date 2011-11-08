@@ -48,7 +48,7 @@ void process_input(struct dev_input *inp)
 
 	switch(inp->type) {
 	case INP_MOTION:
-		if(abs(inp->val) < cfg.dead_threshold) {
+		if(abs(inp->val) < cfg.dead_threshold[inp->idx] ) {
 			break;
 		}
 

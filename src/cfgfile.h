@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cfg {
 	float sensitivity, sens_trans[3], sens_rot[3];
-	int dead_threshold;
+	int dead_threshold[6];
 	int invert[6];
 	int map_axis[6];
 	int map_button[MAX_BUTTONS];

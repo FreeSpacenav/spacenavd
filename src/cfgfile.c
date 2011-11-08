@@ -38,7 +38,10 @@ void default_cfg(struct cfg *cfg)
 		cfg->sens_trans[i] = cfg->sens_rot[i] = 1.0;
 	}
 
-	cfg->dead_threshold = 2;
+	for(i=0; i<6; i++) {
+		cfg->dead_threshold[i] = 2;
+	}
+	
 	cfg->led = 1;
 
 	for(i=0; i<6; i++) {
@@ -79,7 +82,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
 	while(fgets(buf, sizeof buf, fp)) {
-		int isnum;
+		int isnum, i;
 		char *key_str, *val_str, *line = buf;
 		while(*line == ' ' || *line == '\t') line++;
 
@@ -100,7 +103,33 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 		if(strcmp(key_str, "dead-zone") == 0) {
 			EXPECT(isnum);
-			cfg->dead_threshold = atoi(val_str);
+			for(i=0; i<6; i++) {
+				cfg->dead_threshold[i] = atoi(val_str);
+			}
+
+		} else if(strcmp(key_str, "dead-zone-translation-x") == 0) {
+			EXPECT(isnum);
+			cfg->dead_threshold[0] = atoi(val_str);
+
+		} else if(strcmp(key_str, "dead-zone-translation-y") == 0) {
+			EXPECT(isnum);
+			cfg->dead_threshold[1] = atoi(val_str);
+
+		} else if(strcmp(key_str, "dead-zone-translation-z") == 0) {
+			EXPECT(isnum);
+			cfg->dead_threshold[2] = atoi(val_str);
+
+		} else if(strcmp(key_str, "dead-zone-rotation-x") == 0) {
+			EXPECT(isnum);
+			cfg->dead_threshold[3] = atoi(val_str);
+
+		} else if(strcmp(key_str, "dead-zone-rotation-y") == 0) {
+			EXPECT(isnum);
+			cfg->dead_threshold[4] = atoi(val_str);
+
+		} else if(strcmp(key_str, "dead-zone-rotation-z") == 0) {
+			EXPECT(isnum);
+			cfg->dead_threshold[5] = atoi(val_str);
 
 		} else if(strcmp(key_str, "sensitivity") == 0) {
 			EXPECT(isnum);
@@ -251,7 +280,19 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	fputc('\n', fp);
 
 	fprintf(fp, "# dead zone; any motion less than this number, is discarded as noise.\n");
-	fprintf(fp, "dead-zone = %d\n\n", cfg->dead_threshold);
+
+	if(cfg->dead_threshold[0] == cfg->dead_threshold[1] && cfg->dead_threshold[1] == cfg->dead_threshold[2] && cfg->dead_threshold[2] == cfg->dead_threshold[3] && cfg->dead_threshold[3] == cfg->dead_threshold[4] && cfg->dead_threshold[4] == cfg->dead_threshold[5]) {
+		fprintf(fp, "dead-zone = %d\n", cfg->dead_threshold[0]);
+	} else {
+		fprintf(fp, "dead-zone-translation-x = %d\n", cfg->dead_threshold[0]);
+		fprintf(fp, "dead-zone-translation-y = %d\n", cfg->dead_threshold[1]);
+		fprintf(fp, "dead-zone-translation-z = %d\n", cfg->dead_threshold[2]);
+		fprintf(fp, "dead-zone-rotation-x = %d\n", cfg->dead_threshold[3]);
+		fprintf(fp, "dead-zone-rotation-y = %d\n", cfg->dead_threshold[4]);
+		fprintf(fp, "dead-zone-rotation-z = %d\n", cfg->dead_threshold[5]);
+	}
+
+	fputc('\n', fp);
 
 	if(cfg->invert[0] != def_axinv[0] || cfg->invert[1] != def_axinv[1] || cfg->invert[2] != def_axinv[2]) {
 		fprintf(fp, "# invert translations on some axes.\n");
