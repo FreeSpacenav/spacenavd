@@ -29,7 +29,7 @@ struct cfg {
 	int invert[6];
 	int map_axis[6];
 	int map_button[MAX_BUTTONS];
-	int led;
+	int led, grab_device;
 	char serial_dev[PATH_MAX];
 };
 

@@ -41,8 +41,9 @@ void default_cfg(struct cfg *cfg)
 	for(i=0; i<6; i++) {
 		cfg->dead_threshold[i] = 2;
 	}
-	
+
 	cfg->led = 1;
+	cfg->grab_device = 1;
 
 	for(i=0; i<6; i++) {
 		cfg->invert[i] = def_axinv[i];
@@ -223,6 +224,20 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				}
 			}
 
+		} else if(strcmp(key_str, "grab") == 0) {
+			if(isnum) {
+				cfg->grab_device = atoi(val_str);
+			} else {
+				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
+					cfg->grab_device = 1;
+				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
+					cfg->grab_device = 0;
+				} else {
+					fprintf(stderr, "invalid configuration value for %s, expected a boolean value.\n", key_str);
+					continue;
+				}
+			}
+
 		} else if(strcmp(key_str, "serial") == 0) {
 			strncpy(cfg->serial_dev, val_str, PATH_MAX);
 
@@ -318,6 +333,17 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	if(!cfg->led) {
 		fprintf(fp, "# disable led\n");
 		fprintf(fp, "led = 0\n\n");
+	}
+
+	if(!cfg->grab_device) {
+		fprintf(fp, "# Don't grab USB device\n");
+		fprintf(fp, "#   Grabbing the device ensures that other programs won't be able to use it without\n");
+		fprintf(fp, "#   talking to spacenavd. For instance some versions of Xorg will use the device to move\n");
+		fprintf(fp, "#   the mouse pointer if we don't grab it.\n");
+		fprintf(fp, "#   Set this to false if you want to use programs that try to talk to the device directly\n");
+		fprintf(fp, "#   such as google earth, then follow FAQ 11 http://spacenav.sourceforge.net/faq.html#faq11\n");
+		fprintf(fp, "#   to force the X server to ignore the device\n");
+		fprintf(fp, "grab = false\n\n");
 	}
 
 	fprintf(fp, "# serial device\n");

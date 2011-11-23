@@ -312,8 +312,6 @@ void set_led(int state)
 
 static int open_dev_usb(const char *path)
 {
-	int grab = 1;
-
 	if((dev_fd = open(path, O_RDWR)) == -1) {
 		if((dev_fd = open(path, O_RDONLY)) == -1) {
 			perror("failed to open device");
@@ -333,9 +331,12 @@ static int open_dev_usb(const char *path)
 		return -1;
 	}
 
-	/* try to grab the device */
-	if(ioctl(dev_fd, EVIOCGRAB, &grab) == -1) {
-		perror("failed to grab the spacenav device");
+	if(cfg.grab_device) {
+		int grab = 1;
+		/* try to grab the device */
+		if(ioctl(dev_fd, EVIOCGRAB, &grab) == -1) {
+			perror("failed to grab the spacenav device");
+		}
 	}
 
 	/* set non-blocking */
