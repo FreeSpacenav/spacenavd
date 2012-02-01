@@ -437,6 +437,7 @@ static char *get_dev_path(void)
 						path, strerror(errno));
 				continue;
 			} else {
+				fprintf(stderr, "failed to open %s: %s\n", path, strerror(errno));
 				break;
 			}
 		}
