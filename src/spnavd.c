@@ -247,7 +247,7 @@ static void sig_handler(int s)
 	case SIGHUP:
 		tmp = cfg.led;
 		read_cfg("/etc/spnavrc", &cfg);
-		if(cfg.led != tmp) {
+		if(cfg.led != tmp && get_dev_fd() >= 0) {
 			set_led(cfg.led);
 		}
 		break;
