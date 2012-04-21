@@ -53,6 +53,8 @@ void default_cfg(struct cfg *cfg)
 	for(i=0; i<MAX_BUTTONS; i++) {
 		cfg->map_button[i] = i;
 	}
+
+	cfg->repeat_msec = -1;
 }
 
 #define EXPECT(cond) \
@@ -83,8 +85,9 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
 	while(fgets(buf, sizeof buf, fp)) {
-		int isnum, i;
-		char *key_str, *val_str, *line = buf;
+		int isint, isfloat, ival, i;
+		float fval;
+		char *endp, *key_str, *val_str, *line = buf;
 		while(*line == ' ' || *line == '\t') line++;
 
 		if(!*line || *line == '\n' || *line == '\r' || *line == '#') {
@@ -100,73 +103,81 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			continue;
 		}
 
-		isnum = isdigit(val_str[0]);
+		ival = strtol(val_str, &endp, 10);
+		isint = (endp > val_str);
 
-		if(strcmp(key_str, "dead-zone") == 0) {
-			EXPECT(isnum);
+		fval = strtod(val_str, &endp);
+		isfloat = (endp > val_str);
+
+		if(strcmp(key_str, "repeat-interval") == 0) {
+			EXPECT(isint);
+			cfg->repeat_msec = ival;
+
+		} else if(strcmp(key_str, "dead-zone") == 0) {
+			EXPECT(isint);
 			for(i=0; i<6; i++) {
-				cfg->dead_threshold[i] = atoi(val_str);
+				cfg->dead_threshold[i] = ival;
 			}
 
 		} else if(strcmp(key_str, "dead-zone-translation-x") == 0) {
-			EXPECT(isnum);
-			cfg->dead_threshold[0] = atoi(val_str);
+			EXPECT(isint);
+			cfg->dead_threshold[0] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-y") == 0) {
-			EXPECT(isnum);
-			cfg->dead_threshold[1] = atoi(val_str);
+			EXPECT(isint);
+			cfg->dead_threshold[1] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-z") == 0) {
-			EXPECT(isnum);
-			cfg->dead_threshold[2] = atoi(val_str);
+			EXPECT(isint);
+			cfg->dead_threshold[2] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-x") == 0) {
-			EXPECT(isnum);
-			cfg->dead_threshold[3] = atoi(val_str);
+			EXPECT(isint);
+			cfg->dead_threshold[3] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-y") == 0) {
-			EXPECT(isnum);
-			cfg->dead_threshold[4] = atoi(val_str);
+			EXPECT(isint);
+			cfg->dead_threshold[4] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-z") == 0) {
-			EXPECT(isnum);
-			cfg->dead_threshold[5] = atoi(val_str);
+			EXPECT(isint);
+			cfg->dead_threshold[5] = ival;
 
 		} else if(strcmp(key_str, "sensitivity") == 0) {
-			EXPECT(isnum);
-			cfg->sensitivity = atof(val_str);
+			EXPECT(isfloat);
+			cfg->sensitivity = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation") == 0) {
-			EXPECT(isnum);
-			cfg->sens_trans[0] = cfg->sens_trans[1] = cfg->sens_trans[2] = atof(val_str);
+			EXPECT(isfloat);
+			cfg->sens_trans[0] = cfg->sens_trans[1] = cfg->sens_trans[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-x") == 0) {
-			EXPECT(isnum);
-			cfg->sens_trans[0] = atof(val_str);
+			EXPECT(isfloat);
+			cfg->sens_trans[0] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-y") == 0) {
-			EXPECT(isnum);
-			cfg->sens_trans[1] = atof(val_str);
+			EXPECT(isfloat);
+			cfg->sens_trans[1] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-z") == 0) {
-			EXPECT(isnum);
-			cfg->sens_trans[2] = atof(val_str);
+			EXPECT(isfloat);
+			cfg->sens_trans[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation") == 0) {
-			EXPECT(isnum);
-			cfg->sens_rot[0] = cfg->sens_rot[1] = cfg->sens_rot[2] = atof(val_str);
+			EXPECT(isfloat);
+			cfg->sens_rot[0] = cfg->sens_rot[1] = cfg->sens_rot[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-x") == 0) {
-			EXPECT(isnum);
-			cfg->sens_rot[0] = atof(val_str);
+			EXPECT(isfloat);
+			cfg->sens_rot[0] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-y") == 0) {
-			EXPECT(isnum);
-			cfg->sens_rot[1] = atof(val_str);
+			EXPECT(isfloat);
+			cfg->sens_rot[1] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-z") == 0) {
-			EXPECT(isnum);
-			cfg->sens_rot[2] = atof(val_str);
+			EXPECT(isfloat);
+			cfg->sens_rot[2] = fval;
 
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			if(strchr(val_str, 'x')) {
@@ -193,8 +204,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "swap-yz") == 0) {
 			int i, swap_yz = 0;
 
-			if(isnum) {
-				swap_yz = atoi(val_str);
+			if(isint) {
+				swap_yz = ival;
 			} else {
 				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
 					swap_yz = 1;
@@ -211,8 +222,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 
 		} else if(strcmp(key_str, "led") == 0) {
-			if(isnum) {
-				cfg->led = atoi(val_str);
+			if(isint) {
+				cfg->led = ival;
 			} else {
 				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
 					cfg->led = 1;
@@ -225,8 +236,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 
 		} else if(strcmp(key_str, "grab") == 0) {
-			if(isnum) {
-				cfg->grab_device = atoi(val_str);
+			if(isint) {
+				cfg->grab_device = ival;
 			} else {
 				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
 					cfg->grab_device = 1;
@@ -306,8 +317,10 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		fprintf(fp, "dead-zone-rotation-y = %d\n", cfg->dead_threshold[4]);
 		fprintf(fp, "dead-zone-rotation-z = %d\n", cfg->dead_threshold[5]);
 	}
-
 	fputc('\n', fp);
+
+	fprintf(fp, "# repeat interval; non-deadzone events are repeated every so many milliseconds (-1 to disable)\n");
+	fprintf(fp, "repeat-interval = %d\n", cfg->repeat_msec);
 
 	if(cfg->invert[0] != def_axinv[0] || cfg->invert[1] != def_axinv[1] || cfg->invert[2] != def_axinv[2]) {
 		fprintf(fp, "# invert translations on some axes.\n");

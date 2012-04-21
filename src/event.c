@@ -70,10 +70,13 @@ void process_input(struct dev_input *inp)
 		}
 		inp->idx = cfg.map_button[inp->idx];
 
-		ev.type = EVENT_BUTTON;
-		ev.button.press = inp->val;
-		ev.button.bnum = inp->idx;
-		dispatch_event(&ev);
+		{
+			union spnav_event bev;
+			bev.type = EVENT_BUTTON;
+			bev.button.press = inp->val;
+			bev.button.bnum = inp->idx;
+			dispatch_event(&bev);
+		}
 		break;
 
 	case INP_FLUSH:
@@ -85,6 +88,28 @@ void process_input(struct dev_input *inp)
 
 	default:
 		break;
+	}
+}
+
+int in_deadzone(void)
+{
+	int i;
+	if(!ev.motion.data) {
+		ev.motion.data = &ev.motion.x;
+	}
+
+	for(i=0; i<6; i++) {
+		if(ev.motion.data[i] != 0) {
+			return 0;
+		}
+	}
+	return 1;
+}
+
+void repeat_last_event(void)
+{
+	if(ev.type == EVENT_MOTION) {
+		dispatch_event(&ev);
 	}
 }
 

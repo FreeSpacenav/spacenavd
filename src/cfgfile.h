@@ -1,5 +1,5 @@
 /*
-spacenavd - a free software replacement driver for 6dof space-mice.
+spnavcfg - an interactive GUI configurator for the spacenavd daemon.
 Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
@@ -31,6 +31,7 @@ struct cfg {
 	int map_button[MAX_BUTTONS];
 	int led, grab_device;
 	char serial_dev[PATH_MAX];
+	int repeat_msec;
 };
 
 void default_cfg(struct cfg *cfg);

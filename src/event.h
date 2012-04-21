@@ -65,5 +65,11 @@ struct dev_input {
 
 void process_input(struct dev_input *inp);
 
+/* non-zero if the last processed motion event was in the deadzone */
+int in_deadzone(void);
+
+/* dispatches the last event */
+void repeat_last_event(void);
+
 
 #endif	/* EVENT_H_ */

@@ -143,11 +143,22 @@ int main(int argc, char **argv)
 #endif
 
 		do {
-			ret = select(max_fd + 1, &rset, 0, 0, 0);
+			struct timeval tv, *timeout = 0;
+			if(cfg.repeat_msec >= 0 && !in_deadzone()) {
+				tv.tv_sec = cfg.repeat_msec / 1000;
+				tv.tv_usec = cfg.repeat_msec % 1000;
+				timeout = &tv;
+			}
+
+			ret = select(max_fd + 1, &rset, 0, 0, timeout);
 		} while(ret == -1 && errno == EINTR);
 
 		if(ret > 0) {
 			handle_events(&rset);
+		} else {
+			if(cfg.repeat_msec >= 0 && !in_deadzone()) {
+				repeat_last_event();
+			}
 		}
 	}
 	return 0;	/* unreachable */
