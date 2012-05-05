@@ -1,6 +1,6 @@
 /*
 spnavcfg - an interactive GUI configurator for the spacenavd daemon.
-Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -29,6 +29,8 @@ struct cfg {
 	int invert[6];
 	int map_axis[6];
 	int map_button[MAX_BUTTONS];
+	int kbmap[MAX_BUTTONS];
+	char *kbmap_str[MAX_BUTTONS];
 	int led, grab_device;
 	char serial_dev[PATH_MAX];
 	int repeat_msec;

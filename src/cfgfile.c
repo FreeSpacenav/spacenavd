@@ -52,6 +52,8 @@ void default_cfg(struct cfg *cfg)
 
 	for(i=0; i<MAX_BUTTONS; i++) {
 		cfg->map_button[i] = i;
+		cfg->kbmap_str[i] = 0;
+		cfg->kbmap[i] = 0;
 	}
 
 	cfg->repeat_msec = -1;
@@ -85,7 +87,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
 	while(fgets(buf, sizeof buf, fp)) {
-		int isint, isfloat, ival, i;
+		int isint, isfloat, ival, i, bnidx;
 		float fval;
 		char *endp, *key_str, *val_str, *line = buf;
 		while(*line == ' ' || *line == '\t') line++;
@@ -221,6 +223,28 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				cfg->map_axis[i] = swap_yz ? i : def_axmap[i];
 			}
 
+		} else if(sscanf(key_str, "bnmap%d", &bnidx) == 1) {
+			EXPECT(isint);
+			if(bnidx < 0 || bnidx >= MAX_BUTTONS || ival < 0 || ival >= MAX_BUTTONS) {
+				fprintf(stderr, "invalid configuration value for %s, expected a number from 0 to %d\n", key_str, MAX_BUTTONS);
+				continue;
+			}
+			if(cfg->map_button[bnidx] != bnidx) {
+				printf("warning: multiple mappings for button %d\n", bnidx);
+			}
+			cfg->map_button[bnidx] = ival;
+
+		} else if(sscanf(key_str, "kbmap%d", &bnidx) == 1) {
+			if(bnidx < 0 || bnidx >= MAX_BUTTONS) {
+				fprintf(stderr, "invalid configuration value for %s, expected a number from 0 to %d\n", key_str, MAX_BUTTONS);
+				continue;
+			}
+			if(cfg->kbmap_str[bnidx]) {
+				printf("warning: multiple keyboard mappings for button %d: %s -> %s\n", bnidx, cfg->kbmap_str[bnidx], val_str);
+				free(cfg->kbmap_str[bnidx]);
+			}
+			cfg->kbmap_str[bnidx] = strdup(val_str);
+
 		} else if(strcmp(key_str, "led") == 0) {
 			if(isint) {
 				cfg->led = ival;
@@ -269,6 +293,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 int write_cfg(const char *fname, struct cfg *cfg)
 {
+	int i, wrote_comment;
 	FILE *fp;
 	struct flock flk;
 
@@ -342,6 +367,34 @@ int write_cfg(const char *fname, struct cfg *cfg)
 
 	fprintf(fp, "# swap translation along Y and Z axes\n");
 	fprintf(fp, "swap-yz = %s\n\n", cfg->map_axis[1] == def_axmap[1] ? "false" : "true");
+
+	wrote_comment = 0;
+	for(i=0; i<MAX_BUTTONS; i++) {
+		if(cfg->map_button[i] != i) {
+			if(!wrote_comment) {
+				fprintf(fp, "# button mappings\n");
+				wrote_comment = 1;
+			}
+			fprintf(fp, "bnmap%d = %d\n", i, cfg->map_button[i]);
+		}
+	}
+	if(wrote_comment) {
+		fputc('\n', fp);
+	}
+
+	wrote_comment = 0;
+	for(i=0; i<MAX_BUTTONS; i++) {
+		if(cfg->kbmap_str[i]) {
+			if(!wrote_comment) {
+				fprintf(fp, "# button to key mappings\n");
+				wrote_comment = 1;
+			}
+			fprintf(fp, "kbmap%d = %s\n", i, cfg->kbmap_str[i]);
+		}
+	}
+	if(wrote_comment) {
+		fputc('\n', fp);
+	}
 
 	if(!cfg->led) {
 		fprintf(fp, "# disable led\n");

@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,12 +17,17 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
 #include "config.h"
+#include <stdio.h>
 #include <stdlib.h>
 #include "event.h"
 #include "client.h"
 #include "proto_x11.h"
 #include "proto_unix.h"
 #include "spnavd.h"
+
+#ifdef USE_X11
+#include "kbemu.h"
+#endif
 
 enum {
 	MOT_X, MOT_Y, MOT_Z,
@@ -64,6 +69,20 @@ void process_input(struct dev_input *inp)
 		break;
 
 	case INP_BUTTON:
+#ifdef USE_X11
+		/* check to see if we must emulate a keyboard event instead of a
+		 * retular button event for this button
+		 */
+		if(cfg.kbmap_str[inp->idx]) {
+			if(!cfg.kbmap[inp->idx]) {
+				cfg.kbmap[inp->idx] = kbemu_keysym(cfg.kbmap_str[inp->idx]);
+				printf("mapping ``%s'' to keysym %d\n", cfg.kbmap_str[inp->idx], (int)cfg.kbmap[inp->idx]);
+			}
+			send_kbevent(cfg.kbmap[inp->idx], inp->val);
+			break;
+		}
+#endif
+
 		if(ev_pending) {
 			dispatch_event(&ev);
 			ev_pending = 0;

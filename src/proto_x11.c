@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -35,6 +35,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "client.h"
 #include "spnavd.h"
 #include "xdetect.h"
+#include "kbemu.h"
 
 
 enum cmd_msg {
@@ -149,6 +150,9 @@ int init_x11(void)
 	}
 	XFlush(dpy);
 
+	/* pass the display connection to the keyboard emulation module */
+	kbemu_set_display(dpy);
+
 	xdet_stop();	/* stop X server detection if it was running */
 	return 0;
 }
@@ -173,6 +177,9 @@ void close_x11(void)
 		XDestroyWindow(dpy, win);
 		XCloseDisplay(dpy);
 		dpy = 0;
+
+		/* stop the kbemu module from using an invalid Display* */
+		kbemu_set_display(0);
 	}
 
 	/* also remove all x11 clients from the client list */
