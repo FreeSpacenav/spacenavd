@@ -133,7 +133,7 @@ if [ "$DBG" = 'yes' ]; then
 fi
 
 if [ "$OPT" = 'yes' ]; then
-	echo 'opt = -O3' >>Makefile
+	echo 'opt = -O2' >>Makefile
 fi
 
 if [ "$X11" = 'yes' ]; then

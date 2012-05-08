@@ -15,12 +15,16 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#ifdef __FreeBSD__
 
-#ifndef SPNAV_DEV_SERIAL_H_
-#define SPNAV_DEV_SERIAL_H_
+int open_dev_usb(struct device *dev, const char *path)
+{
+	return -1;	/* TODO */
+}
 
-struct device;
+const char *find_usb_device(void)
+{
+	return 0;	/* TODO */
+}
 
-int open_dev_serial(struct device *dev, const char *devfile);
-
-#endif	/* SPNAV_DEV_SERIAL_H_ */
+#endif	/* __FreeBSD__ */

@@ -15,12 +15,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-
-#ifndef SPNAV_DEV_SERIAL_H_
-#define SPNAV_DEV_SERIAL_H_
+#ifndef SPNAV_DEV_USB_H_
+#define SPNAV_DEV_USB_H_
 
 struct device;
 
-int open_dev_serial(struct device *dev, const char *devfile);
+int open_dev_usb(struct device *dev, const char *path);
+const char *find_usb_device(void);
 
-#endif	/* SPNAV_DEV_SERIAL_H_ */
+#endif	/* SPNAV_DEV_USB_H_ */

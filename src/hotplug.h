@@ -15,12 +15,12 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+#ifndef SPNAV_HOTPLUG_H_
+#define SPNAV_HOTPLUG_H_
 
-#ifndef SPNAV_DEV_SERIAL_H_
-#define SPNAV_DEV_SERIAL_H_
+int init_hotplug(void);
+void shutdown_hotplug(void);
+int get_hotplug_fd(void);
+int handle_hotplug(void);
 
-struct device;
-
-int open_dev_serial(struct device *dev, const char *devfile);
-
-#endif	/* SPNAV_DEV_SERIAL_H_ */
+#endif	/* SPNAV_HOTPLUG_H_ */

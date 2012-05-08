@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -16,27 +16,38 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#include "config.h"
 #include "dev_serial.h"
+#include "dev.h"
+#include "event.h"
 #include "serial/sball.h"
 
-static void *dev;
+static void close_dev_serial(struct device *dev);
+static int read_dev_serial(struct device *dev, struct dev_input *inp);
 
-int open_dev_serial(const char *devfile)
+int open_dev_serial(struct device *dev, const char *devfile)
 {
-	if(!(dev = sball_open(devfile))) {
+	if(!(dev->data = sball_open(devfile))) {
 		return -1;
 	}
-	return sball_get_fd(dev);
+	dev->fd = sball_get_fd(dev->data);
+
+	dev->close = close_dev_serial;
+	dev->read = read_dev_serial;
+	return 0;
 }
 
-void close_dev_serial(void)
+static void close_dev_serial(struct device *dev)
 {
-	sball_close(dev);
+	if(dev->data) {
+		sball_close(dev->data);
+	}
+	dev->data = 0;
 }
 
-int read_dev_serial(struct dev_input *inp)
+static int read_dev_serial(struct device *dev, struct dev_input *inp)
 {
-	if(!sball_get_input(dev, inp)) {
+	if(!dev->data || !sball_get_input(dev->data, inp)) {
 		return -1;
 	}
 	return 0;
