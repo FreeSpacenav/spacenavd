@@ -24,6 +24,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/select.h>
+#include <sys/socket.h>
+#include <sys/un.h>
 #include "spnavd.h"
 #include "dev.h"
 #include "hotplug.h"
@@ -36,13 +38,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 static void cleanup(void);
 static void daemonize(void);
 static int write_pid_file(void);
+static int find_running_daemon(void);
 static void handle_events(fd_set *rset);
 static void sig_handler(int s);
 
 
 int main(int argc, char **argv)
 {
-	int i, ret, become_daemon = 1;
+	int i, pid, ret, become_daemon = 1;
 
 	for(i=1; i<argc; i++) {
 		if(argv[i][0] == '-' && argv[i][2] == 0) {
@@ -71,6 +74,11 @@ int main(int argc, char **argv)
 			fprintf(stderr, "unexpected argument: %s\n", argv[i]);
 			return 1;
 		}
+	}
+
+	if((pid = find_running_daemon()) != -1) {
+		fprintf(stderr, "Spacenav daemon already running (pid: %d). Aborting.\n", pid);
+		return 1;
 	}
 
 	if(become_daemon) {
@@ -215,6 +223,40 @@ static int write_pid_file(void)
 	fprintf(fp, "%d\n", pid);
 	fclose(fp);
 	return 0;
+}
+
+static int find_running_daemon(void)
+{
+	FILE *fp;
+	int s, pid;
+	struct sockaddr_un addr;
+
+	/* try to open the pid-file */
+	if(!(fp = fopen(PIDFILE, "r"))) {
+		return -1;
+	}
+	if(fscanf(fp, "%d\n", &pid) != 1) {
+		fclose(fp);
+		return -1;
+	}
+	fclose(fp);
+
+	/* make sure it's not just a stale pid-file */
+	if((s = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
+		return -1;
+	}
+	memset(&addr, 0, sizeof addr);
+	addr.sun_family = AF_UNIX;
+	strncpy(addr.sun_path, SOCK_NAME, sizeof addr.sun_path);
+
+	if(connect(s, (struct sockaddr*)&addr, sizeof addr) == -1) {
+		close(s);
+		return -1;
+	}
+
+	/* managed to connect alright, it's running... */
+	close(s);
+	return pid;
 }
 
 static void handle_events(fd_set *rset)
