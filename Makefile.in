@@ -30,18 +30,18 @@ clean:
 
 .PHONY: install
 install: $(bin)
-	$(INSTALL) -d $(PREFIX)/bin
-	$(INSTALL) -m 755 $(bin) $(PREFIX)/bin/$(bin)
-	$(INSTALL) -m 755 $(srcdir)/$(ctl) $(PREFIX)/bin/$(ctl)
+	$(INSTALL) -d $(DESTDIR)$(PREFIX)/bin
+	$(INSTALL) -m 755 $(bin) $(DESTDIR)$(PREFIX)/bin/$(bin)
+	$(INSTALL) -m 755 $(srcdir)/$(ctl) $(DESTDIR)$(PREFIX)/bin/$(ctl)
 	cd $(srcdir) && ./setup_init --no-install
 
 #	[ -d /etc/hal/fdi/policy ] && \
-#		$(INSTALL) -m 644 spacenav.fdi /etc/hal/fdi/policy/spacenav.fdi
+#		$(INSTALL) -m 644 spacenav.fdi $(DESTDIR)/etc/hal/fdi/policy/spacenav.fdi
 
 .PHONY: uninstall
 uninstall:
-	rm -f $(PREFIX)/bin/$(bin)
-	rm -f $(PREFIX)/bin/$(ctl)
-	rm -f /etc/hal/fdi/policy/spacenav.fdi
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(bin)
+	rm -f $(DESTDIR)$(PREFIX)/bin/$(ctl)
+	rm -f $(DESTDIR)/etc/hal/fdi/policy/spacenav.fdi
 
 #	cd $(srcdir) && ./setup_init remove
