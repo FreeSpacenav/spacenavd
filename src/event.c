@@ -21,11 +21,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include "event.h"
 #include "client.h"
-#include "proto_x11.h"
 #include "proto_unix.h"
 #include "spnavd.h"
 
 #ifdef USE_X11
+#include "proto_x11.h"
 #include "kbemu.h"
 #endif
 
