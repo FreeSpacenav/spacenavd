@@ -15,7 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifdef __FreeBSD__
+#if defined(__FreeBSD__) || defined(__APPLE__)
 
 #include "config.h"
 
@@ -45,7 +45,7 @@ int xdet_start(void)
 		return -1;
 	}
 
-	if((fd_x11 = open("/tmp/,X11-unix", O_RDONLY)) == -1) {
+	if((fd_x11 = open("/tmp/.X11-unix", O_RDONLY)) == -1) {
 		if((fd_tmp = open("/tmp", O_RDONLY)) == -1) {
 			perror("failed to open /tmp");
 			goto err;

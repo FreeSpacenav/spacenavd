@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #if !defined(__linux__)
 
 #include <stdio.h>
+#include "dev.h"
 
 static const char *message =
 	"Unfortunately this version of spacenavd does not support USB devices on your "
@@ -25,7 +26,7 @@ static const char *message =
 
 const char *find_usb_device(void)
 {
-	fprintf(stderr, message);
+	fputs(message, stderr);
 	return 0;
 }
 

@@ -137,7 +137,7 @@ if [ "$OPT" = 'yes' ]; then
 fi
 
 if [ "$X11" = 'yes' ]; then
-	echo 'xlib = -lX11' >>Makefile
+	echo 'xlib = -L/usr/X11/lib -lX11' >>Makefile
 fi
 
 cat "$srcdir/Makefile.in" >>Makefile
