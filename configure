@@ -47,15 +47,17 @@ fi
 
 echo "configuring spacenavd - $VER"
 
-if [ `uname -s` = Linux ]; then
+sys=`uname -s`
+if [ "$sys" = Linux ]; then
 	# NETLINK_KOBJECT_UEVENT used for hotplug detection requires 2.6.10
 	if test_kver 2.6.10; then
 		HOTPLUG=yes
 	else
 		HOTPLUG=no
 	fi
+elif [ "$sys" = Darwin ]; then
+	add_ldflags='-framework CoreFoundation -framework IOKit'
 else
-	echo "Currently support for systems other than Linux is experimental."
 	# TODO implement hotplug for other systems then switch this on
 	HOTPLUG=no
 fi
@@ -138,6 +140,13 @@ fi
 
 if [ "$X11" = 'yes' ]; then
 	echo 'xlib = -L/usr/X11/lib -lX11' >>Makefile
+fi
+
+if [ -n "$add_cflags" ]; then
+	echo "add_cflags = $add_cflags" >>Makefile
+fi
+if [ -n "$add_ldflags" ]; then
+	echo "add_ldflags = $add_ldflags" >>Makefile
 fi
 
 cat "$srcdir/Makefile.in" >>Makefile

@@ -15,27 +15,13 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#if !defined(__linux__) && !(defined(__APPLE__) && defined(__MACH__))
+#if defined(__APPLE__) && defined(__MACH__)
 
+#include "config.h"
 #include <stdio.h>
-#include "dev.h"
+#include <IOKit/IOKitLib.h>
+#include <IOKit/hid/IOHIDLib.h>
 
-static const char *message =
-	"Unfortunately this version of spacenavd does not support USB devices on your "
-	"platform yet. Make sure you are using the latest version of spacenavd.\n";
-
-const char *find_usb_device(void)
-{
-	fputs(message, stderr);
-	return 0;
-}
-
-int open_dev_usb(struct device *dev, const char *path)
-{
-	return -1;
-}
-
-/* the hotplug functions will also be missing on unsupported platforms */
 int init_hotplug(void)
 {
 	return -1;
@@ -55,4 +41,4 @@ int handle_hotplug(void)
 	return -1;
 }
 
-#endif	/* unsupported platform */
+#endif	/* __APPLE__ && __MACH__ */
