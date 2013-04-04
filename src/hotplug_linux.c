@@ -92,12 +92,11 @@ int handle_hotplug(void)
 	char buf[512];
 	read(hotplug_fd, buf, sizeof buf);
 
-	if(get_dev_fd() == -1) {
-		if(init_dev() == -1) {
-			return -1;
-		}
-		shutdown_hotplug();
-	}
+	if(verbose)
+		printf("\nhandle_hotplug called\n");
+
+	if (init_devices() == -1)
+		return -1;
 
 	return 0;
 }

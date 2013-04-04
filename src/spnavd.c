@@ -91,10 +91,6 @@ int main(int argc, char **argv)
 
 	read_cfg("/etc/spnavrc", &cfg);
 
-	if(init_clients() == -1) {
-		return 1;
-	}
-
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
 	signal(SIGSEGV, sig_handler);
@@ -102,9 +98,9 @@ int main(int argc, char **argv)
 	signal(SIGUSR1, sig_handler);
 	signal(SIGUSR2, sig_handler);
 
-	if(init_dev() == -1) {
-		init_hotplug();
-	}
+	init_devices();
+	init_hotplug();
+
 	init_unix();
 #ifdef USE_X11
 	init_x11();
@@ -115,12 +111,21 @@ int main(int argc, char **argv)
 	for(;;) {
 		fd_set rset;
 		int fd, max_fd = 0;
-		struct client *c;
+		struct client *client_iter;
+		struct device *dev_iter;
 
 		FD_ZERO(&rset);
 
-		/* set the device fd if it's open, otherwise set the hotplug fd */
-		if((fd = get_dev_fd()) != -1 || (fd = get_hotplug_fd()) != -1) {
+		dev_iter = first_device();
+		while(dev_iter) {
+			if((fd = get_device_fd(dev_iter)) != -1) {
+				FD_SET(fd, &rset);
+				if(fd > max_fd) max_fd = fd;
+			}
+			dev_iter = next_device();
+		}
+
+		if((fd = get_hotplug_fd()) != -1) {
 			FD_SET(fd, &rset);
 			if(fd > max_fd) max_fd = fd;
 		}
@@ -132,16 +137,16 @@ int main(int argc, char **argv)
 		}
 
 		/* all the UNIX socket clients */
-		c = first_client();
-		while(c) {
-			if(get_client_type(c) == CLIENT_UNIX) {
-				int s = get_client_socket(c);
+		client_iter = first_client();
+		while(client_iter) {
+			if(get_client_type(client_iter) == CLIENT_UNIX) {
+				int s = get_client_socket(client_iter);
 				assert(s >= 0);
 
 				FD_SET(s, &rset);
 				if(s > max_fd) max_fd = s;
 			}
-			c = next_client();
+			client_iter = next_client();
 		}
 
 		/* and the X server socket */
@@ -154,7 +159,8 @@ int main(int argc, char **argv)
 
 		do {
 			struct timeval tv, *timeout = 0;
-			if(is_dev_valid() && cfg.repeat_msec >= 0 && !in_deadzone()) {
+			dev_iter = first_device();
+			if(is_device_valid(dev_iter) && cfg.repeat_msec >= 0 && !in_deadzone(dev_iter)) {
 				tv.tv_sec = cfg.repeat_msec / 1000;
 				tv.tv_usec = cfg.repeat_msec % 1000;
 				timeout = &tv;
@@ -166,8 +172,13 @@ int main(int argc, char **argv)
 		if(ret > 0) {
 			handle_events(&rset);
 		} else {
-			if(cfg.repeat_msec >= 0 && !in_deadzone()) {
-				repeat_last_event();
+			if(cfg.repeat_msec >= 0) {
+				dev_iter = first_device();
+				while(dev_iter) {
+					if(!in_deadzone(dev_iter))
+						repeat_last_event(dev_iter);
+					dev_iter = next_device();
+				}
 			}
 		}
 	}
@@ -176,11 +187,20 @@ int main(int argc, char **argv)
 
 static void cleanup(void)
 {
+	struct device *dev_iter, *tmp;
 #ifdef USE_X11
 	close_x11();	/* call to avoid leaving garbage in the X server's root windows */
 #endif
 	close_unix();
-	shutdown_dev();
+
+	shutdown_hotplug();
+
+	dev_iter = first_device();
+	while(dev_iter) {
+		tmp = next_device();
+		remove_device(dev_iter);
+		dev_iter = tmp;
+	}
 	remove(PIDFILE);
 }
 
@@ -263,6 +283,8 @@ static int find_running_daemon(void)
 static void handle_events(fd_set *rset)
 {
 	int dev_fd, hotplug_fd;
+	struct device *dev_iter;
+	struct dev_input inp;
 
 	/* handle anything coming through the UNIX socket */
 	handle_uevents(rset);
@@ -273,18 +295,19 @@ static void handle_events(fd_set *rset)
 #endif
 
 	/* finally read any pending device input data */
-	if((dev_fd = get_dev_fd()) != -1) {
-		if(FD_ISSET(dev_fd, rset)) {
-			struct dev_input inp;
-
+	dev_iter = first_device();
+	while(dev_iter) {
+		if((dev_fd = get_device_fd(dev_iter)) != -1 && FD_ISSET(dev_fd, rset)) {
 			/* read an event from the device ... */
-			while(read_dev(&inp) != -1) {
+			while(read_device(dev_iter, &inp) != -1) {
 				/* ... and process it, possibly dispatching a spacenav event to clients */
-				process_input(&inp);
+				process_input(dev_iter, &inp);
 			}
 		}
+		dev_iter = next_device();
+	}
 
-	} else if((hotplug_fd = get_hotplug_fd()) != -1) {
+	if((hotplug_fd = get_hotplug_fd()) != -1) {
 		if(FD_ISSET(hotplug_fd, rset)) {
 			handle_hotplug();
 		}
@@ -297,13 +320,20 @@ static void handle_events(fd_set *rset)
 static void sig_handler(int s)
 {
 	int tmp;
+	struct device *dev_iter;
 
 	switch(s) {
 	case SIGHUP:
 		tmp = cfg.led;
 		read_cfg("/etc/spnavrc", &cfg);
-		if(cfg.led != tmp && get_dev_fd() >= 0) {
-			set_led(cfg.led);
+		dev_iter = first_device();
+		while(dev_iter) {
+			if(cfg.led != tmp && is_device_valid(dev_iter)) {
+				if(verbose)
+					printf("turn led %s, device: %s\n", cfg.led ? "on": "off", dev_iter->name);
+				set_device_led(dev_iter, cfg.led);
+			}
+			dev_iter = next_device();
 		}
 		break;
 

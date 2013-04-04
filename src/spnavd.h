@@ -25,6 +25,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SOCK_NAME	"/var/run/spnav.sock"
 #define PIDFILE		"/var/run/spnavd.pid"
 #define LOGFILE		"/var/log/spnavd.log"
+/* Multiple devices support */
+#ifndef MAX_DEVICES
+#define MAX_DEVICES 8
+#endif
 
 struct cfg cfg;
 int verbose;

@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <stdlib.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <linux/types.h>
@@ -54,12 +55,12 @@ static int read_evdev(struct device *dev, struct dev_input *inp);
 static void set_led_evdev(struct device *dev, int state);
 
 
-int open_dev_usb(struct device *dev, const char *path)
+int open_dev_usb(struct device *dev)
 {
 	/*unsigned char evtype_mask[(EV_MAX + 7) / 8];*/
 
-	if((dev->fd = open(path, O_RDWR)) == -1) {
-		if((dev->fd = open(path, O_RDONLY)) == -1) {
+	if((dev->fd = open(dev->path, O_RDWR)) == -1) {
+		if((dev->fd = open(dev->path, O_RDONLY)) == -1) {
 			perror("failed to open device");
 			return -1;
 		}
@@ -107,6 +108,7 @@ static void close_evdev(struct device *dev)
 		dev->set_led(dev, 0);
 		close(dev->fd);
 		dev->fd = -1;
+		remove_device(dev);
 	}
 }
 
@@ -126,11 +128,7 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 	if(rdbytes == -1) {
 		if(errno != EAGAIN) {
 			perror("read error");
-			close(dev->fd);
-			dev->fd = -1;
-
-			/* restart hotplug detection */
-			init_hotplug();
+			remove_device(dev);
 		}
 		return -1;
 	}
@@ -165,7 +163,6 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 			return -1;
 		}
 	}
-
 	return 0;
 
 }
@@ -188,60 +185,97 @@ static void set_led_evdev(struct device *dev, int state)
 }
 
 #define PROC_DEV	"/proc/bus/input/devices"
-const char *find_usb_device(void)
+void find_usb_devices(char **path, int str_n, int char_n)
 {
-	static char path[PATH_MAX];
+	int path_idx = 0;
 	int i, valid_vendor = 0, valid_str = 0;
+	int skip_section = 0, buf_used, buf_len;
 	char buf[1024];
+	char *buf_pos, *section_start, *next_section = 0, *cur_line, *next_line;
 	FILE *fp;
 
 	if(verbose) {
 		printf("Device detection, parsing " PROC_DEV "\n");
 	}
 
+	for(i=0; i<str_n; i++) {
+		path[i][0] = 0;
+	}
+
+	buf_pos = buf;
+	buf_len = sizeof(buf);
 	if((fp = fopen(PROC_DEV, "r"))) {
-		while(fgets(buf, sizeof buf, fp)) {
-			switch(buf[0]) {
-			case 'I':
-				valid_vendor = strstr(buf, "Vendor=046d") != 0;
-				break;
+		while(fread(buf_pos, sizeof(char), buf_len, fp)) {
+			section_start = buf;
 
-			case 'N':
-				valid_str = strstr(buf, "3Dconnexion") != 0;
-				break;
-
-			case 'H':
-				if(valid_str && valid_vendor) {
-					char *ptr, *start;
-
-					if(!(start = strchr(buf, '='))) {
-						continue;
-					}
-					start++;
-
-					if((ptr = strstr(start, "event"))) {
-						start = ptr;
-					}
-
-					if((ptr = strchr(start, ' '))) {
-						*ptr = 0;
-					}
-					if((ptr = strchr(start, '\n'))) {
-						*ptr = 0;
-					}
-
-					snprintf(path, sizeof path, "/dev/input/%s", start);
-					fclose(fp);
-					return path;
+			for(;;) {
+				next_section = strstr(section_start, "\n\n");
+				if(next_section == NULL) {
+					/* move last (partial) section to start of buf */
+					buf_used = (buf + sizeof(buf)) - section_start;
+					memmove(buf, section_start, buf_used);
+					/* point to end of last section and calc remaining space in buf */
+					buf_pos = buf + buf_used + 1;
+					buf_len = sizeof(buf) - buf_used;
+					/* break to read from file again */
+					break;
 				}
-				break;
+				/* set second newline to teminating null */
+				*(next_section + sizeof(char)) = 0;
+				/* point to start of next section */
+				next_section += 2 * sizeof(char);
 
-			case '\n':
-				valid_vendor = valid_str = 0;
-				break;
+				valid_vendor = 0;
+				valid_str = 0;
+				cur_line = section_start;
+				while (*cur_line) {
+					next_line = strchr(cur_line, '\n');
+					*next_line = 0;
+					next_line++;
+					switch (*cur_line) {
+						case 'I':
+							valid_vendor = strstr(cur_line, "Vendor=046d") != 0;
+							break;
 
-			default:
-				break;
+						case 'N':
+							valid_str = strstr(cur_line, "3Dconnexion") != 0;
+							break;
+
+						case 'H':
+							if(valid_vendor && valid_str) {
+								char *ptr, *start;
+
+								if(!(start = strchr(cur_line, '='))) {
+									skip_section = 1;
+									break;
+								}
+								start++;
+
+								if((ptr = strstr(start, "event"))) {
+									start = ptr;
+								}
+
+								if((ptr = strchr(start, ' '))) {
+									*ptr = 0;
+								}
+
+								snprintf(path[path_idx], char_n, "/dev/input/%s", start);
+								path_idx++;
+								if(path_idx == str_n) {
+									return;
+								}
+							} else {
+								skip_section = 1;
+								break;
+							}
+					}
+					if(skip_section) {
+						skip_section = 0;
+						break;
+					}
+					cur_line = next_line;
+				}
+				section_start = next_section;
 			}
 		}
 		fclose(fp);
@@ -249,6 +283,10 @@ const char *find_usb_device(void)
 		if(verbose) {
 			perror("failed to open " PROC_DEV);
 		}
+	}
+
+	if(path[0][0] != 0) {
+		return;
 	}
 
 	if(verbose) {
@@ -263,26 +301,27 @@ const char *find_usb_device(void)
 	for(;;) {
 		int fd;
 
-		snprintf(path, sizeof path, "/dev/input/event%d", ++i);
+		snprintf(path[path_idx], char_n, "/dev/input/event%d", ++i);
 
 		if(verbose) {
-			fprintf(stderr, "  trying \"%s\" ... ", path);
+			fprintf(stderr, "  trying \"%s\" ... ", path[path_idx]);
 		}
 
-		if((fd = open(path, O_RDONLY)) == -1) {
+		if((fd = open(path[path_idx], O_RDONLY)) == -1) {
 			if(errno != ENOENT) {
 				fprintf(stderr, "failed to open %s: %s. this might hinder device detection\n",
-						path, strerror(errno));
+						path[path_idx], strerror(errno));
 				continue;
 			} else {
-				fprintf(stderr, "failed to open %s: %s\n", path, strerror(errno));
+				fprintf(stderr, "failed to open %s: %s\n", path[path_idx], strerror(errno));
+				path[path_idx][0] = 0;
 				break;
 			}
 		}
 
 		if(ioctl(fd, EVIOCGNAME(sizeof buf), buf) == -1) {
 			fprintf(stderr, "failed to get device name for device %s: %s. this might hinder device detection\n",
-					path, strerror(errno));
+					path[path_idx], strerror(errno));
 			buf[0] = 0;
 		}
 
@@ -292,13 +331,15 @@ const char *find_usb_device(void)
 
 		if(strstr(buf, "3Dconnexion")) {
 			close(fd);
-			return path;
+			path_idx++;
+			if(path_idx == str_n) {
+				return;
+			}
 		}
 		close(fd);
 	}
 
-	return 0;
+	return;
 }
-
 
 #endif	/* __linux__ */

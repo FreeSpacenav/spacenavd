@@ -24,13 +24,13 @@ static const char *message =
 	"Unfortunately this version of spacenavd does not support USB devices on your "
 	"platform yet. Make sure you are using the latest version of spacenavd.\n";
 
-const char *find_usb_device(void)
+void **find_usb_devices(char **path, int str_n, int char_n)
 {
 	fputs(message, stderr);
 	return 0;
 }
 
-int open_dev_usb(struct device *dev, const char *path)
+int open_dev_usb(struct device *dev)
 {
 	return -1;
 }

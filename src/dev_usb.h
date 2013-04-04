@@ -20,7 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct device;
 
-int open_dev_usb(struct device *dev, const char *path);
-const char *find_usb_device(void);
+int open_dev_usb(struct device *dev);
+void find_usb_devices(char **path, int str_n, int char_n);
 
 #endif	/* SPNAV_DEV_USB_H_ */

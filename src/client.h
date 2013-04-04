@@ -34,8 +34,6 @@ enum {
 
 struct client;
 
-int init_clients(void);
-
 struct client *add_client(int type, void *cdata);
 void remove_client(struct client *client);
 
@@ -47,6 +45,9 @@ Window get_client_window(struct client *client);
 
 void set_client_sensitivity(struct client *client, float sens);
 float get_client_sensitivity(struct client *client);
+
+void set_client_device_index(struct client *client, int dev_idx);
+int get_client_device_index(struct client *client);
 
 /* these two can be used to iterate over all clients */
 struct client *first_client(void);

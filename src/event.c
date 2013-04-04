@@ -34,12 +34,89 @@ enum {
 	MOT_RX, MOT_RY, MOT_RZ
 };
 
-static void dispatch_event(spnav_event *ev);
+struct dev_event {
+	spnav_event event;
+	struct timeval timeval;
+	struct device *dev;
+	int pending;
+	struct dev_event *next;
+};
+
+static struct dev_event *add_dev_event(struct device *dev);
+static struct dev_event *device_event_in_use(struct device *dev);
+static void dispatch_event(struct dev_event *dev);
 static void send_event(spnav_event *ev, struct client *c);
 static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
 
-static spnav_event ev;
-static int ev_pending;
+static struct dev_event *dev_ev_list = NULL;
+
+static struct dev_event *add_dev_event(struct device *dev)
+{
+	struct dev_event *dev_ev, *iter;
+	int i;
+
+	if((dev_ev = malloc(sizeof *dev_ev)) == NULL) {
+		return NULL;
+	}
+
+	dev_ev->event.motion.data = (int*)&dev_ev->event.motion.x;
+	for(i=0; i<6; i++)
+		dev_ev->event.motion.data[i] = 0;
+	gettimeofday(&dev_ev->timeval, 0);
+	dev_ev->dev = dev;
+	dev_ev->next = NULL;
+
+	if(dev_ev_list == NULL)
+		return dev_ev_list = dev_ev;
+
+	iter = dev_ev_list;
+	while(iter->next) {
+		iter = iter->next;
+	}
+	iter->next = dev_ev;
+	return dev_ev;
+}
+
+/* remove_dev_event takes a device pointer as argument so that upon removal of
+ * a device the pending event (if any) can be removed.
+ */
+void remove_dev_event(struct device *dev)
+{
+	struct dev_event *iter = dev_ev_list, *tmp;
+
+	if(iter == NULL)
+		return;
+	if(iter->dev == dev) {
+		dev_ev_list = iter->next;
+		free(iter);
+		if((iter = dev_ev_list) == NULL)
+			return;
+	}
+
+	while(iter->next) {
+		if(iter->next->dev == dev) {
+			if(verbose)
+				printf("removing device event of: %s\n", dev->path);
+			tmp = iter->next;
+			iter->next = iter->next->next;
+			free(tmp);
+		} else {
+			iter = iter->next;
+		}
+	}
+}
+
+static struct dev_event *device_event_in_use(struct device *dev)
+{
+	struct dev_event *iter = dev_ev_list;
+	while(iter) {
+		if(iter->dev == dev) {
+			return iter;
+		}
+		iter = iter->next;
+	}
+	return NULL;
+}
 
 /* process_input processes an device input event, and dispatches
  * spacenav events to the clients by calling dispatch_event.
@@ -47,9 +124,10 @@ static int ev_pending;
  * we get an INP_FLUSH event. Button events are dispatched immediately
  * and they implicitly flush any pending motion event.
  */
-void process_input(struct dev_input *inp)
+void process_input(struct device *dev, struct dev_input *inp)
 {
 	int sign;
+	struct dev_event *dev_ev;
 
 	switch(inp->type) {
 	case INP_MOTION:
@@ -62,10 +140,17 @@ void process_input(struct dev_input *inp)
 
 		inp->val = (int)((float)inp->val * cfg.sensitivity * (inp->idx < 3 ? cfg.sens_trans[inp->idx] : cfg.sens_rot[inp->idx - 3]));
 
-		ev.type = EVENT_MOTION;
-		ev.motion.data = (int*)&ev.motion.x;
-		ev.motion.data[inp->idx] = sign * inp->val;
-		ev_pending = 1;
+		dev_ev = device_event_in_use(dev);
+		if(verbose && dev_ev == NULL)
+			printf("adding dev event for device: %s\n", dev->path);
+		if(dev_ev == NULL && (dev_ev = add_dev_event(dev)) == NULL) {
+			fprintf(stderr, "failed to get dev_event\n");
+			break;
+		}
+		dev_ev->event.type = EVENT_MOTION;
+		dev_ev->event.motion.data = (int*)&dev_ev->event.motion.x;
+		dev_ev->event.motion.data[inp->idx] = sign * inp->val;
+		dev_ev->pending = 1;
 		break;
 
 	case INP_BUTTON:
@@ -82,26 +167,37 @@ void process_input(struct dev_input *inp)
 			break;
 		}
 #endif
-
-		if(ev_pending) {
-			dispatch_event(&ev);
-			ev_pending = 0;
+		dev_ev = device_event_in_use(dev);
+		if(dev_ev && dev_ev->pending) {
+			dispatch_event(dev_ev);
+			dev_ev->pending = 0;
 		}
 		inp->idx = cfg.map_button[inp->idx];
 
+		/* button events are not queued */
 		{
-			union spnav_event bev;
-			bev.type = EVENT_BUTTON;
-			bev.button.press = inp->val;
-			bev.button.bnum = inp->idx;
-			dispatch_event(&bev);
+			struct dev_event dev_button_event;
+			dev_button_event.dev = dev;
+			dev_button_event.event.type = EVENT_BUTTON;
+			dev_button_event.event.button.press = inp->val;
+			dev_button_event.event.button.bnum = inp->idx;
+			dispatch_event(&dev_button_event);
 		}
+
+		/* to have them replace motion events in the queue uncomment next section */
+		/* dev_ev = add_dev_event(dev);
+		 * dev_ev->event.type = EVENT_BUTTON;
+		 * dev_ev->event.button.press = inp->val;
+		 * dev_ev->event.button.bnum = inp->idx;
+		 * dispatch_event(dev_ev);
+		 */
 		break;
 
 	case INP_FLUSH:
-		if(ev_pending) {
-			dispatch_event(&ev);
-			ev_pending = 0;
+		dev_ev = device_event_in_use(dev);
+		if(dev_ev && dev_ev->pending) {
+			dispatch_event(dev_ev);
+			dev_ev->pending = 0;
 		}
 		break;
 
@@ -110,47 +206,47 @@ void process_input(struct dev_input *inp)
 	}
 }
 
-int in_deadzone(void)
+int in_deadzone(struct device *dev)
 {
 	int i;
-	if(!ev.motion.data) {
-		ev.motion.data = &ev.motion.x;
-	}
-
+	struct dev_event *dev_ev;
+	if((dev_ev = device_event_in_use(dev)) == NULL)
+		return -1;
 	for(i=0; i<6; i++) {
-		if(ev.motion.data[i] != 0) {
+		if(dev_ev->event.motion.data[i] != 0)
 			return 0;
-		}
 	}
 	return 1;
 }
 
-void repeat_last_event(void)
+void repeat_last_event(struct device *dev)
 {
-	if(ev.type == EVENT_MOTION) {
-		dispatch_event(&ev);
-	}
+	struct dev_event *dev_ev;
+	if((dev_ev = device_event_in_use(dev)) == NULL)
+		return;
+	dispatch_event(dev_ev);
 }
 
-static void dispatch_event(spnav_event *ev)
+static void dispatch_event(struct dev_event *dev_ev)
 {
-	struct client *c, *citer;
-	static struct timeval prev_motion_time;
+	struct client *c, *client_iter;
+	int dev_idx;
 
-	if(ev->type == EVENT_MOTION) {
+	if(dev_ev->event.type == EVENT_MOTION) {
 		struct timeval tv;
 		gettimeofday(&tv, 0);
 
-		ev->motion.period = msec_dif(tv, prev_motion_time);
-		prev_motion_time = tv;
+		dev_ev->event.motion.period = msec_dif(tv, dev_ev->timeval);
+		dev_ev->timeval = tv;
 	}
 
-	citer = first_client();
-	while(citer) {
-		c = citer;
-		citer = next_client();
-
-		send_event(ev, c);
+	dev_idx = get_device_index(dev_ev->dev);
+	client_iter = first_client();
+	while(client_iter) {
+		c = client_iter;
+		client_iter = next_client();
+		if(get_client_device_index(c) <= dev_idx) /* use <= until API changes, else == */
+			send_event(&dev_ev->event, c);
 	}
 }
 

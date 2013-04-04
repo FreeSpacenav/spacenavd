@@ -21,6 +21,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config.h"
 #include <sys/time.h>
+#include "dev.h"
 
 enum {
 	EVENT_MOTION,
@@ -47,8 +48,6 @@ typedef union spnav_event {
 	struct event_button button;
 } spnav_event;
 
-
-
 enum {
 	INP_MOTION,
 	INP_BUTTON,
@@ -62,14 +61,15 @@ struct dev_input {
 	int val;
 };
 
+void remove_dev_event(struct device *dev);
 
-void process_input(struct dev_input *inp);
+void process_input(struct device *dev, struct dev_input *inp);
 
 /* non-zero if the last processed motion event was in the deadzone */
-int in_deadzone(void);
+int in_deadzone(struct device *dev);
 
 /* dispatches the last event */
-void repeat_last_event(void);
+void repeat_last_event(struct device *dev);
 
 
 #endif	/* EVENT_H_ */

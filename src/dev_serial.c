@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 static void close_dev_serial(struct device *dev);
 static int read_dev_serial(struct device *dev, struct dev_input *inp);
 
-int open_dev_serial(struct device *dev, const char *devfile)
+int open_dev_serial(struct device *dev)
 {
-	if(!(dev->data = sball_open(devfile))) {
+	if(!(dev->data = sball_open(dev->path))) {
 		return -1;
 	}
 	dev->fd = sball_get_fd(dev->data);

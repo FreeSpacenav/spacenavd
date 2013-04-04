@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef SPNAV_DEV_H_
 #define SPNAV_DEV_H_
 
+#include <limits.h>
 #include "config.h"
 
 struct dev_input;
@@ -28,19 +29,26 @@ struct device {
 	int fd;
 	void *data;
 	char name[MAX_DEV_NAME];
+  char path[PATH_MAX];
 
 	void (*close)(struct device*);
 	int (*read)(struct device*, struct dev_input*);
 	void (*set_led)(struct device*, int);
+
+  struct device *next;
 };
 
-int init_dev(void);
-void shutdown_dev(void);
-int get_dev_fd(void);
-#define is_dev_valid()	(get_dev_fd() >= 0)
+int init_devices(void);
 
-int read_dev(struct dev_input *inp);
+void remove_device(struct device *dev);
 
-void set_led(int state);
+int get_device_fd(struct device *dev);
+#define is_device_valid(dev) (get_device_fd(dev) >= 0)
+int get_device_index(struct device *dev);
+int read_device(struct device *dev, struct dev_input *inp);
+void set_device_led(struct device *dev, int state);
+
+struct device *first_device(void);
+struct device *next_device(void);
 
 #endif	/* SPNAV_DEV_H_ */

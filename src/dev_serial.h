@@ -21,6 +21,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct device;
 
-int open_dev_serial(struct device *dev, const char *devfile);
+int open_dev_serial(struct device *dev);
 
 #endif	/* SPNAV_DEV_SERIAL_H_ */

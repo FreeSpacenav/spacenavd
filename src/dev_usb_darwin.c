@@ -23,12 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <IOKit/hid/IOHIDLib.h>
 #include "dev.h"
 
-int open_dev_usb(struct device *dev, const char *path)
+int open_dev_usb(struct device *dev)
 {
 	return -1;
 }
 
-const char *find_usb_device(void)
+void find_usb_devices(char **path, int str_n, int char_n);
 {
 	static const int vendor_id = 1133;	/* 3dconnexion */
 	static char dev_path[512];
@@ -47,7 +47,8 @@ const char *find_usb_device(void)
 	/* fetch... */
 	if(IOServiceGetMatchingServices(kIOMasterPortDefault, match_dict, &iter) != kIOReturnSuccess) {
 		fprintf(stderr, "failed to retrieve USB HID devices\n");
-		return 0;
+		/* return 0; */
+		return;
 	}
 
 	dev = IOIteratorNext(iter);
@@ -56,7 +57,7 @@ const char *find_usb_device(void)
 
 	IOObjectRelease(dev);
 	IOObjectRelease(iter);
-	return dev_path;
+	/* return dev_path;*/
 }
 
 #endif	/* __APPLE__ && __MACH__ */

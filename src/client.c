@@ -35,24 +35,14 @@ struct client {
 #endif
 
 	float sens;	/* sensitivity */
+	int dev_idx; /* device index */
 
 	struct client *next;
 };
 
 
-static struct client *client_list;
-static struct client *citer;	/* iterator (used by first/next calls) */
-
-int init_clients(void)
-{
-	if(!(client_list = malloc(sizeof *client_list))) {
-		perror("failed to allocate client list");
-		return -1;
-	}
-	client_list->next = 0;
-	return 0;
-}
-
+static struct client *client_list = NULL;
+static struct client *client_iter;	/* iterator (used by first/next calls) */
 
 /* add a client to the list
  * cdata points to the socket fd for new-protocol clients, or the
@@ -63,9 +53,9 @@ struct client *add_client(int type, void *cdata)
 	struct client *client;
 
 #ifdef USE_X11
-	if(!cdata || (type != CLIENT_UNIX && type != CLIENT_X11)) 
+	if(!cdata || (type != CLIENT_UNIX && type != CLIENT_X11))
 #else
-	if(!cdata || type != CLIENT_UNIX) 
+	if(!cdata || type != CLIENT_UNIX)
 #endif
 	{
 		return 0;
@@ -85,8 +75,14 @@ struct client *add_client(int type, void *cdata)
 	}
 
 	client->sens = 1.0f;
-	client->next = client_list->next;
-	client_list->next = client;
+	client->dev_idx = 0; /* default/first device */
+
+	if(client_list == NULL) {
+		client->next = NULL;
+		return (client_list = client);
+	}
+	client->next = client_list;
+	client_list = client;
 
 	return client;
 }
@@ -94,6 +90,15 @@ struct client *add_client(int type, void *cdata)
 void remove_client(struct client *client)
 {
 	struct client *iter = client_list;
+
+	if(iter == NULL)
+		return;
+	if(iter == client) {
+		client_list = iter->next;
+		free(iter);
+		if((iter = client_list) == NULL)
+			return;
+	}
 
 	while(iter->next) {
 		if(iter->next == client) {
@@ -133,13 +138,24 @@ float get_client_sensitivity(struct client *client)
 	return client->sens;
 }
 
+void set_client_device_index(struct client *client, int dev_idx)
+{
+	client->dev_idx = dev_idx;
+}
+
+int get_client_device_index(struct client *client)
+{
+	return client->dev_idx;
+}
+
 struct client *first_client(void)
 {
-	return citer = client_list->next;
+	return (client_iter = client_list);
 }
 
 struct client *next_client(void)
 {
-	citer = citer->next;
-	return citer;
+	if(client_iter)
+		client_iter = client_iter->next;
+	return client_iter;
 }
