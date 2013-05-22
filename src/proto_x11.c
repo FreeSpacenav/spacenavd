@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <setjmp.h>
 #ifdef HAVE_ALLOCA_H
 #include <alloca.h>
@@ -84,8 +85,21 @@ int init_x11(void)
 	/* ... also there won't be an XAUTHORITY env var, so set one up */
 	if(!getenv("XAUTHORITY")) {
 		struct passwd *p = getpwuid(getuid());
-		char *home = p->pw_dir ? p->pw_dir : "/tmp";
-		char *buf = alloca(strlen("XAUTHORITY=") + strlen(home) + strlen("/.Xauthority") + 1);
+		char *home, *buf;
+		if(!p || !p->pw_dir) {
+			if(!p) {
+				fprintf(stderr, "getpwuid failed: %s\n", strerror(errno));
+			}
+			fprintf(stderr, "falling back to getting the home directory from the HOME env var...\n");
+			if(!(home = getenv("HOME"))) {
+				fprintf(stderr, "HOME env var not found, using /tmp as a home directory...\n");
+				home = "/tmp";
+			}
+		} else {
+			home = p->pw_dir;
+		}
+
+		buf = alloca(strlen("XAUTHORITY=") + strlen(home) + strlen("/.Xauthority") + 1);
 		sprintf(buf, "XAUTHORITY=%s/.Xauthority", home);
 		putenv(buf);
 	}
