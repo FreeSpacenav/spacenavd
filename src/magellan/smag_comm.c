@@ -22,6 +22,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/select.h>
+#include <sys/time.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <termios.h>
