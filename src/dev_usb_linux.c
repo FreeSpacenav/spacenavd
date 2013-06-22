@@ -205,7 +205,7 @@ void find_usb_devices(char **path, int str_n, int char_n)
 	buf_pos = buf;
 	buf_len = sizeof(buf);
 	if((fp = fopen(PROC_DEV, "r"))) {
-		while(fread(buf_pos, sizeof(char), buf_len, fp)) {
+		while(fread(buf_pos, 1, buf_len, fp) > 0) {
 			section_start = buf;
 
 			for(;;) {
@@ -215,15 +215,15 @@ void find_usb_devices(char **path, int str_n, int char_n)
 					buf_used = (buf + sizeof(buf)) - section_start;
 					memmove(buf, section_start, buf_used);
 					/* point to end of last section and calc remaining space in buf */
-					buf_pos = buf + buf_used + 1;
+					buf_pos = buf + buf_used;
 					buf_len = sizeof(buf) - buf_used;
 					/* break to read from file again */
 					break;
 				}
 				/* set second newline to teminating null */
-				*(next_section + sizeof(char)) = 0;
+				next_section[1] = 0;
 				/* point to start of next section */
-				next_section += 2 * sizeof(char);
+				next_section += 2;
 
 				valid_vendor = 0;
 				valid_str = 0;
