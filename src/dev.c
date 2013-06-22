@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -30,7 +30,6 @@ static struct device *add_device(void);
 static struct device *dev_path_in_use(char const * dev_path);
 
 static struct device *dev_list = NULL;
-static struct device *dev_iter;
 
 int init_devices(void)
 {
@@ -82,7 +81,7 @@ int init_devices(void)
 		}
 	}
 
-	for(i=0; i<8; i++) {
+	for(i=0; i<MAX_DEVICES; i++) {
 		free(dev_path[i]);
 	}
 	free(dev_path);
@@ -96,59 +95,47 @@ int init_devices(void)
 
 static struct device *add_device(void)
 {
-	struct device *dev_new, *iter;
+	struct device *dev;
 
-	if((dev_new = malloc(sizeof *dev_new)) == NULL) {
-		return NULL;
+	if(!(dev = malloc(sizeof *dev))) {
+		return 0;
 	}
+	memset(dev, 0, sizeof *dev);
 
 	printf("adding device.\n");
 
-	dev_new->fd = -1;
-	dev_new->data = NULL;
-	dev_new->next = NULL;
+	dev->fd = -1;
+	dev->next = dev_list;
+	dev_list = dev;
 
-	if(dev_list == NULL)
-		return (dev_list = dev_new);
-
-	iter = dev_list;
-	while(iter->next) {
-		iter = iter->next;
-	}
-	iter->next = dev_new;
-	return dev_new;
+	return dev_list;
 }
 
 void remove_device(struct device *dev)
 {
-	struct device *iter = dev_list, *tmp;
+	struct device dummy;
+	struct device *iter;
 
-	if(iter == NULL)
-		return;
-	if(iter == dev) {
-		if(verbose)
-				printf("removing device: %s\n", dev->path);
-		dev_list = iter->next;
-		free(iter);
-		if((iter = dev_list) == NULL)
-			return;
-	}
+	printf("removing device: %s\n", dev->name);
+
+	dummy.next = dev_list;
+	iter = &dummy;
 
 	while(iter->next) {
 		if(iter->next == dev) {
-			if(verbose)
-				printf("removing device: %s\n", dev->path);
-			tmp = iter->next;
-			iter->next = iter->next->next;
-			remove_dev_event(dev);
-			if(tmp->fd >= 0) {
-				close(tmp->fd);
-			}
-			free(tmp);
-		} else {
-			iter = iter->next;
+			iter->next = dev->next;
+			break;
 		}
+		iter = iter->next;
 	}
+	dev_list = dummy.next;
+
+	remove_dev_event(dev);
+
+	if(dev->close) {
+		dev->close(dev);
+	}
+	free(dev);
 }
 
 static struct device *dev_path_in_use(char const *dev_path)
@@ -165,9 +152,7 @@ static struct device *dev_path_in_use(char const *dev_path)
 
 int get_device_fd(struct device *dev)
 {
-	if(dev == NULL)
-		return -1;
-	return dev->fd;
+	return dev ? dev->fd : -1;
 }
 
 int get_device_index(struct device *dev)
@@ -175,8 +160,9 @@ int get_device_index(struct device *dev)
 	struct device *iter = dev_list;
 	int index = 0;
 	while(iter) {
-		if(dev == iter)
+		if(dev == iter) {
 			return index;
+		}
 		index++;
 		iter = iter->next;
 	}
@@ -185,25 +171,20 @@ int get_device_index(struct device *dev)
 
 int read_device(struct device *dev, struct dev_input *inp)
 {
-	if(dev->read == NULL)
+	if(dev->read == NULL) {
 		return -1;
-	return (dev->read(dev, inp));
+	}
+	return dev->read(dev, inp);
 }
 
 void set_device_led(struct device *dev, int state)
 {
-	if(dev->set_led)
+	if(dev->set_led) {
 		dev->set_led(dev, state);
+	}
 }
 
-struct device *first_device(void)
+struct device *get_devices(void)
 {
-	return (dev_iter = dev_list);
-}
-
-struct device *next_device(void)
-{
-	if(dev_iter)
-		dev_iter = dev_iter->next;
-	return dev_iter;
+	return dev_list;
 }

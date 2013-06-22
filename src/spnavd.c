@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -112,17 +112,17 @@ int main(int argc, char **argv)
 		fd_set rset;
 		int fd, max_fd = 0;
 		struct client *client_iter;
-		struct device *dev_iter;
+		struct device *dev;
 
 		FD_ZERO(&rset);
 
-		dev_iter = first_device();
-		while(dev_iter) {
-			if((fd = get_device_fd(dev_iter)) != -1) {
+		dev = get_devices();
+		while(dev) {
+			if((fd = get_device_fd(dev)) != -1) {
 				FD_SET(fd, &rset);
 				if(fd > max_fd) max_fd = fd;
 			}
-			dev_iter = next_device();
+			dev = dev->next;
 		}
 
 		if((fd = get_hotplug_fd()) != -1) {
@@ -158,12 +158,21 @@ int main(int argc, char **argv)
 #endif
 
 		do {
+			/* if there is at least one device out of the deadzone and repeat is enabled
+			 * wait for only as long as specified in cfg.repeat_msec
+			 */
 			struct timeval tv, *timeout = 0;
-			dev_iter = first_device();
-			if(is_device_valid(dev_iter) && cfg.repeat_msec >= 0 && !in_deadzone(dev_iter)) {
-				tv.tv_sec = cfg.repeat_msec / 1000;
-				tv.tv_usec = cfg.repeat_msec % 1000;
-				timeout = &tv;
+			if(cfg.repeat_msec >= 0) {
+				dev = get_devices();
+				while(dev) {
+					if(is_device_valid(dev) && !in_deadzone(dev)) {
+						tv.tv_sec = cfg.repeat_msec / 1000;
+						tv.tv_usec = cfg.repeat_msec % 1000;
+						timeout = &tv;
+						break;
+					}
+					dev = dev->next;
+				}
 			}
 
 			ret = select(max_fd + 1, &rset, 0, 0, timeout);
@@ -173,11 +182,12 @@ int main(int argc, char **argv)
 			handle_events(&rset);
 		} else {
 			if(cfg.repeat_msec >= 0) {
-				dev_iter = first_device();
-				while(dev_iter) {
-					if(!in_deadzone(dev_iter))
-						repeat_last_event(dev_iter);
-					dev_iter = next_device();
+				dev = get_devices();
+				while(dev) {
+					if(!in_deadzone(dev)) {
+						repeat_last_event(dev);
+					}
+					dev = dev->next;
 				}
 			}
 		}
@@ -187,7 +197,8 @@ int main(int argc, char **argv)
 
 static void cleanup(void)
 {
-	struct device *dev_iter, *tmp;
+	struct device *dev;
+
 #ifdef USE_X11
 	close_x11();	/* call to avoid leaving garbage in the X server's root windows */
 #endif
@@ -195,12 +206,13 @@ static void cleanup(void)
 
 	shutdown_hotplug();
 
-	dev_iter = first_device();
-	while(dev_iter) {
-		tmp = next_device();
-		remove_device(dev_iter);
-		dev_iter = tmp;
+	dev = get_devices();
+	while(dev) {
+		struct device *tmp = dev;
+		dev = dev->next;
+		remove_device(tmp);
 	}
+
 	remove(PIDFILE);
 }
 
@@ -283,7 +295,7 @@ static int find_running_daemon(void)
 static void handle_events(fd_set *rset)
 {
 	int dev_fd, hotplug_fd;
-	struct device *dev_iter;
+	struct device *dev;
 	struct dev_input inp;
 
 	/* handle anything coming through the UNIX socket */
@@ -295,16 +307,16 @@ static void handle_events(fd_set *rset)
 #endif
 
 	/* finally read any pending device input data */
-	dev_iter = first_device();
-	while(dev_iter) {
-		if((dev_fd = get_device_fd(dev_iter)) != -1 && FD_ISSET(dev_fd, rset)) {
+	dev = get_devices();
+	while(dev) {
+		if((dev_fd = get_device_fd(dev)) != -1 && FD_ISSET(dev_fd, rset)) {
 			/* read an event from the device ... */
-			while(read_device(dev_iter, &inp) != -1) {
+			while(read_device(dev, &inp) != -1) {
 				/* ... and process it, possibly dispatching a spacenav event to clients */
-				process_input(dev_iter, &inp);
+				process_input(dev, &inp);
 			}
 		}
-		dev_iter = next_device();
+		dev = dev->next;
 	}
 
 	if((hotplug_fd = get_hotplug_fd()) != -1) {
@@ -319,21 +331,22 @@ static void handle_events(fd_set *rset)
  */
 static void sig_handler(int s)
 {
-	int tmp;
-	struct device *dev_iter;
+	int prev_led = cfg.led;
 
 	switch(s) {
 	case SIGHUP:
-		tmp = cfg.led;
 		read_cfg("/etc/spnavrc", &cfg);
-		dev_iter = first_device();
-		while(dev_iter) {
-			if(cfg.led != tmp && is_device_valid(dev_iter)) {
-				if(verbose)
-					printf("turn led %s, device: %s\n", cfg.led ? "on": "off", dev_iter->name);
-				set_device_led(dev_iter, cfg.led);
+		if(cfg.led != prev_led) {
+			struct device *dev = get_devices();
+			while(dev) {
+				if(is_device_valid(dev)) {
+					if(verbose) {
+						printf("turn led %s, device: %s\n", cfg.led ? "on": "off", dev->name);
+					}
+					set_device_led(dev, cfg.led);
+				}
+				dev = dev->next;
 			}
-			dev_iter = next_device();
 		}
 		break;
 

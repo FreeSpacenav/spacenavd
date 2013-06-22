@@ -108,7 +108,6 @@ static void close_evdev(struct device *dev)
 		dev->set_led(dev, 0);
 		close(dev->fd);
 		dev->fd = -1;
-		remove_device(dev);
 	}
 }
 

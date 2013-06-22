@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -82,28 +82,26 @@ static struct dev_event *add_dev_event(struct device *dev)
  */
 void remove_dev_event(struct device *dev)
 {
-	struct dev_event *iter = dev_ev_list, *tmp;
+	struct dev_event dummy;
+	struct dev_event *iter;
 
-	if(iter == NULL)
-		return;
-	if(iter->dev == dev) {
-		dev_ev_list = iter->next;
-		free(iter);
-		if((iter = dev_ev_list) == NULL)
-			return;
-	}
+	dummy.next = dev_ev_list;
+	iter = &dummy;
 
 	while(iter->next) {
 		if(iter->next->dev == dev) {
-			if(verbose)
-				printf("removing device event of: %s\n", dev->path);
-			tmp = iter->next;
-			iter->next = iter->next->next;
-			free(tmp);
+			struct dev_event *ev = iter->next;
+			iter->next = ev->next;
+
+			if(verbose) {
+				printf("removing pending device event of: %s\n", dev->path);
+			}
+			free(ev);
 		} else {
 			iter = iter->next;
 		}
 	}
+	dev_ev_list = dummy.next;
 }
 
 static struct dev_event *device_event_in_use(struct device *dev)

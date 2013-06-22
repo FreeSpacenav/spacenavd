@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,7 +48,6 @@ int get_device_index(struct device *dev);
 int read_device(struct device *dev, struct dev_input *inp);
 void set_device_led(struct device *dev, int state);
 
-struct device *first_device(void);
-struct device *next_device(void);
+struct device *get_devices(void);
 
 #endif	/* SPNAV_DEV_H_ */
