@@ -15,39 +15,35 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef SPNAV_DEV_H_
-#define SPNAV_DEV_H_
+#include <stdio.h>
+#include <stdlib.h>
+#include "dev_usb.h"
 
-#include <limits.h>
-#include "config.h"
 
-struct dev_input;
+void free_usb_devices_list(struct usb_device_info *list)
+{
+	while(list) {
+		int i;
+		struct usb_device_info *tmp = list;
+		list = list->next;
 
-#define MAX_DEV_NAME	256
+		free(tmp->name);
+		for(i=0; i<tmp->num_devfiles; i++) {
+			free(tmp->devfiles[i]);
+		}
+		free(tmp);
+	}
+}
 
-struct device {
-	int fd;
-	void *data;
-	char name[MAX_DEV_NAME];
-	char path[PATH_MAX];
+void print_usb_device_info(struct usb_device_info *devinfo)
+{
+	int i;
 
-	void (*close)(struct device*);
-	int (*read)(struct device*, struct dev_input*);
-	void (*set_led)(struct device*, int);
+	printf("[%x:%x]: \"%s\" (", devinfo->vendorid, devinfo->productid,
+			devinfo->name ? devinfo->name : "unknown");
 
-  struct device *next;
-};
-
-int init_devices(void);
-
-void remove_device(struct device *dev);
-
-int get_device_fd(struct device *dev);
-#define is_device_valid(dev) (get_device_fd(dev) >= 0)
-int get_device_index(struct device *dev);
-int read_device(struct device *dev, struct dev_input *inp);
-void set_device_led(struct device *dev, int state);
-
-struct device *get_devices(void);
-
-#endif	/* SPNAV_DEV_H_ */
+	for(i=0; i<devinfo->num_devfiles; i++) {
+		printf("%s ", devinfo->devfiles[i]);
+	}
+	fputs(")\n", stdout);
+}

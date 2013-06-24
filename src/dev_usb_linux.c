@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -24,10 +24,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include <stdlib.h>
 #include <fcntl.h>
+#include <dirent.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <linux/types.h>
 #include <linux/input.h>
 #include "dev.h"
+#include "dev_usb.h"
 #include "spnavd.h"
 #include "event.h"
 #include "hotplug.h"
@@ -68,7 +71,7 @@ int open_dev_usb(struct device *dev)
 	}
 
 	if(ioctl(dev->fd, EVIOCGNAME(sizeof dev->name), dev->name) == -1) {
-		perror("EVIOCGNAME ioctl failed\n");
+		perror("EVIOCGNAME ioctl failed");
 		strcpy(dev->name, "unknown");
 	}
 	printf("device name: %s\n", dev->name);
@@ -184,161 +187,220 @@ static void set_led_evdev(struct device *dev, int state)
 }
 
 #define PROC_DEV	"/proc/bus/input/devices"
-void find_usb_devices(char **path, int str_n, int char_n)
+struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_info*))
 {
-	int path_idx = 0;
-	int i, valid_vendor = 0, valid_str = 0;
-	int skip_section = 0, buf_used, buf_len;
+	struct usb_device_info *devlist = 0, devinfo;
+	int buf_used, buf_len;
 	char buf[1024];
 	char *buf_pos, *section_start, *next_section = 0, *cur_line, *next_line;
 	FILE *fp;
+	DIR *dir;
+	struct dirent *dent;
 
 	if(verbose) {
 		printf("Device detection, parsing " PROC_DEV "\n");
 	}
 
-	for(i=0; i<str_n; i++) {
-		path[i][0] = 0;
-	}
+	devlist = 0;
 
 	buf_pos = buf;
 	buf_len = sizeof(buf);
-	if((fp = fopen(PROC_DEV, "r"))) {
-		while(fread(buf_pos, 1, buf_len, fp) > 0) {
-			section_start = buf;
-
-			for(;;) {
-				next_section = strstr(section_start, "\n\n");
-				if(next_section == NULL) {
-					/* move last (partial) section to start of buf */
-					buf_used = (buf + sizeof(buf)) - section_start;
-					memmove(buf, section_start, buf_used);
-					/* point to end of last section and calc remaining space in buf */
-					buf_pos = buf + buf_used;
-					buf_len = sizeof(buf) - buf_used;
-					/* break to read from file again */
-					break;
-				}
-				/* set second newline to teminating null */
-				next_section[1] = 0;
-				/* point to start of next section */
-				next_section += 2;
-
-				valid_vendor = 0;
-				valid_str = 0;
-				cur_line = section_start;
-				while (*cur_line) {
-					next_line = strchr(cur_line, '\n');
-					*next_line = 0;
-					next_line++;
-					switch (*cur_line) {
-						case 'I':
-							valid_vendor = strstr(cur_line, "Vendor=046d") != 0;
-							break;
-
-						case 'N':
-							valid_str = strstr(cur_line, "3Dconnexion") != 0;
-							break;
-
-						case 'H':
-							if(valid_vendor && valid_str) {
-								char *ptr, *start;
-
-								if(!(start = strchr(cur_line, '='))) {
-									skip_section = 1;
-									break;
-								}
-								start++;
-
-								if((ptr = strstr(start, "event"))) {
-									start = ptr;
-								}
-
-								if((ptr = strchr(start, ' '))) {
-									*ptr = 0;
-								}
-
-								snprintf(path[path_idx], char_n, "/dev/input/%s", start);
-								path_idx++;
-								if(path_idx == str_n) {
-									return;
-								}
-							} else {
-								skip_section = 1;
-								break;
-							}
-					}
-					if(skip_section) {
-						skip_section = 0;
-						break;
-					}
-					cur_line = next_line;
-				}
-				section_start = next_section;
-			}
-		}
-		fclose(fp);
-	} else {
+	if(!(fp = fopen(PROC_DEV, "r"))) {
 		if(verbose) {
 			perror("failed to open " PROC_DEV);
 		}
+		goto alt_detect;
 	}
 
-	if(path[0][0] != 0) {
-		return;
-	}
+	while(fread(buf_pos, 1, buf_len, fp) > 0) {
+		section_start = buf;
 
+		for(;;) {
+			char *keyptr;
+
+			next_section = strstr(section_start, "\n\n");
+			if(next_section == NULL) {
+				/* move last (partial) section to start of buf */
+				buf_used = (buf + sizeof(buf)) - section_start;
+				memmove(buf, section_start, buf_used);
+				/* point to end of last section and calc remaining space in buf */
+				buf_pos = buf + buf_used;
+				buf_len = sizeof(buf) - buf_used;
+				/* break to read from file again */
+				break;
+			}
+			/* set second newline to teminating null */
+			next_section[1] = 0;
+			/* point to start of next section */
+			next_section += 2;
+
+			memset(&devinfo, 0, sizeof devinfo);
+
+			cur_line = section_start;
+			while (*cur_line) {
+				next_line = strchr(cur_line, '\n');
+				*next_line = 0;
+				next_line++;
+				switch (*cur_line) {
+				case 'I':
+					keyptr = strstr(cur_line, "Vendor=");
+					if(keyptr) {
+						char *endp, *valptr = keyptr + strlen("Vendor=");
+						devinfo.vendorid = strtol(valptr, &endp, 16);
+					}
+					keyptr = strstr(cur_line, "Product=");
+					if(keyptr) {
+						char *endp, *valptr = keyptr + strlen("Product=");
+						devinfo.productid = strtol(valptr, &endp, 16);
+					}
+					break;
+
+				case 'N':
+					keyptr = strstr(cur_line, "Name=\"");
+					if(keyptr) {
+						char *valptr = keyptr + strlen("Name=\"");
+						char *endp = strrchr(cur_line, '"');
+						if(endp) {
+							*endp = 0;
+						}
+						if(!(devinfo.name = strdup(valptr))) {
+							fprintf(stderr, "failed to allocate the device name buffer for: %s: %s\n", valptr, strerror(errno));
+						}
+					}
+					break;
+
+				case 'H':
+					keyptr = strstr(cur_line, "Handlers=");
+					if(keyptr) {
+						char *devfile, *valptr = keyptr + strlen("Handlers=");
+						static const char *prefix = "/dev/input/";
+
+						int idx = 0;
+						while((devfile = strtok(idx ? 0 : valptr, " \t\v\n\r"))) {
+							if(!(devinfo.devfiles[idx] = malloc(strlen(devfile) + strlen(prefix) + 1))) {
+								perror("failed to allocate device filename buffer");
+								continue;
+							}
+							sprintf(devinfo.devfiles[idx++], "%s%s", prefix, devfile);
+						}
+						devinfo.num_devfiles = idx;
+					}
+					break;
+
+				}
+				cur_line = next_line;
+			}
+
+			/* check with the user-supplied matching callback to see if we should include
+			 * this device in the returned list or not...
+			 */
+			if(!match || match(&devinfo)) {
+				/* add it to the list */
+				struct usb_device_info *node = malloc(sizeof *node);
+				if(node) {
+					if(verbose) {
+						printf("found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
+								devinfo.name ? devinfo.name : "unknown", devinfo.devfiles[0]);
+					}
+
+					*node = devinfo;
+					memset(&devinfo, 0, sizeof devinfo);
+
+					node->next = devlist;
+					devlist = node;
+				} else {
+					perror("failed to allocate usb device info node");
+				}
+			}
+
+			section_start = next_section;
+		}
+	}
+	fclose(fp);
+
+	if(devlist) {
+		return devlist;
+	}
+	/* otherwise try the alternative detection in case it finds something... */
+
+alt_detect:
 	if(verbose) {
-		fprintf(stderr, "trying alternative detection, querying /dev/input/eventX device names...\n");
+		fprintf(stderr, "trying alternative detection, querying /dev/input/ devices...\n");
 	}
 
 	/* if for some reason we can't open the /proc/bus/input/devices file, or we
-	 * couldn't find our device there, we'll try opening all /dev/input/eventX
-	 * devices, and see if anyone is named: 3Dconnexion whatever
+	 * couldn't find our device there, we'll try opening all /dev/input/
+	 * devices, and see if anyone matches our predicate
 	 */
-	i = 0;
-	for(;;) {
-		int fd;
+	if(!(dir = opendir("/dev/input"))) {
+		perror("failed to open /dev/input/ directory");
+		return 0;
+	}
 
-		snprintf(path[path_idx], char_n, "/dev/input/event%d", ++i);
+	while((dent = readdir(dir))) {
+		int fd;
+		struct stat st;
+		struct input_id id;
+
+		memset(&devinfo, 0, sizeof devinfo);
+
+		if(!(devinfo.devfiles[0] = malloc(strlen(dent->d_name) + strlen("/dev/input/") + 1))) {
+			perror("failed to allocate device file name");
+			continue;
+		}
+		sprintf(devinfo.devfiles[0], "/dev/input/%s", dent->d_name);
+		devinfo.num_devfiles = 1;
 
 		if(verbose) {
-			fprintf(stderr, "  trying \"%s\" ... ", path[path_idx]);
+			fprintf(stderr, "  trying \"%s\" ... ", devinfo.devfiles[0]);
 		}
 
-		if((fd = open(path[path_idx], O_RDONLY)) == -1) {
-			if(errno != ENOENT) {
-				fprintf(stderr, "failed to open %s: %s. this might hinder device detection\n",
-						path[path_idx], strerror(errno));
+		if(stat(devinfo.devfiles[0], &st) == -1 || !S_ISCHR(st.st_mode)) {
+			free(devinfo.devfiles[0]);
+			continue;
+		}
+
+		if((fd = open(devinfo.devfiles[0], O_RDONLY)) == -1) {
+			fprintf(stderr, "failed to open %s: %s\n", devinfo.devfiles[0], strerror(errno));
+			free(devinfo.devfiles[0]);
+			continue;
+		}
+
+		if(ioctl(fd, EVIOCGID, &id) != -1) {
+			devinfo.vendorid = id.vendor;
+			devinfo.productid = id.product;
+		}
+
+		if(ioctl(fd, EVIOCGNAME(sizeof buf), buf) != -1) {
+			if(!(devinfo.name = strdup(buf))) {
+				perror("failed to allocate device name buffer");
+				close(fd);
+				free(devinfo.devfiles[0]);
 				continue;
-			} else {
-				fprintf(stderr, "failed to open %s: %s\n", path[path_idx], strerror(errno));
-				path[path_idx][0] = 0;
-				break;
 			}
 		}
 
-		if(ioctl(fd, EVIOCGNAME(sizeof buf), buf) == -1) {
-			fprintf(stderr, "failed to get device name for device %s: %s. this might hinder device detection\n",
-					path[path_idx], strerror(errno));
-			buf[0] = 0;
-		}
+		if(!match || match(&devinfo)) {
+			struct usb_device_info *node = malloc(sizeof *node);
+			if(node) {
+				if(verbose) {
+					printf("found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
+							devinfo.name ? devinfo.name : "unknown", devinfo.devfiles[0]);
+				}
 
-		if(verbose) {
-			fprintf(stderr, "%s\n", buf[0] ? buf : "unknown");
-		}
-
-		if(strstr(buf, "3Dconnexion")) {
-			close(fd);
-			path_idx++;
-			if(path_idx == str_n) {
-				return;
+				*node = devinfo;
+				node->next = devlist;
+				devlist = node;
+			} else {
+				free(devinfo.devfiles[0]);
+				perror("failed to allocate usb device info");
 			}
 		}
 		close(fd);
 	}
+	closedir(dir);
 
-	return;
+	return devlist;
 }
 
 #endif	/* __linux__ */

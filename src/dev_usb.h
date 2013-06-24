@@ -21,6 +21,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct device;
 
 int open_dev_usb(struct device *dev);
-void find_usb_devices(char **path, int str_n, int char_n);
+
+/* USB device enumeration and matching */
+#define MAX_USB_DEV_FILES	16
+struct usb_device_info {
+	char *name;
+	int num_devfiles;
+	char *devfiles[MAX_USB_DEV_FILES];
+	int vendorid, productid;
+
+	struct usb_device_info *next;
+};
+
+struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_info*));
+void free_usb_devices_list(struct usb_device_info *list);
+void print_usb_device_info(struct usb_device_info *devinfo);
 
 #endif	/* SPNAV_DEV_USB_H_ */

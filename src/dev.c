@@ -22,74 +22,71 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include "dev.h"
 #include "dev_usb.h"
+#include "dev_js.h"
 #include "dev_serial.h"
 #include "event.h" /* remove pending events upon device removal */
 #include "spnavd.h"
 
 static struct device *add_device(void);
 static struct device *dev_path_in_use(char const * dev_path);
+static int match_usbdev(const struct usb_device_info *devinfo);
 
 static struct device *dev_list = NULL;
 
 int init_devices(void)
 {
-	struct device *dev_cur;
+	struct device *dev;
 	int i, device_added = 0;
-	char **dev_path;
+	struct usb_device_info *usblist, *usbdev;
 
 	/* try to open a serial device if specified in the config file */
 	if(cfg.serial_dev[0]) {
 		if(!dev_path_in_use(cfg.serial_dev)) {
-			dev_cur = add_device();
-			strcpy(dev_cur->path, cfg.serial_dev);
-			if(open_dev_serial(dev_cur) == -1) {
-				remove_device(dev_cur);
+			dev = add_device();
+			strcpy(dev->path, cfg.serial_dev);
+			if(open_dev_serial(dev) == -1) {
+				remove_device(dev);
 			} else {
-				strcpy(dev_cur->name, "serial device");
+				strcpy(dev->name, "serial device");
 				printf("using device: %s\n", cfg.serial_dev);
 				device_added++;
 			}
 		}
 	}
 
-	dev_path = malloc(MAX_DEVICES * sizeof(char *));
-	for(i=0; i<MAX_DEVICES; i++) {
-		dev_path[i] = malloc(PATH_MAX);
-	}
+	/* detect any supported USB devices */
+	usblist = find_usb_devices(match_usbdev);
 
-	find_usb_devices(dev_path, MAX_DEVICES, PATH_MAX);
-	if(!dev_path[0][0] && !cfg.serial_dev[0]) {
-		fprintf(stderr, "failed to find the any spaceball device files\n");
-	}
-
-	for(i=0; i<MAX_DEVICES; i++) {
-		if(dev_path[i][0] == 0)
-			break;
-		if(dev_path_in_use(dev_path[i]) != NULL) {
-			if(verbose) {
-				fprintf(stderr, "already using device at: %s\n", dev_path[i]);
+	usbdev = usblist;
+	while(usbdev) {
+		for(i=0; i<usbdev->num_devfiles; i++) {
+			if((dev = dev_path_in_use(usbdev->devfiles[i]))) {
+				if(verbose) {
+					fprintf(stderr, "already using device: %s (%s)\n", dev->name, dev->path);
+				}
+				break;
 			}
-			continue;
+
+			dev = add_device();
+			strcpy(dev->path, usbdev->devfiles[i]);
+
+			if(open_dev_usb(dev) == -1 && open_dev_js(dev) == -1) {
+				remove_device(dev);
+			} else {
+				printf("using device: %s\n", dev->path);
+				device_added++;
+				break;
+			}
 		}
-		dev_cur = add_device();
-		strcpy(dev_cur->path, dev_path[i]);
-		if(open_dev_usb(dev_cur) == -1) {
-			remove_device(dev_cur);
-		} else {
-			printf("using device: %s\n", dev_path[i]);
-			device_added++;
-		}
+		usbdev = usbdev->next;
 	}
 
-	for(i=0; i<MAX_DEVICES; i++) {
-		free(dev_path[i]);
-	}
-	free(dev_path);
+	free_usb_devices_list(usblist);
 
 	if(!device_added) {
+		fprintf(stderr, "failed to find any supported devices\n");
 		return -1;
 	}
-
 	return 0;
 }
 
@@ -187,4 +184,28 @@ void set_device_led(struct device *dev, int state)
 struct device *get_devices(void)
 {
 	return dev_list;
+}
+
+static int match_usbdev(const struct usb_device_info *devinfo)
+{
+	int i;
+
+	/* if it's a 3Dconnexion device match it immediately */
+	if(devinfo->vendorid == 0x046d || (devinfo->name && strstr(devinfo->name, "3Dconnexion"))) {
+		return 1;
+	}
+
+	/* match any joystick devices listed in the config file */
+	for(i=0; i<MAX_CUSTOM; i++) {
+		if(cfg.devid[i][0] != -1 && cfg.devid[i][1] != -1 &&
+				(unsigned int)cfg.devid[i][0] == devinfo->vendorid &&
+				(unsigned int)cfg.devid[i][1] == devinfo->productid) {
+			return 1;
+		}
+		if(cfg.devname[i] && devinfo->name && strcmp(cfg.devname[i], devinfo->name) == 0) {
+			return 1;
+		}
+	}
+
+	return 0;	/* no match */
 }

@@ -1,6 +1,6 @@
 /*
 spnavcfg - an interactive GUI configurator for the spacenavd daemon.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -22,6 +22,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <limits.h>
 
 #define MAX_BUTTONS		64
+#define MAX_CUSTOM		64
 
 struct cfg {
 	float sensitivity, sens_trans[3], sens_rot[3];
@@ -34,6 +35,9 @@ struct cfg {
 	int led, grab_device;
 	char serial_dev[PATH_MAX];
 	int repeat_msec;
+
+	char *devname[MAX_CUSTOM];	/* custom USB device name list */
+	int devid[MAX_CUSTOM][2];	/* custom USB vendor/product id list */
 };
 
 void default_cfg(struct cfg *cfg);

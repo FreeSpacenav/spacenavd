@@ -22,15 +22,18 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hid/IOHIDLib.h>
 #include "dev.h"
+#include "dev_usb.h"
 
 int open_dev_usb(struct device *dev)
 {
 	return -1;
 }
 
-void find_usb_devices(char **path, int str_n, int char_n);
+struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_info*))
 {
-	static const int vendor_id = 1133;	/* 3dconnexion */
+	struct usb_device_info *devlist = 0;
+	struct usb_device_info devinfo;
+	/*static const int vendor_id = 1133;*/	/* 3dconnexion */
 	static char dev_path[512];
 	io_object_t dev;
 	io_iterator_t iter;
@@ -40,24 +43,50 @@ void find_usb_devices(char **path, int str_n, int char_n);
 	match_dict = IOServiceMatching(kIOHIDDeviceKey);
 
 	/* add filter rule: vendor-id should be 3dconnexion's */
-	number_ref = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &vendor_id);
+	/*number_ref = CFNumberCreate(kCFAllocatorDefault, kCFNumberIntType, &vendor_id);
 	CFDictionarySetValue(match_dict, CFSTR(kIOHIDVendorIDKey), number_ref);
 	CFRelease(number_ref);
+	*/
 
 	/* fetch... */
 	if(IOServiceGetMatchingServices(kIOMasterPortDefault, match_dict, &iter) != kIOReturnSuccess) {
 		fprintf(stderr, "failed to retrieve USB HID devices\n");
-		/* return 0; */
-		return;
+		return 0;
 	}
 
-	dev = IOIteratorNext(iter);
+	while((dev = IOIteratorNext(iter))) {
+		memset(&devinfo, 0, sizeof devinfo);
 
-	IORegistryEntryGetPath(dev, kIOServicePlane, dev_path);
+		IORegistryEntryGetPath(dev, kIOServicePlane, dev_path);
+		if(!(devinfo.devfiles[0] = strdup(dev_path))) {
+			perror("failed to allocate device file path buffer");
+			continue;
+		}
+		devinfo.num_devfiles = 1;
+
+		// TODO retrieve vendor id and product id
+
+		if(!match || match(&devinfo)) {
+			struct usb_device_info *node = malloc(sizeof *node);
+			if(node) {
+				if(verbose) {
+					printf("found usb device: ");
+					print_usb_device_info(&devinfo);
+				}
+
+				*node = devinfo;
+				node->next = devlist;
+				devlist = node;
+			} else {
+				free(devinfo.devfiles[0]);
+				perror("failed to allocate usb device info node");
+			}
+		}
+	}
 
 	IOObjectRelease(dev);
 	IOObjectRelease(iter);
-	/* return dev_path;*/
+	return devlist;
 }
 
 #endif	/* __APPLE__ && __MACH__ */

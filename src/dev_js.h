@@ -15,39 +15,11 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef SPNAV_DEV_H_
-#define SPNAV_DEV_H_
+#ifndef DEV_JS_H_
+#define DEV_JS_H_
 
-#include <limits.h>
-#include "config.h"
+#include "dev.h"
 
-struct dev_input;
+int open_dev_js(struct device *dev);
 
-#define MAX_DEV_NAME	256
-
-struct device {
-	int fd;
-	void *data;
-	char name[MAX_DEV_NAME];
-	char path[PATH_MAX];
-
-	void (*close)(struct device*);
-	int (*read)(struct device*, struct dev_input*);
-	void (*set_led)(struct device*, int);
-
-  struct device *next;
-};
-
-int init_devices(void);
-
-void remove_device(struct device *dev);
-
-int get_device_fd(struct device *dev);
-#define is_device_valid(dev) (get_device_fd(dev) >= 0)
-int get_device_index(struct device *dev);
-int read_device(struct device *dev, struct dev_input *inp);
-void set_device_led(struct device *dev, int state);
-
-struct device *get_devices(void);
-
-#endif	/* SPNAV_DEV_H_ */
+#endif	/* DEV_JS_H_ */

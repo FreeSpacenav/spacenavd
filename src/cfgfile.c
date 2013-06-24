@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -57,6 +57,11 @@ void default_cfg(struct cfg *cfg)
 	}
 
 	cfg->repeat_msec = -1;
+
+	for(i=0; i<MAX_CUSTOM; i++) {
+		cfg->devname[i] = 0;
+		cfg->devid[i][0] = cfg->devid[i][1] = -1;
+	}
 }
 
 #define EXPECT(cond) \
@@ -72,6 +77,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	FILE *fp;
 	char buf[512];
 	struct flock flk;
+	int num_devid = 0;
+	/*int num_devnames = 0;*/
 
 	default_cfg(cfg);
 
@@ -276,6 +283,18 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "serial") == 0) {
 			strncpy(cfg->serial_dev, val_str, PATH_MAX);
 
+		} else if(strcmp(key_str, "device-id") == 0) {
+			unsigned int vendor, prod;
+			if(sscanf(val_str, "%x:%x", &vendor, &prod) == 2) {
+				cfg->devid[num_devid][0] = (int)vendor;
+				cfg->devid[num_devid][1] = (int)prod;
+				num_devid++;
+			} else {
+				fprintf(stderr, "invalid configuration value for %s, expected a vendorid:productid pair\n", key_str);
+				continue;
+			}
+
+
 		} else {
 			fprintf(stderr, "unrecognized config option: %s\n", key_str);
 		}
@@ -419,6 +438,14 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		fprintf(fp, "serial = %s\n\n", cfg->serial_dev);
 	} else {
 		fprintf(fp, "#serial = /dev/ttyS0\n");
+	}
+
+	fprintf(fp, "# custom list USB device ids to open if present\n");
+	fprintf(fp, "# (multiple entries can be listed)\n");
+	for(i=0; i<MAX_CUSTOM; i++) {
+		if(cfg->devid[i][0] != -1 && cfg->devid[i][1] != -1) {
+			fprintf(fp, "device-id = %x:%x\n", cfg->devid[i][0], cfg->devid[i][1]);
+		}
 	}
 
 	/* unlock */
