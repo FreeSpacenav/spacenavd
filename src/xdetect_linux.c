@@ -33,6 +33,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 /* TODO implement fallback to polling if inotify is not available */
 
+static int try_xconnect(void);
+
 static int fd = -1;
 static int watch_tmp = -1, watch_x11 = -1;
 
@@ -112,6 +114,9 @@ int handle_xdet_events(fd_set *rset)
 					perror("failed to add /tmp/.X11-unix to the watch queue");
 					continue;
 				}
+				if(try_xconnect() == 0) {
+					return 0;
+				}
 			}
 
 		} else if(ev->wd == watch_x11) {
@@ -127,20 +132,13 @@ int handle_xdet_events(fd_set *rset)
 			sprintf(sock_file, "X%d", dpynum);
 
 			if(ev->len > 0 && strcmp(ev->name, sock_file) == 0) {
-				int i;
-
 				if(verbose) {
 					printf("found X socket, will now attempt to connect to the X server\n");
 				}
 
-				/* poll for approximately 30 seconds (well a bit more than that) */
-				for(i=0; i<30; i++) {
-					sleep(1);
-					if(init_x11() != -1) {
-						return 0; /* success */
-					}
+				if(try_xconnect() == 0) {
+					return 0;
 				}
-
 				fprintf(stderr, "found X socket yet failed to connect\n");
 			}
 		}
@@ -148,6 +146,20 @@ int handle_xdet_events(fd_set *rset)
 
 	return -1;
 }
+
+static int try_xconnect(void)
+{
+	int i;
+	/* poll for approximately 15 seconds (well a bit more than that) */
+	for(i=0; i<15; i++) {
+		sleep(1);
+		if(init_x11() != -1) {
+			return 0; /* success */
+		}
+	}
+	return -1;
+}
+
 #endif	/* USE_X11 */
 
 #else
