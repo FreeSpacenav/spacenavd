@@ -31,6 +31,10 @@ struct device {
 	char name[MAX_DEV_NAME];
 	char path[PATH_MAX];
 
+	int num_axes;
+	int *minval, *maxval;	/* input value range (default: -500, 500) */
+	int *fuzz;				/* noise threshold */
+
 	void (*close)(struct device*);
 	int (*read)(struct device*, struct dev_input*);
 	void (*set_led)(struct device*, int);

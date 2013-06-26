@@ -30,6 +30,20 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_DEVICES 8
 #endif
 
+#if defined(__cplusplus) || (__STDC_VERSION__ >= 199901L)
+#define INLINE	inline
+#else	/* not C++ or C99 */
+
+#ifdef __GNUC__
+#define INLINE	__inline__
+#else
+#define INLINE
+#endif
+
+#endif
+
+
+
 struct cfg cfg;
 int verbose;
 

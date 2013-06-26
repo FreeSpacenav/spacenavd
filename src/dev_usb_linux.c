@@ -35,6 +35,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "event.h"
 #include "hotplug.h"
 
+#define DEF_MINVAL	(-500)
+#define DEF_MAXVAL	500
+#define DEF_RANGE	(DEF_MAXVAL - DEF_MINVAL)
+
 #define IS_DEV_OPEN(dev) ((dev)->fd >= 0)
 
 /* sometimes the rotation events are missing from linux/input.h */
@@ -60,7 +64,9 @@ static void set_led_evdev(struct device *dev, int state);
 
 int open_dev_usb(struct device *dev)
 {
-	/*unsigned char evtype_mask[(EV_MAX + 7) / 8];*/
+	int i;
+	struct input_absinfo absinfo;
+	unsigned char evtype_mask[(EV_MAX + 7) / 8];
 
 	if((dev->fd = open(dev->path, O_RDWR)) == -1) {
 		if((dev->fd = open(dev->path, O_RDONLY)) == -1) {
@@ -76,6 +82,51 @@ int open_dev_usb(struct device *dev)
 	}
 	printf("device name: %s\n", dev->name);
 
+	/* get number of axes */
+	dev->num_axes = 6;	/* default to regular 6dof controller axis count */
+	if(ioctl(dev->fd, EVIOCGBIT(EV_ABS, sizeof evtype_mask), evtype_mask) == 0) {
+		dev->num_axes = 0;
+		for(i=0; i<ABS_CNT; i++) {
+			int idx = i / 8;
+			int bit = i % 8;
+
+			if(evtype_mask[idx] & (1 << bit)) {
+				dev->num_axes++;
+			} else {
+				break;
+			}
+		}
+	}
+	if(verbose) {
+		printf("  Number of axes: %d\n", dev->num_axes);
+	}
+
+	dev->minval = malloc(dev->num_axes * sizeof *dev->minval);
+	dev->maxval = malloc(dev->num_axes * sizeof *dev->maxval);
+	dev->fuzz = malloc(dev->num_axes * sizeof *dev->fuzz);
+
+	if(!dev->minval || !dev->maxval || !dev->fuzz) {
+		perror("failed to allocate memory");
+		return -1;
+	}
+
+	/* if the device is an absolute device, find the minimum and maximum axis values */
+	for(i=0; i<dev->num_axes; i++) {
+		dev->minval[i] = DEF_MINVAL;
+		dev->maxval[i] = DEF_MAXVAL;
+		dev->fuzz[i] = 0;
+
+		if(ioctl(dev->fd, EVIOCGABS(i), &absinfo) == 0) {
+			dev->minval[i] = absinfo.minimum;
+			dev->maxval[i] = absinfo.maximum;
+			dev->fuzz[i] = absinfo.fuzz;
+
+			if(verbose) {
+				printf("  Axis %d value range: %d - %d (fuzz: %d)\n", i, dev->minval[i], dev->maxval[i], dev->fuzz[i]);
+			}
+		}
+	}
+
 	/*if(ioctl(dev->fd, EVIOCGBIT(0, sizeof(evtype_mask)), evtype_mask) == -1) {
 		perror("EVIOCGBIT ioctl failed\n");
 		close(dev->fd);
@@ -86,7 +137,7 @@ int open_dev_usb(struct device *dev)
 		int grab = 1;
 		/* try to grab the device */
 		if(ioctl(dev->fd, EVIOCGRAB, &grab) == -1) {
-			perror("failed to grab the spacenav device");
+			perror("failed to grab the device");
 		}
 	}
 
@@ -112,6 +163,16 @@ static void close_evdev(struct device *dev)
 		close(dev->fd);
 		dev->fd = -1;
 	}
+}
+
+static INLINE int map_range(struct device *dev, int axidx, int val)
+{
+	int range = dev->maxval[axidx] - dev->minval[axidx];
+	if(range <= 0) {
+		return val;
+	}
+
+	return (val - dev->minval[axidx]) * DEF_RANGE / range + DEF_MINVAL;
 }
 
 static int read_evdev(struct device *dev, struct dev_input *inp)
@@ -143,12 +204,14 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 			inp->type = INP_MOTION;
 			inp->idx = iev.code - REL_X;
 			inp->val = iev.value;
+			/*printf("[%s] EV_REL(%d): %d\n", dev->name, inp->idx, iev.value);*/
 			break;
 
 		case EV_ABS:
 			inp->type = INP_MOTION;
 			inp->idx = iev.code - ABS_X;
-			inp->val = iev.value;
+			inp->val = map_range(dev, inp->idx, iev.value);
+			/*printf("[%s] EV_ABS(%d): %d (orig: %d)\n", dev->name, inp->idx, inp->val, iev.value);*/
 			break;
 
 		case EV_KEY:
@@ -159,6 +222,7 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 
 		case EV_SYN:
 			inp->type = INP_FLUSH;
+			/*printf("[%s] EV_SYN\n", dev->name);*/
 			break;
 
 		default:

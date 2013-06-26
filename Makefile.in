@@ -28,6 +28,10 @@ tags: $(src) $(hdr)
 clean:
 	rm -f $(obj) $(bin)
 
+.PHONY: cleandep
+cleandep:
+	rm -f $(dep)
+
 .PHONY: install
 install: $(bin)
 	$(INSTALL) -d $(DESTDIR)$(PREFIX)/bin

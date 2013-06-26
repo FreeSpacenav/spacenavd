@@ -22,7 +22,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include "dev.h"
 #include "dev_usb.h"
-#include "dev_js.h"
 #include "dev_serial.h"
 #include "event.h" /* remove pending events upon device removal */
 #include "spnavd.h"
@@ -70,7 +69,7 @@ int init_devices(void)
 			dev = add_device();
 			strcpy(dev->path, usbdev->devfiles[i]);
 
-			if(open_dev_usb(dev) == -1 && open_dev_js(dev) == -1) {
+			if(open_dev_usb(dev) == -1) {
 				remove_device(dev);
 			} else {
 				printf("using device: %s\n", dev->path);
@@ -186,13 +185,31 @@ struct device *get_devices(void)
 	return dev_list;
 }
 
+static int devid_list[][2] = {
+	/* 3Dconnexion devices */
+	{0x46d, 0xc621},	/* spaceball 5000 */
+	{0x46d, 0xc625},	/* space pilot */
+	{0x46d, 0xc626},	/* space navigator */
+
+	{-1, -1}
+};
+
 static int match_usbdev(const struct usb_device_info *devinfo)
 {
 	int i;
 
 	/* if it's a 3Dconnexion device match it immediately */
-	if(devinfo->vendorid == 0x046d || (devinfo->name && strstr(devinfo->name, "3Dconnexion"))) {
+	if((devinfo->name && strstr(devinfo->name, "3Dconnexion"))) {
 		return 1;
+	}
+
+	/* match any device in the devid_list */
+	if(devinfo->vendorid != -1 && devinfo->productid != -1) {
+		for(i=0; devid_list[i][0] > 0; i++) {
+			if(devinfo->vendorid == devid_list[i][0] && devinfo->productid == devid_list[i][1]) {
+				return 1;
+			}
+		}
 	}
 
 	/* match any joystick devices listed in the config file */

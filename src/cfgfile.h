@@ -21,14 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include <limits.h>
 
+#define MAX_AXES		64
 #define MAX_BUTTONS		64
 #define MAX_CUSTOM		64
 
 struct cfg {
 	float sensitivity, sens_trans[3], sens_rot[3];
-	int dead_threshold[6];
-	int invert[6];
-	int map_axis[6];
+	int dead_threshold[MAX_AXES];
+	int invert[MAX_AXES];
+	int map_axis[MAX_AXES];
 	int map_button[MAX_BUTTONS];
 	int kbmap[MAX_BUTTONS];
 	char *kbmap_str[MAX_BUTTONS];

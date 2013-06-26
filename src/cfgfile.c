@@ -94,7 +94,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
 	while(fgets(buf, sizeof buf, fp)) {
-		int isint, isfloat, ival, i, bnidx;
+		int isint, isfloat, ival, i, bnidx, axisidx;
 		float fval;
 		char *endp, *key_str, *val_str, *line = buf;
 		while(*line == ' ' || *line == '\t') line++;
@@ -103,11 +103,11 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			continue;
 		}
 
-		if(!(key_str = strtok(line, " :=\n\t\r"))) {
+		if(!(key_str = strtok(line, " =\n\t\r"))) {
 			fprintf(stderr, "invalid config line: %s, skipping.\n", line);
 			continue;
 		}
-		if(!(val_str = strtok(0, " :=\n\t\r"))) {
+		if(!(val_str = strtok(0, " =\n\t\r"))) {
 			fprintf(stderr, "missing value for config key: %s\n", key_str);
 			continue;
 		}
@@ -229,6 +229,18 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			for(i=0; i<6; i++) {
 				cfg->map_axis[i] = swap_yz ? i : def_axmap[i];
 			}
+
+		} else if(sscanf(key_str, "axismap%d", &axisidx) == 1) {
+			EXPECT(isint);
+			if(axisidx < 0 || axisidx >= MAX_AXES) {
+				fprintf(stderr, "invalid option %s, valid input axis numbers 0 - %d\n", key_str, MAX_AXES - 1);
+				continue;
+			}
+			if(ival < 0 || ival >= 6) {
+				fprintf(stderr, "invalid config value for %s, expected a number from 0 to 6\n", key_str);
+				continue;
+			}
+			cfg->map_axis[axisidx] = ival;
 
 		} else if(sscanf(key_str, "bnmap%d", &bnidx) == 1) {
 			EXPECT(isint);
