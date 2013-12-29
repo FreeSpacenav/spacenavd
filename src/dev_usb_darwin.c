@@ -64,7 +64,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 		}
 		devinfo.num_devfiles = 1;
 
-		// TODO retrieve vendor id and product id
+		/* TODO retrieve vendor id and product id */
 
 		if(!match || match(&devinfo)) {
 			struct usb_device_info *node = malloc(sizeof *node);
@@ -89,4 +89,6 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 	return devlist;
 }
 
+#else
+int spacenavd_dev_usb_darwin_silence_empty_warning;
 #endif	/* __APPLE__ && __MACH__ */
