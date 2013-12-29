@@ -254,7 +254,7 @@ static void set_led_evdev(struct device *dev, int state)
 struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_info*))
 {
 	struct usb_device_info *devlist = 0, devinfo;
-	int buf_used, buf_len;
+	int buf_used, buf_len, bytes_read;
 	char buf[1024];
 	char *buf_pos, *section_start, *next_section = 0, *cur_line, *next_line;
 	FILE *fp;
@@ -268,7 +268,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 	devlist = 0;
 
 	buf_pos = buf;
-	buf_len = sizeof(buf);
+	buf_len = sizeof(buf) - 1;
 	if(!(fp = fopen(PROC_DEV, "r"))) {
 		if(verbose) {
 			perror("failed to open " PROC_DEV);
@@ -276,7 +276,8 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 		goto alt_detect;
 	}
 
-	while(fread(buf_pos, 1, buf_len, fp) > 0) {
+	while((bytes_read = fread(buf_pos, 1, buf_len, fp)) >= 0) {
+		buf_pos[bytes_read] = '\0';
 		section_start = buf;
 
 		for(;;) {
@@ -285,8 +286,10 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 			next_section = strstr(section_start, "\n\n");
 			if(next_section == NULL) {
 				/* move last (partial) section to start of buf */
-				buf_used = (buf + sizeof(buf)) - section_start;
+				/* sizeof(buf) - 1 because the last one is '\0' */
+				buf_used = (buf + sizeof(buf) - 1) - section_start;
 				memmove(buf, section_start, buf_used);
+				buf[buf_used] = '\0';
 				/* point to end of last section and calc remaining space in buf */
 				buf_pos = buf + buf_used;
 				buf_len = sizeof(buf) - buf_used;
@@ -379,6 +382,8 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 
 			section_start = next_section;
 		}
+		if(bytes_read == 0)
+			break;
 	}
 	fclose(fp);
 
