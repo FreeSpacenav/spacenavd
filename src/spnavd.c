@@ -309,6 +309,11 @@ static void handle_events(fd_set *rset)
 	/* finally read any pending device input data */
 	dev = get_devices();
 	while(dev) {
+		/* keep the next pointer because read_device can potentially destroy
+		 * the device node if the read fails.
+		 */
+		struct device *next = dev->next;
+
 		if((dev_fd = get_device_fd(dev)) != -1 && FD_ISSET(dev_fd, rset)) {
 			/* read an event from the device ... */
 			while(read_device(dev, &inp) != -1) {
@@ -316,7 +321,7 @@ static void handle_events(fd_set *rset)
 				process_input(dev, &inp);
 			}
 		}
-		dev = dev->next;
+		dev = next;
 	}
 
 	if((hotplug_fd = get_hotplug_fd()) != -1) {
