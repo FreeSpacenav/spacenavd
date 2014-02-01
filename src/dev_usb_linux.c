@@ -162,6 +162,9 @@ static void close_evdev(struct device *dev)
 		dev->set_led(dev, 0);
 		close(dev->fd);
 		dev->fd = -1;
+		free(dev->minval);
+		free(dev->maxval);
+		free(dev->fuzz);
 	}
 }
 
@@ -378,6 +381,14 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 				} else {
 					perror("failed to allocate usb device info node");
 				}
+			} else {
+				/* cleanup devinfo before moving to the next line */
+				int i;
+				for(i = 0; i < devinfo.num_devfiles; ++i) {
+					free(devinfo.devfiles[i]);
+				}
+				free(devinfo.name);
+				memset(&devinfo, 0, sizeof devinfo);
 			}
 
 			section_start = next_section;
@@ -461,9 +472,13 @@ alt_detect:
 				node->next = devlist;
 				devlist = node;
 			} else {
+				free(devinfo.name);
 				free(devinfo.devfiles[0]);
 				perror("failed to allocate usb device info");
 			}
+		} else {
+			free(devinfo.name);
+			free(devinfo.devfiles[0]);
 		}
 		close(fd);
 	}
