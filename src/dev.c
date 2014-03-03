@@ -187,9 +187,18 @@ struct device *get_devices(void)
 
 static int devid_list[][2] = {
 	/* 3Dconnexion devices */
+	{0x46d, 0xc603},	/* spacemouse plus XT */
+	{0x46d, 0xc605},	/* cadman */
+	{0x46d, 0xc606},	/* spacemouse classic */
 	{0x46d, 0xc621},	/* spaceball 5000 */
+	{0x46d, 0xc623},	/* space traveller */
 	{0x46d, 0xc625},	/* space pilot */
 	{0x46d, 0xc626},	/* space navigator */
+	{0x46d, 0xc627},	/* space explorer */
+	{0x46d, 0xc628},	/* space navigator for notebooks*/
+	{0x46d, 0xc629},	/* space pilot pro*/
+	{0x46d, 0xc62b},	/* space mouse pro*/
+	{0x46d, 0xc640},	/* nulooq */
 
 	{-1, -1}
 };
