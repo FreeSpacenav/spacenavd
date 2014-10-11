@@ -342,11 +342,16 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 				case 'H':
 					keyptr = strstr(cur_line, "Handlers=");
 					if(keyptr) {
-						char *devfile, *valptr = keyptr + strlen("Handlers=");
+						char *devfile = 0, *valptr = keyptr + strlen("Handlers=");
 						static const char *prefix = "/dev/input/";
 
 						int idx = 0;
-						while((devfile = strtok(idx ? 0 : valptr, " \t\v\n\r"))) {
+						while((devfile = strtok(devfile ? 0 : valptr, " \t\v\n\r"))) {
+							if(strstr(devfile, "js") == devfile) {
+								/* ignore joystick device files, can't use them */
+								continue;
+							}
+
 							if(!(devinfo.devfiles[idx] = malloc(strlen(devfile) + strlen(prefix) + 1))) {
 								perror("failed to allocate device filename buffer");
 								continue;
