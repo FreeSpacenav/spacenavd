@@ -347,8 +347,8 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 
 						int idx = 0;
 						while((devfile = strtok(devfile ? 0 : valptr, " \t\v\n\r"))) {
-							if(strstr(devfile, "js") == devfile) {
-								/* ignore joystick device files, can't use them */
+							if(strstr(devfile, "event") != devfile) {
+								/* ignore everything which isn't an event interface device */
 								continue;
 							}
 
