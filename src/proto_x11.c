@@ -35,8 +35,14 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto_x11.h"
 #include "client.h"
 #include "spnavd.h"
+#include "dev.h"
 #include "xdetect.h"
 #include "kbemu.h"
+
+#ifdef HAVE_XINPUT2_H
+#include <X11/Xatom.h>
+#include <X11/extensions/XInput2.h>
+#endif
 
 
 enum cmd_msg {
@@ -168,6 +174,8 @@ int init_x11(void)
 	kbemu_set_display(dpy);
 
 	xdet_stop();	/* stop X server detection if it was running */
+
+	drop_xinput();
 	return 0;
 }
 
@@ -344,6 +352,42 @@ void remove_client_window(Window win)
 			return;
 		}
 	}
+}
+
+void drop_xinput(void)
+{
+#ifdef HAVE_XINPUT2_H
+	XIDeviceInfo *xidevs;
+	int i, num_devs;
+	static Atom atom_enabled;
+
+	if(!dpy) return;
+
+	if(!atom_enabled) {
+		atom_enabled = XInternAtom(dpy, "Device Enabled", False);
+	}
+
+	if(!(xidevs = XIQueryDevice(dpy, XIAllDevices, &num_devs))) {
+		fprintf(stderr, "failed to query XInput2 devices\n");
+		return;
+	}
+
+	for(i=0; i<num_devs; i++) {
+		struct device *dev = get_devices();
+		while(dev) {
+			if(strcmp(dev->name, xidevs[i].name) == 0 && xidevs[i].enabled) {
+				unsigned char zero = 0;
+				printf("Removing device \"%s\" from X server\n", dev->name);
+
+				XIChangeProperty(dpy, xidevs[i].deviceid, atom_enabled, XA_INTEGER, 8, PropModeReplace, &zero, 1);
+				break;
+			}
+			dev = dev->next;
+		}
+	}
+	XIFreeDeviceInfo(xidevs);
+
+#endif	/* HAVE_XINPUT2_H */
 }
 
 

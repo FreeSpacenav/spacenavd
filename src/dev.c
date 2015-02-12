@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dev_serial.h"
 #include "event.h" /* remove pending events upon device removal */
 #include "spnavd.h"
+#include "proto_x11.h"
 
 static struct device *add_device(void);
 static struct device *dev_path_in_use(char const * dev_path);
@@ -86,6 +87,8 @@ int init_devices(void)
 		fprintf(stderr, "failed to find any supported devices\n");
 		return -1;
 	}
+
+	drop_xinput();
 	return 0;
 }
 

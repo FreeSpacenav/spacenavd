@@ -37,5 +37,7 @@ int handle_xevents(fd_set *rset);
 void set_client_window(Window win);
 void remove_client_window(Window win);
 
+void drop_xinput(void);
+
 
 #endif	/* PROTO_X11_H_ */

@@ -229,6 +229,9 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 			break;
 
 		default:
+			if(verbose) {
+				printf("unexpected event: %d\n", iev.type);
+			}
 			return -1;
 		}
 	}

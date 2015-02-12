@@ -39,7 +39,7 @@ struct device {
 	int (*read)(struct device*, struct dev_input*);
 	void (*set_led)(struct device*, int);
 
-  struct device *next;
+	struct device *next;
 };
 
 int init_devices(void);
