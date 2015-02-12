@@ -109,5 +109,6 @@
 # You probably don't need this setting. Set it to something like 250 if you
 # find that your apps stop moving the view while you hold the puck/ball at a
 # fixed off-center position (like bottomed out on the vertical axis).
+# Set to -1 to disable it (default).
 #
-#repeat-interval = 0
+#repeat-interval = -1
