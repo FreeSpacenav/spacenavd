@@ -452,8 +452,7 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		fprintf(fp, "#serial = /dev/ttyS0\n");
 	}
 
-	fprintf(fp, "# custom list USB device ids to open if present\n");
-	fprintf(fp, "# (multiple entries can be listed)\n");
+	fprintf(fp, "List of additional USB devices to use (multiple devices can be listed)");
 	for(i=0; i<MAX_CUSTOM; i++) {
 		if(cfg->devid[i][0] != -1 && cfg->devid[i][1] != -1) {
 			fprintf(fp, "device-id = %x:%x\n", cfg->devid[i][0], cfg->devid[i][1]);

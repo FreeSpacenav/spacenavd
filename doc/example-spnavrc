@@ -92,23 +92,33 @@
 
 
 # Device grab (USB)
+#
 # When set to true (default): grab the USB device to prevent other programs
 # (such as the X server) from also using it.
+#
+# Grabbing the device ensures that other programs won't be able to use it without
+# talking to spacenavd. For instance some versions of Xorg will use the device to move
+# the mouse pointer if we don't grab it.
+# Set this to false if you want to use programs that try to talk to the device directly
+# such as google earth, then follow FAQ 11 http://spacenav.sourceforge.net/faq.html#faq11
+# to force the X server to ignore the device
 #
 #grab = true
 
 
-# Custom USB device
-# List of additional devices to use
+# List of additional USB devices to use (multiple devices can be listed)
+#
 # example:
 #    device-id = 046d:c625
 
 
 # Repeat interval (milliseconds)
-# How often should spacenavd repeat the last event while out of the deadzone?
+# Non-deadzone events are repeated every so many milliseconds (-1 to disable).
+#
 # You probably don't need this setting. Set it to something like 250 if you
 # find that your apps stop moving the view while you hold the puck/ball at a
 # fixed off-center position (like bottomed out on the vertical axis).
-# Set to -1 to disable it (default).
+# Might cause inadvertent continuous motion if the deadzone is too small for
+# the re-centering power of the device.
 #
 #repeat-interval = -1

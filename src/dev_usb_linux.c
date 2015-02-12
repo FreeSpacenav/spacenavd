@@ -207,14 +207,14 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 			inp->type = INP_MOTION;
 			inp->idx = iev.code - REL_X;
 			inp->val = iev.value;
-			printf("[%s] EV_REL(%d): %d\n", dev->name, inp->idx, iev.value);
+			/*printf("[%s] EV_REL(%d): %d\n", dev->name, inp->idx, iev.value);*/
 			break;
 
 		case EV_ABS:
 			inp->type = INP_MOTION;
 			inp->idx = iev.code - ABS_X;
 			inp->val = map_range(dev, inp->idx, iev.value);
-			printf("[%s] EV_ABS(%d): %d (orig: %d)\n", dev->name, inp->idx, inp->val, iev.value);
+			/*printf("[%s] EV_ABS(%d): %d (orig: %d)\n", dev->name, inp->idx, inp->val, iev.value);*/
 			break;
 
 		case EV_KEY:
@@ -225,12 +225,12 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 
 		case EV_SYN:
 			inp->type = INP_FLUSH;
-			printf("[%s] EV_SYN\n", dev->name);
+			/*printf("[%s] EV_SYN\n", dev->name);*/
 			break;
 
 		default:
 			if(verbose) {
-				printf("unexpected event: %d\n", iev.type);
+				printf("unhandled event: %d\n", iev.type);
 			}
 			return -1;
 		}

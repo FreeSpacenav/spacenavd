@@ -132,7 +132,6 @@ void process_input(struct device *dev, struct dev_input *inp)
 		inp->idx = cfg.map_axis[inp->idx];
 
 		if(abs(inp->val) < cfg.dead_threshold[inp->idx] ) {
-			printf("clamping axis %d event with value %d in deadzone\n", inp->idx, inp->val);
 			inp->val = 0;
 		}
 		sign = cfg.invert[inp->idx] ? -1 : 1;
@@ -212,13 +211,8 @@ int in_deadzone(struct device *dev)
 	if((dev_ev = device_event_in_use(dev)) == NULL)
 		return -1;
 	for(i=0; i<6; i++) {
-		int val = dev_ev->event.motion.data[i];
-		if(val != 0) {
-			if(abs(val) < cfg.dead_threshold[i]) {
-				printf("BUG %d on axis %d not in deadzone? (%d)\n", dev_ev->event.motion.data[i], i, cfg.dead_threshold[i]);
-			}
+		if(dev_ev->event.motion.data[i] != 0)
 			return 0;
-		}
 	}
 	return 1;
 }
