@@ -188,6 +188,8 @@ struct device *get_devices(void)
 	return dev_list;
 }
 
+#define VENDOR_3DCONNEXION	0x256f
+
 static int devid_list[][2] = {
 	/* 3Dconnexion devices */
 	{0x46d, 0xc603},	/* spacemouse plus XT */
@@ -215,8 +217,13 @@ static int match_usbdev(const struct usb_device_info *devinfo)
 		return 1;
 	}
 
-	/* match any device in the devid_list */
 	if(devinfo->vendorid != -1 && devinfo->productid != -1) {
+		/* match any device with the new 3Dconnexion device id */
+		if(devinfo->vendorid == VENDOR_3DCONNEXION) {
+			return 1;
+		}
+
+		/* match any device in the devid_list */
 		for(i=0; devid_list[i][0] > 0; i++) {
 			if(devinfo->vendorid == devid_list[i][0] && devinfo->productid == devid_list[i][1]) {
 				return 1;
