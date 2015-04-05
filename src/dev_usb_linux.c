@@ -293,7 +293,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 			if(next_section == NULL) {
 				/* move last (partial) section to start of buf */
 				/* sizeof(buf) - 1 because the last one is '\0' */
-				buf_used = (buf + sizeof(buf) - 1) - section_start;
+				buf_used = strlen(section_start);
 				memmove(buf, section_start, buf_used);
 				buf[buf_used] = '\0';
 				/* point to end of last section and calc remaining space in buf */
