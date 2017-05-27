@@ -1,4 +1,4 @@
-src = $(wildcard src/*.c) $(wildcard src/serial/*.c) $(wildcard src/magellan/*.c)
+src = $(sort $(wildcard src/*.c) $(wildcard src/serial/*.c) $(wildcard src/magellan/*.c))
 hdr = $(wildcard src/*.h) $(wildcard src/serial/*.h) $(wildcard src/magellan/*.h)
 obj = $(src:.c=.o)
 dep = $(obj:.o=.d)
