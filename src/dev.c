@@ -73,7 +73,7 @@ int init_devices(void)
 			if(open_dev_usb(dev) == -1) {
 				remove_device(dev);
 			} else {
-				printf("using device: %s\n", dev->path);
+				printf("using device: %s (%s)\n", dev->name, dev->path);
 				device_added++;
 				break;
 			}
@@ -83,7 +83,7 @@ int init_devices(void)
 
 	free_usb_devices_list(usblist);
 
-	if(!device_added) {
+	if(!usblist) {
 		fprintf(stderr, "failed to find any supported devices\n");
 		return -1;
 	}
