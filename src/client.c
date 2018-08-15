@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include "client.h"
+#include "dev.h"
+#include "spnavd.h"
 
 #ifdef USE_X11
 #include <X11/Xlib.h>
@@ -79,6 +81,8 @@ struct client *add_client(int type, void *cdata)
 
 	if(client_list == NULL) {
 		client->next = NULL;
+		if(cfg.led == 2)
+			set_devices_led(1); /* on first client, turn on led */
 		return (client_list = client);
 	}
 	client->next = client_list;
@@ -96,8 +100,11 @@ void remove_client(struct client *client)
 	if(iter == client) {
 		client_list = iter->next;
 		free(iter);
-		if((iter = client_list) == NULL)
+		if((iter = client_list) == NULL) {
+			if (cfg.led == 2)
+				set_devices_led(0); /* no more clients, turn off led */
 			return;
+		}
 	}
 
 	while(iter->next) {

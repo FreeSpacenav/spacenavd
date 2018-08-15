@@ -42,7 +42,7 @@ void default_cfg(struct cfg *cfg)
 		cfg->dead_threshold[i] = 2;
 	}
 
-	cfg->led = 1;
+	cfg->led = 2;
 	cfg->grab_device = 1;
 
 	for(i=0; i<6; i++) {
@@ -268,7 +268,9 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			if(isint) {
 				cfg->led = ival;
 			} else {
-				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
+				if(strcmp(val_str, "auto") == 0) {
+					cfg->led = 2;
+				} else if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
 					cfg->led = 1;
 				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
 					cfg->led = 0;
@@ -427,9 +429,11 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		fputc('\n', fp);
 	}
 
-	if(!cfg->led) {
-		fprintf(fp, "# disable led\n");
-		fprintf(fp, "led = 0\n\n");
+	fprintf(fp, "# led status: on, off, or auto (enabling on connected clients)\n");
+	switch(cfg->led) {
+	case 0: fprintf(fp, "led = off\n\n"); break;
+	case 2: fprintf(fp, "led = auto\n\n"); break;
+	default: fprintf(fp, "led = on\n\n"); break;
 	}
 
 	if(!cfg->grab_device) {

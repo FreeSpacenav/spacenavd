@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "spnavd.h"
 #include "event.h"
 #include "hotplug.h"
+#include "client.h"
 
 #define DEF_MINVAL	(-500)
 #define DEF_MAXVAL	500
@@ -144,7 +145,7 @@ int open_dev_usb(struct device *dev)
 	/* set non-blocking */
 	fcntl(dev->fd, F_SETFL, fcntl(dev->fd, F_GETFL) | O_NONBLOCK);
 
-	if(cfg.led) {
+	if(cfg.led == 1 || (cfg.led == 2 && first_client())) {
 		set_led_evdev(dev, 1);
 	}
 

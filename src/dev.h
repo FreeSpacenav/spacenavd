@@ -51,6 +51,7 @@ int get_device_fd(struct device *dev);
 int get_device_index(struct device *dev);
 int read_device(struct device *dev, struct dev_input *inp);
 void set_device_led(struct device *dev, int state);
+void set_devices_led(int state);
 
 struct device *get_devices(void);
 

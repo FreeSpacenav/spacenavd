@@ -183,6 +183,15 @@ void set_device_led(struct device *dev, int state)
 	}
 }
 
+void set_devices_led(int state)
+{
+	struct device *dev = get_devices();
+	while(dev) {
+		set_device_led(dev, state);
+		dev = dev->next;
+	}
+}
+
 struct device *get_devices(void)
 {
 	return dev_list;
