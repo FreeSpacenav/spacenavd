@@ -31,7 +31,7 @@ struct device {
 	char name[MAX_DEV_NAME];
 	char path[PATH_MAX];
 
-	int num_axes;
+	int num_axes, num_buttons;
 	int *minval, *maxval;	/* input value range (default: -500, 500) */
 	int *fuzz;				/* noise threshold */
 

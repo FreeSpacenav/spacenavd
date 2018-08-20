@@ -64,9 +64,9 @@ static void set_led_evdev(struct device *dev, int state);
 
 int open_dev_usb(struct device *dev)
 {
-	int i;
+	int i, axes_rel = 0, axes_abs = 0;
 	struct input_absinfo absinfo;
-	unsigned char evtype_mask[(EV_MAX + 7) / 8];
+	unsigned char evtype_mask[((EV_MAX | KEY_MAX) + 7) / 8];
 
 	if((dev->fd = open(dev->path, O_RDWR)) == -1) {
 		if((dev->fd = open(dev->path, O_RDONLY)) == -1) {
@@ -83,22 +83,61 @@ int open_dev_usb(struct device *dev)
 	printf("device name: %s\n", dev->name);
 
 	/* get number of axes */
-	dev->num_axes = 6;	/* default to regular 6dof controller axis count */
-	if(ioctl(dev->fd, EVIOCGBIT(EV_ABS, sizeof evtype_mask), evtype_mask) == 0) {
-		dev->num_axes = 0;
+	if(ioctl(dev->fd, EVIOCGBIT(EV_ABS, sizeof evtype_mask), evtype_mask) != -1) {
 		for(i=0; i<ABS_CNT; i++) {
 			int idx = i / 8;
 			int bit = i % 8;
 
 			if(evtype_mask[idx] & (1 << bit)) {
-				dev->num_axes++;
+				axes_abs++;
 			} else {
 				break;
 			}
 		}
+	} else {
+		perror("EVIOCGBIT(EV_ABS) ioctl failed");
 	}
-	if(verbose) {
-		printf("  Number of axes: %d\n", dev->num_axes);
+	if(ioctl(dev->fd, EVIOCGBIT(EV_REL, sizeof evtype_mask), evtype_mask) != -1) {
+		for(i=0; i<ABS_CNT; i++) {
+			int idx = i / 8;
+			int bit = i % 8;
+
+			if(evtype_mask[idx] & (1 << bit)) {
+				axes_rel++;
+			}
+		}
+	}
+	dev->num_axes = axes_rel + axes_abs;
+	if(!dev->num_axes) {
+		fprintf(stderr, "failed to retrieve number of axes. assuming 6\n");
+		dev->num_axes = 6;
+	} else {
+		if(verbose) {
+			printf("  Number of axes: %d (%da %dr)\n", dev->num_axes, axes_abs, axes_rel);
+		}
+	}
+
+	/* get number of buttons */
+	dev->num_buttons = 0;
+	if(ioctl(dev->fd, EVIOCGBIT(EV_KEY, sizeof evtype_mask), evtype_mask) != -1) {
+		for(i=0; i<KEY_CNT; i++) {
+			int idx = i / 8;
+			int bit = i % 8;
+
+			if(evtype_mask[idx] & (1 << bit)) {
+				dev->num_buttons++;
+			}
+		}
+	} else {
+		perror("EVIOCGBIT(EV_KEY) ioctl failed");
+	}
+	if(!dev->num_buttons) {
+		fprintf(stderr, "failed to retrieve number of buttons, will default to 2\n");
+		dev->num_buttons = 2;
+	} else {
+		if(verbose) {
+			printf("  Number of buttons: %d\n", dev->num_buttons);
+		}
 	}
 
 	dev->minval = malloc(dev->num_axes * sizeof *dev->minval);
