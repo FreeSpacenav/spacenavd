@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2018 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -165,12 +165,6 @@ int open_dev_usb(struct device *dev)
 			}
 		}
 	}
-
-	/*if(ioctl(dev->fd, EVIOCGBIT(0, sizeof(evtype_mask)), evtype_mask) == -1) {
-		perror("EVIOCGBIT ioctl failed\n");
-		close(dev->fd);
-		return -1;
-	}*/
 
 	if(cfg.grab_device) {
 		int grab = 1;
