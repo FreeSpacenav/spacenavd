@@ -1,3 +1,6 @@
 *.o
 *.d
 *.swp
+Makefile
+spacenavd
+config.h
