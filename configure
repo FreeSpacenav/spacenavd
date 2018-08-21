@@ -40,10 +40,10 @@ DBG=yes
 X11=yes
 HOTPLUG=yes
 XINPUT=yes
-VER=`head -1 README | sed 's/^.*- //'`
+VER=`git describe --tags 2>/dev/null`
 
-if echo $VER | grep '$Rev' >/dev/null; then
-	VER=svn-r`echo $VER | awk '{print $2}' | sed 's/$//g'`
+if [ -z "$VER" ]; then
+	VER=`git rev-parse --short HEAD`
 fi
 
 echo "configuring spacenavd - $VER"
