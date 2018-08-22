@@ -40,7 +40,7 @@ Installation
 If you have the dependencies installed, just run `./configure` and then `make`
 to compile the daemon, and then `make install`, to install it.The default
 installation prefix is `/usr/local`. If you wish to install somewhere else, you
-may pass --prefix=/whatever to the configure script.
+may pass `--prefix=/whatever` to the configure script.
 
 Running spacenavd
 -----------------
@@ -56,14 +56,14 @@ follow your init documentation to set this up yourself. You may be able to
 use the provided `init_script` file as a starting point.
 
 For systems running systemd, there is a spacenavd.service file under
-contrib/systemd. Follow your system documentation for how to use it.
+`contrib/systemd`. Follow your system documentation for how to use it.
 
 Configuration
 -------------
-The spacenavd daemon reads a number of options from /etc/spnavrc. If
+The spacenavd daemon reads a number of options from `/etc/spnavrc`. If
 that file doesn't exist, then it will use default values for everything. An
 example configuration file is included in the doc subdirectory, which you may
-copy to /etc and tweak.
+copy to `/etc` and tweak.
 
 You may use the graphical spnavcfg program to interactively set any of these
 options, which will create the spnavrc file for you, and automatically notify
