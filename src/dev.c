@@ -73,7 +73,7 @@ int init_devices(void)
 			if(open_dev_usb(dev) == -1) {
 				remove_device(dev);
 			} else {
-				printf("using device: %s\n", dev->path);
+				printf("using device: %s (%s)\n", dev->name, dev->path);
 				device_added++;
 				break;
 			}
@@ -83,7 +83,7 @@ int init_devices(void)
 
 	free_usb_devices_list(usblist);
 
-	if(!device_added) {
+	if(!usblist) {
 		fprintf(stderr, "failed to find any supported devices\n");
 		return -1;
 	}
@@ -180,6 +180,15 @@ void set_device_led(struct device *dev, int state)
 {
 	if(dev->set_led) {
 		dev->set_led(dev, state);
+	}
+}
+
+void set_devices_led(int state)
+{
+	struct device *dev = get_devices();
+	while(dev) {
+		set_device_led(dev, state);
+		dev = dev->next;
 	}
 }
 
