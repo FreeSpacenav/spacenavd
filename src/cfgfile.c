@@ -42,7 +42,7 @@ void default_cfg(struct cfg *cfg)
 		cfg->dead_threshold[i] = 2;
 	}
 
-	cfg->led = LED_AUTO;
+	cfg->led = LED_ON;
 	cfg->grab_device = 1;
 
 	for(i=0; i<6; i++) {
