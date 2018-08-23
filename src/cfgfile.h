@@ -25,6 +25,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_BUTTONS		64
 #define MAX_CUSTOM		64
 
+enum {
+	LED_OFF		= 0,
+	LED_ON		= 1,
+	LED_AUTO	= 2
+};
+
 struct cfg {
 	float sensitivity, sens_trans[3], sens_rot[3];
 	int dead_threshold[MAX_AXES];
