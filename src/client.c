@@ -20,6 +20,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include "client.h"
+#include "dev.h"
+#include "spnavd.h"
 
 #ifdef USE_X11
 #include <X11/Xlib.h>
@@ -77,9 +79,9 @@ struct client *add_client(int type, void *cdata)
 	client->sens = 1.0f;
 	client->dev_idx = 0; /* default/first device */
 
-	if(client_list == NULL) {
-		client->next = NULL;
-		return (client_list = client);
+	if(!client_list && cfg.led == LED_AUTO) {
+		/* on first client, turn the led on */
+		set_devices_led(1);
 	}
 	client->next = client_list;
 	client_list = client;
@@ -90,14 +92,18 @@ struct client *add_client(int type, void *cdata)
 void remove_client(struct client *client)
 {
 	struct client *iter = client_list;
+	if(!iter) return;
 
-	if(iter == NULL)
-		return;
 	if(iter == client) {
 		client_list = iter->next;
 		free(iter);
-		if((iter = client_list) == NULL)
+		iter = client_list;
+		if(!iter) {
+			if(cfg.led == LED_AUTO) {
+				set_devices_led(0); /* no more clients, turn off led */
+			}
 			return;
+		}
 	}
 
 	while(iter->next) {
@@ -150,12 +156,14 @@ int get_client_device_index(struct client *client)
 
 struct client *first_client(void)
 {
-	return (client_iter = client_list);
+	client_iter = client_list;
+	return client_iter;
 }
 
 struct client *next_client(void)
 {
-	if(client_iter)
+	if(client_iter) {
 		client_iter = client_iter->next;
+	}
 	return client_iter;
 }

@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2018 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -42,7 +42,7 @@ void default_cfg(struct cfg *cfg)
 		cfg->dead_threshold[i] = 2;
 	}
 
-	cfg->led = 1;
+	cfg->led = LED_AUTO;
 	cfg->grab_device = 1;
 
 	for(i=0; i<6; i++) {
@@ -268,10 +268,12 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			if(isint) {
 				cfg->led = ival;
 			} else {
-				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
-					cfg->led = 1;
+				if(strcmp(val_str, "auto") == 0) {
+					cfg->led = LED_AUTO;
+				} else if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
+					cfg->led = LED_ON;
 				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
-					cfg->led = 0;
+					cfg->led = LED_OFF;
 				} else {
 					fprintf(stderr, "invalid configuration value for %s, expected a boolean value.\n", key_str);
 					continue;
@@ -293,7 +295,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 
 		} else if(strcmp(key_str, "serial") == 0) {
-			strncpy(cfg->serial_dev, val_str, PATH_MAX);
+			strncpy(cfg->serial_dev, val_str, PATH_MAX - 1);
 
 		} else if(strcmp(key_str, "device-id") == 0) {
 			unsigned int vendor, prod;
@@ -333,7 +335,7 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		return -1;
 	}
 
-	/* aquire exclusive write lock */
+	/* acquire exclusive write lock */
 	flk.l_type = F_WRLCK;
 	flk.l_start = flk.l_len = 0;
 	flk.l_whence = SEEK_SET;
@@ -427,10 +429,8 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		fputc('\n', fp);
 	}
 
-	if(!cfg->led) {
-		fprintf(fp, "# disable led\n");
-		fprintf(fp, "led = 0\n\n");
-	}
+	fprintf(fp, "# led status: on, off, or auto (turn on when a client is connected)\n");
+	fprintf(fp, "led = %s\n\n", (cfg->led ? (cfg->led == LED_AUTO ? "auto" : "on") : "off"));
 
 	if(!cfg->grab_device) {
 		fprintf(fp, "# Don't grab USB device\n");
