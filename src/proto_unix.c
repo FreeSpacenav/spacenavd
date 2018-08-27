@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2018 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -34,7 +34,7 @@ enum {
 	UEV_TYPE_RELEASE
 };
 
-static int lsock;
+static int lsock = -1;
 
 int init_unix(void)
 {
@@ -42,7 +42,7 @@ int init_unix(void)
 	mode_t prev_umask;
 	struct sockaddr_un addr;
 
-	if(lsock) return 0;
+	if(lsock >= 0) return 0;
 
 	if((s = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
 		perror("failed to create socket");
@@ -93,7 +93,7 @@ void send_uevent(spnav_event *ev, struct client *c)
 	int i, data[8] = {0};
 	float motion_mul;
 
-	if(!lsock) return;
+	if(lsock == -1) return;
 
 	switch(ev->type) {
 	case EVENT_MOTION:
