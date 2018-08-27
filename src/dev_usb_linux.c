@@ -294,7 +294,7 @@ static void set_led_evdev(struct device *dev, int state)
 struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_info*))
 {
 	struct usb_device_info *devlist = 0, devinfo;
-	int buf_used, buf_len, bytes_read;
+	int i, buf_used, buf_len, bytes_read;
 	char buf[1024];
 	char *buf_pos, *section_start, *next_section = 0, *cur_line, *next_line;
 	FILE *fp;
@@ -406,7 +406,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 			/* check with the user-supplied matching callback to see if we should include
 			 * this device in the returned list or not...
 			 */
-			if(!match || match(&devinfo)) {
+			if(devinfo.num_devfiles > 0 && (!match || match(&devinfo))) {
 				/* add it to the list */
 				struct usb_device_info *node = malloc(sizeof *node);
 				if(node) {
@@ -425,8 +425,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 				}
 			} else {
 				/* cleanup devinfo before moving to the next line */
-				int i;
-				for(i = 0; i < devinfo.num_devfiles; ++i) {
+				for(i=0; i<devinfo.num_devfiles; i++) {
 					free(devinfo.devfiles[i]);
 				}
 				free(devinfo.name);
