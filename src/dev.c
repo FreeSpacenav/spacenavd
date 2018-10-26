@@ -197,8 +197,6 @@ struct device *get_devices(void)
 	return dev_list;
 }
 
-#define VENDOR_3DCONNEXION	0x256f
-
 static int devid_list[][2] = {
 	/* 3Dconnexion devices */
 	{0x46d, 0xc603},	/* spacemouse plus XT */
@@ -214,6 +212,13 @@ static int devid_list[][2] = {
 	{0x46d, 0xc62b},	/* space mouse pro*/
 	{0x46d, 0xc640},	/* nulooq */
 
+	{0x256f, 0xc62e},	/* 3Dconnexion SpaceMouse Wireless */
+	{0x256f, 0xc631},	/* 3Dconnexion SpaceMouse Pro Wireless */
+	{0x256f, 0xc632},	/* 3Dconnexion SpaceMouse Pro Wireless Receiver */
+	{0x256f, 0xc633},	/* 3Dconnexion SpaceMouse Enterprise */
+	{0x256f, 0xc635},	/* 3Dconnexion SpaceMouse Compact */
+	{0x256f, 0xc636},	/* 3Dconnexion SpaceMouse Module */
+
 	{-1, -1}
 };
 
@@ -221,17 +226,7 @@ static int match_usbdev(const struct usb_device_info *devinfo)
 {
 	int i;
 
-	/* if it's a 3Dconnexion device match it immediately */
-	if((devinfo->name && strstr(devinfo->name, "3Dconnexion"))) {
-		return 1;
-	}
-
 	if(devinfo->vendorid != -1 && devinfo->productid != -1) {
-		/* match any device with the new 3Dconnexion device id */
-		if(devinfo->vendorid == VENDOR_3DCONNEXION) {
-			return 1;
-		}
-
 		/* match any device in the devid_list */
 		for(i=0; devid_list[i][0] > 0; i++) {
 			if(devinfo->vendorid == devid_list[i][0] && devinfo->productid == devid_list[i][1]) {
