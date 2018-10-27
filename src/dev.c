@@ -200,47 +200,48 @@ struct device *get_devices(void)
 #define VENDOR_3DCONNEXION	0x256f
 
 static int devid_list[][2] = {
-	/* 3Dconnexion devices */
-	{0x46d, 0xc603},	/* spacemouse plus XT */
-	{0x46d, 0xc605},	/* cadman */
-	{0x46d, 0xc606},	/* spacemouse classic */
-	{0x46d, 0xc621},	/* spaceball 5000 */
-	{0x46d, 0xc623},	/* space traveller */
-	{0x46d, 0xc625},	/* space pilot */
-	{0x46d, 0xc626},	/* space navigator */
-	{0x46d, 0xc627},	/* space explorer */
-	{0x46d, 0xc628},	/* space navigator for notebooks*/
-	{0x46d, 0xc629},	/* space pilot pro*/
-	{0x46d, 0xc62b},	/* space mouse pro*/
-	{0x46d, 0xc640},	/* nulooq */
+	{0x046d, 0xc603},	/* spacemouse plus XT */
+	{0x046d, 0xc605},	/* cadman */
+	{0x046d, 0xc606},	/* spacemouse classic */
+	{0x046d, 0xc621},	/* spaceball 5000 */
+	{0x046d, 0xc623},	/* space traveller */
+	{0x046d, 0xc625},	/* space pilot */
+	{0x046d, 0xc626},	/* space navigator */
+	{0x046d, 0xc627},	/* space explorer */
+	{0x046d, 0xc628},	/* space navigator for notebooks*/
+	{0x046d, 0xc629},	/* space pilot pro*/
+	{0x046d, 0xc62b},	/* space mouse pro*/
+	{0x046d, 0xc640},	/* nulooq */
+	{0x256f, 0xc62e},	/* spacemouse wireless */
+	{0x256f, 0xc631},	/* spacemouse pro wireless */
+	{0x256f, 0xc632},	/* spacemouse pro wireless receiver */
+	{0x256f, 0xc633},	/* spacemouse enterprise */
+	{0x256f, 0xc635},	/* spacemouse compact */
+	{0x256f, 0xc636},	/* spacemouse module */
 
 	{-1, -1}
 };
+
+/* 3Dconnexion devices which we don't want to match, because they are
+ * not 6dof space-mice. reported by: Herbert Graeber in github issue #4
+ */
+static int devid_blacklist[][2] = {
+	{0x256f, 0xc62f},	/* spacemouse wireless receiver */
+	{0x256f, 0xc652},
+	{0x256f, 0xc650},	/* cadmouse */
+	{0x256f, 0xc651},	/* cadmouse wireless */
+	{0x256f, 0xc62c},	/* lipari(?) */
+	{0x256f, 0xc641},	/* scout(?) */
+
+	{-1, -1}
+};
+
 
 static int match_usbdev(const struct usb_device_info *devinfo)
 {
 	int i;
 
-	/* if it's a 3Dconnexion device match it immediately */
-	if((devinfo->name && strstr(devinfo->name, "3Dconnexion"))) {
-		return 1;
-	}
-
-	if(devinfo->vendorid != -1 && devinfo->productid != -1) {
-		/* match any device with the new 3Dconnexion device id */
-		if(devinfo->vendorid == VENDOR_3DCONNEXION) {
-			return 1;
-		}
-
-		/* match any device in the devid_list */
-		for(i=0; devid_list[i][0] > 0; i++) {
-			if(devinfo->vendorid == devid_list[i][0] && devinfo->productid == devid_list[i][1]) {
-				return 1;
-			}
-		}
-	}
-
-	/* match any joystick devices listed in the config file */
+	/* match any USB devices listed in the config file */
 	for(i=0; i<MAX_CUSTOM; i++) {
 		if(cfg.devid[i][0] != -1 && cfg.devid[i][1] != -1 &&
 				(unsigned int)cfg.devid[i][0] == devinfo->vendorid &&
@@ -250,6 +251,35 @@ static int match_usbdev(const struct usb_device_info *devinfo)
 		if(cfg.devname[i] && devinfo->name && strcmp(cfg.devname[i], devinfo->name) == 0) {
 			return 1;
 		}
+	}
+
+	if(devinfo->vendorid != -1 && devinfo->productid != -1) {
+		int vid = devinfo->vendorid;
+		int pid = devinfo->productid;
+
+		/* ignore any device in the devid_blacklist */
+		for(i=0; devid_blacklist[i][0] > 0; i++) {
+			if(vid == devid_blacklist[i][0] && pid == devid_blacklist[i][1]) {
+				return 0;
+			}
+		}
+
+		/* match any device with the new 3Dconnexion device id */
+		if(vid == VENDOR_3DCONNEXION) {
+			return 1;
+		}
+
+		/* match any device in the devid_list */
+		for(i=0; devid_list[i][0] > 0; i++) {
+			if(vid == devid_list[i][0] && pid == devid_list[i][1]) {
+				return 1;
+			}
+		}
+	}
+
+	/* if it's a 3Dconnexion device match it immediately */
+	if((devinfo->name && strstr(devinfo->name, "3Dconnexion"))) {
+		return 1;
 	}
 
 	return 0;	/* no match */

@@ -1,6 +1,6 @@
 /*
-spnavcfg - an interactive GUI configurator for the spacenavd daemon.
-Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
+spacenavd - a free software replacement driver for 6dof space-mice.
+Copyright (C) 2007-2018 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
