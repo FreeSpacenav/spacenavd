@@ -140,9 +140,9 @@ if [ "$OPT" = 'yes' ]; then
 fi
 
 if [ "$X11" = 'yes' ]; then
-	echo 'xlib = -L/usr/X11/lib -lX11' >>Makefile
-	if [ -n "`check_header X11/extensions/XInput2.h 2>&1`" ]; then
-		echo 'xlib += -lXi' >>Makefile
+	echo "xlib = $(pkg-config --libs --cflags x11)" >>Makefile
+	if $(pkg-config --exists xi); then
+		echo "xlib += $(pkg-config --libs --cflags xi)" >>Makefile
 	fi
 fi
 
