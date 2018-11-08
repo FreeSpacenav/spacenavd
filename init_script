@@ -5,6 +5,17 @@
 # chkconfig: 2345 99 99
 # description: A free user space driver for 3Dconnexion input devices,\
 #              compatible with the proprietary 3dxsrv daemon.
+#
+#
+### BEGIN INIT INFO
+# Provides:          spacenavd
+# Required-Start:    $remote_fs $syslog
+# Required-Stop:     $remote_fs $syslog
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: free driver for 3Dconnexion 6dof devices
+# Description:       A free user space driver for 3Dconnexion input devices, compatible with the proprietary 3dxsrv daemon.
+### END INIT INFO
 
 DAEMON=/usr/local/bin/spacenavd
 
