@@ -59,6 +59,7 @@ int init_unix(void)
 
 	if(bind(s, (struct sockaddr*)&addr, sizeof addr) == -1) {
 		fprintf(stderr, "failed to bind unix socket: %s: %s\n", SOCK_NAME, strerror(errno));
+		close(s);
 		return -1;
 	}
 
@@ -66,6 +67,8 @@ int init_unix(void)
 
 	if(listen(s, 8) == -1) {
 		perror("listen failed");
+		close(s);
+		unlink(SOCK_NAME);
 		return -1;
 	}
 
