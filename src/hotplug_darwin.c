@@ -41,4 +41,6 @@ int handle_hotplug(void)
 	return -1;
 }
 
+#else
+int spacenavd_hotplug_darwin_shut_up_empty_source_warning;
 #endif	/* __APPLE__ && __MACH__ */

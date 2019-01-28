@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2018 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -71,17 +71,17 @@ int open_dev_usb(struct device *dev)
 
 	if((dev->fd = open(dev->path, O_RDWR)) == -1) {
 		if((dev->fd = open(dev->path, O_RDONLY)) == -1) {
-			perror("failed to open device");
+			logmsg(LOG_ERR, "failed to open device: %s\n", strerror(errno));
 			return -1;
 		}
-		fprintf(stderr, "opened device read-only, LEDs won't work\n");
+		logmsg(LOG_WARNING, "opened device read-only, LEDs won't work\n");
 	}
 
 	if(ioctl(dev->fd, EVIOCGNAME(sizeof dev->name), dev->name) == -1) {
-		perror("EVIOCGNAME ioctl failed");
+		logmsg(LOG_WARNING, "EVIOCGNAME ioctl failed: %s\n", strerror(errno));
 		strcpy(dev->name, "unknown");
 	}
-	printf("device name: %s\n", dev->name);
+	logmsg(LOG_INFO, "device name: %s\n", dev->name);
 
 	/* get number of axes */
 	if(ioctl(dev->fd, EVIOCGBIT(EV_ABS, sizeof evtype_mask), evtype_mask) != -1) {
@@ -96,7 +96,7 @@ int open_dev_usb(struct device *dev)
 			}
 		}
 	} else {
-		perror("EVIOCGBIT(EV_ABS) ioctl failed");
+		logmsg(LOG_DEBUG, "EVIOCGBIT(EV_ABS) ioctl failed: %s\n", strerror(errno));
 	}
 	if(ioctl(dev->fd, EVIOCGBIT(EV_REL, sizeof evtype_mask), evtype_mask) != -1) {
 		for(i=0; i<ABS_CNT; i++) {
@@ -110,11 +110,11 @@ int open_dev_usb(struct device *dev)
 	}
 	dev->num_axes = axes_rel + axes_abs;
 	if(!dev->num_axes) {
-		fprintf(stderr, "failed to retrieve number of axes. assuming 6\n");
+		logmsg(LOG_WARNING, "failed to retrieve number of axes. assuming 6\n");
 		dev->num_axes = 6;
 	} else {
 		if(verbose) {
-			printf("  Number of axes: %d (%da %dr)\n", dev->num_axes, axes_abs, axes_rel);
+			logmsg(LOG_INFO, "  Number of axes: %d (%da %dr)\n", dev->num_axes, axes_abs, axes_rel);
 		}
 	}
 
@@ -130,14 +130,14 @@ int open_dev_usb(struct device *dev)
 			}
 		}
 	} else {
-		perror("EVIOCGBIT(EV_KEY) ioctl failed");
+		logmsg(LOG_DEBUG, "EVIOCGBIT(EV_KEY) ioctl failed: %s\n", strerror(errno));
 	}
 	if(!dev->num_buttons) {
-		fprintf(stderr, "failed to retrieve number of buttons, will default to 2\n");
+		logmsg(LOG_WARNING, "failed to retrieve number of buttons, will default to 2\n");
 		dev->num_buttons = 2;
 	} else {
 		if(verbose) {
-			printf("  Number of buttons: %d\n", dev->num_buttons);
+			logmsg(LOG_INFO, "  Number of buttons: %d\n", dev->num_buttons);
 		}
 	}
 
@@ -146,7 +146,7 @@ int open_dev_usb(struct device *dev)
 	dev->fuzz = malloc(dev->num_axes * sizeof *dev->fuzz);
 
 	if(!dev->minval || !dev->maxval || !dev->fuzz) {
-		perror("failed to allocate memory");
+		logmsg(LOG_ERR, "failed to allocate memory: %s\n", strerror(errno));
 		return -1;
 	}
 
@@ -162,7 +162,7 @@ int open_dev_usb(struct device *dev)
 			dev->fuzz[i] = absinfo.fuzz;
 
 			if(verbose) {
-				printf("  Axis %d value range: %d - %d (fuzz: %d)\n", i, dev->minval[i], dev->maxval[i], dev->fuzz[i]);
+				logmsg(LOG_INFO, "  Axis %d value range: %d - %d (fuzz: %d)\n", i, dev->minval[i], dev->maxval[i], dev->fuzz[i]);
 			}
 		}
 	}
@@ -171,7 +171,7 @@ int open_dev_usb(struct device *dev)
 		int grab = 1;
 		/* try to grab the device */
 		if(ioctl(dev->fd, EVIOCGRAB, &grab) == -1) {
-			perror("failed to grab the device");
+			logmsg(LOG_WARNING, "failed to grab the device: %s\n", strerror(errno));
 		}
 	}
 
@@ -227,7 +227,7 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 	/* disconnect? */
 	if(rdbytes == -1) {
 		if(errno != EAGAIN) {
-			perror("read error");
+			logmsg(LOG_ERR, "read error: %s\n", strerror(errno));
 			remove_device(dev);
 		}
 		return -1;
@@ -264,7 +264,7 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 
 		default:
 			if(verbose) {
-				printf("unhandled event: %d\n", iev.type);
+				logmsg(LOG_DEBUG, "unhandled event: %d\n", iev.type);
 			}
 			return -1;
 		}
@@ -286,7 +286,7 @@ static void set_led_evdev(struct device *dev, int state)
 	ev.value = state;
 
 	if(write(dev->fd, &ev, sizeof ev) == -1) {
-		fprintf(stderr, "failed to turn LED %s\n", state ? "on" : "off");
+		logmsg(LOG_WARNING, "failed to turn LED %s\n", state ? "on" : "off");
 	}
 }
 
@@ -302,7 +302,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 	struct dirent *dent;
 
 	if(verbose) {
-		printf("Device detection, parsing " PROC_DEV "\n");
+		logmsg(LOG_INFO, "Device detection, parsing " PROC_DEV "\n");
 	}
 
 	devlist = 0;
@@ -311,7 +311,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 	buf_len = sizeof(buf) - 1;
 	if(!(fp = fopen(PROC_DEV, "r"))) {
 		if(verbose) {
-			perror("failed to open " PROC_DEV);
+			logmsg(LOG_ERR, "failed to open " PROC_DEV);
 		}
 		goto alt_detect;
 	}
@@ -371,7 +371,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 							*endp = 0;
 						}
 						if(!(devinfo.name = strdup(valptr))) {
-							fprintf(stderr, "failed to allocate the device name buffer for: %s: %s\n", valptr, strerror(errno));
+							logmsg(LOG_ERR, "failed to allocate the device name buffer for: %s: %s\n", valptr, strerror(errno));
 						}
 					}
 					break;
@@ -390,7 +390,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 							}
 
 							if(!(devinfo.devfiles[idx] = malloc(strlen(devfile) + strlen(prefix) + 1))) {
-								perror("failed to allocate device filename buffer");
+								logmsg(LOG_ERR, "failed to allocate device filename buffer: %s\n", strerror(errno));
 								continue;
 							}
 							sprintf(devinfo.devfiles[idx++], "%s%s", prefix, devfile);
@@ -411,7 +411,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 				struct usb_device_info *node = malloc(sizeof *node);
 				if(node) {
 					if(verbose) {
-						printf("found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
+						logmsg(LOG_INFO, "found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
 								devinfo.name ? devinfo.name : "unknown", devinfo.devfiles[0]);
 					}
 
@@ -421,7 +421,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 					node->next = devlist;
 					devlist = node;
 				} else {
-					perror("failed to allocate usb device info node");
+					logmsg(LOG_ERR, "failed to allocate usb device info node: %s\n", strerror(errno));
 				}
 			} else {
 				/* cleanup devinfo before moving to the next line */
@@ -446,7 +446,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 
 alt_detect:
 	if(verbose) {
-		fprintf(stderr, "trying alternative detection, querying /dev/input/ devices...\n");
+		logmsg(LOG_INFO, "trying alternative detection, querying /dev/input/ devices...\n");
 	}
 
 	/* if for some reason we can't open the /proc/bus/input/devices file, or we
@@ -454,7 +454,7 @@ alt_detect:
 	 * devices, and see if anyone matches our predicate
 	 */
 	if(!(dir = opendir("/dev/input"))) {
-		perror("failed to open /dev/input/ directory");
+		logmsg(LOG_ERR, "failed to open /dev/input/ directory: %s\n", strerror(errno));
 		return 0;
 	}
 
@@ -466,14 +466,14 @@ alt_detect:
 		memset(&devinfo, 0, sizeof devinfo);
 
 		if(!(devinfo.devfiles[0] = malloc(strlen(dent->d_name) + strlen("/dev/input/") + 1))) {
-			perror("failed to allocate device file name");
+			logmsg(LOG_ERR, "failed to allocate device file name: %s\n", strerror(errno));
 			continue;
 		}
 		sprintf(devinfo.devfiles[0], "/dev/input/%s", dent->d_name);
 		devinfo.num_devfiles = 1;
 
 		if(verbose) {
-			fprintf(stderr, "  trying \"%s\" ... ", devinfo.devfiles[0]);
+			logmsg(LOG_INFO, "  trying \"%s\" ... ", devinfo.devfiles[0]);
 		}
 
 		if(stat(devinfo.devfiles[0], &st) == -1 || !S_ISCHR(st.st_mode)) {
@@ -482,7 +482,7 @@ alt_detect:
 		}
 
 		if((fd = open(devinfo.devfiles[0], O_RDONLY)) == -1) {
-			fprintf(stderr, "failed to open %s: %s\n", devinfo.devfiles[0], strerror(errno));
+			logmsg(LOG_ERR, "failed to open %s: %s\n", devinfo.devfiles[0], strerror(errno));
 			free(devinfo.devfiles[0]);
 			continue;
 		}
@@ -494,7 +494,7 @@ alt_detect:
 
 		if(ioctl(fd, EVIOCGNAME(sizeof buf), buf) != -1) {
 			if(!(devinfo.name = strdup(buf))) {
-				perror("failed to allocate device name buffer");
+				logmsg(LOG_ERR, "failed to allocate device name buffer: %s\n", strerror(errno));
 				close(fd);
 				free(devinfo.devfiles[0]);
 				continue;
@@ -505,7 +505,7 @@ alt_detect:
 			struct usb_device_info *node = malloc(sizeof *node);
 			if(node) {
 				if(verbose) {
-					printf("found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
+					logmsg(LOG_INFO, "found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
 							devinfo.name ? devinfo.name : "unknown", devinfo.devfiles[0]);
 				}
 
@@ -515,7 +515,7 @@ alt_detect:
 			} else {
 				free(devinfo.name);
 				free(devinfo.devfiles[0]);
-				perror("failed to allocate usb device info");
+				logmsg(LOG_ERR, "failed to allocate usb device info: %s\n", strerror(errno));
 			}
 		} else {
 			free(devinfo.name);

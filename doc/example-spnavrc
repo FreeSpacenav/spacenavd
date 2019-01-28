@@ -122,3 +122,17 @@
 # the re-centering power of the device.
 #
 #repeat-interval = -1
+
+
+# Log file path
+#
+#logfile = /var/log/spnavd.log
+
+# Log targets
+#
+# Valid options are:
+#  - file: log messages to a file defined by the logfile option.
+#  - syslog: log messages to the system logging daemon.
+# Combine multiple options by listing them on the same line.
+#
+#log = file, syslog

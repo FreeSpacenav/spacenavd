@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -18,6 +18,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #if !defined(__linux__) && !(defined(__APPLE__) && defined(__MACH__))
 
 #include <stdio.h>
+#include "logger.h"
 #include "dev.h"
 
 static const char *message =
@@ -26,7 +27,7 @@ static const char *message =
 
 struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_info*))
 {
-	fputs(message, stderr);
+	logmsg(LOG_ERR, message);
 	return 0;
 }
 

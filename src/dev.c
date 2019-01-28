@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,7 +48,7 @@ int init_devices(void)
 				remove_device(dev);
 			} else {
 				strcpy(dev->name, "serial device");
-				printf("using device: %s\n", cfg.serial_dev);
+				logmsg(LOG_INFO, "using device: %s\n", cfg.serial_dev);
 				device_added++;
 			}
 		}
@@ -62,7 +62,7 @@ int init_devices(void)
 		for(i=0; i<usbdev->num_devfiles; i++) {
 			if((dev = dev_path_in_use(usbdev->devfiles[i]))) {
 				if(verbose) {
-					fprintf(stderr, "already using device: %s (%s)\n", dev->name, dev->path);
+					logmsg(LOG_WARNING, "already using device: %s (%s)\n", dev->name, dev->path);
 				}
 				break;
 			}
@@ -73,7 +73,7 @@ int init_devices(void)
 			if(open_dev_usb(dev) == -1) {
 				remove_device(dev);
 			} else {
-				printf("using device: %s (%s)\n", dev->name, dev->path);
+				logmsg(LOG_INFO, "using device: %s (%s)\n", dev->name, dev->path);
 				device_added++;
 				break;
 			}
@@ -84,7 +84,7 @@ int init_devices(void)
 	free_usb_devices_list(usblist);
 
 	if(!usblist) {
-		fprintf(stderr, "failed to find any supported devices\n");
+		logmsg(LOG_ERR, "failed to find any supported devices\n");
 		return -1;
 	}
 
@@ -101,7 +101,7 @@ static struct device *add_device(void)
 	}
 	memset(dev, 0, sizeof *dev);
 
-	printf("adding device.\n");
+	logmsg(LOG_INFO, "adding device.\n");
 
 	dev->fd = -1;
 	dev->next = dev_list;
@@ -115,7 +115,7 @@ void remove_device(struct device *dev)
 	struct device dummy;
 	struct device *iter;
 
-	printf("removing device: %s\n", dev->name);
+	logmsg(LOG_INFO, "removing device: %s\n", dev->name);
 
 	dummy.next = dev_list;
 	iter = &dummy;

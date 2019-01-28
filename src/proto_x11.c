@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -94,11 +94,11 @@ int init_x11(void)
 		char *home, *buf;
 		if(!p || !p->pw_dir) {
 			if(!p) {
-				fprintf(stderr, "getpwuid failed: %s\n", strerror(errno));
+				logmsg(LOG_ERR, "getpwuid failed: %s\n", strerror(errno));
 			}
-			fprintf(stderr, "falling back to getting the home directory from the HOME env var...\n");
+			logmsg(LOG_WARNING, "falling back to getting the home directory from the HOME env var...\n");
 			if(!(home = getenv("HOME"))) {
-				fprintf(stderr, "HOME env var not found, using /tmp as a home directory...\n");
+				logmsg(LOG_WARNING, "HOME env var not found, using /tmp as a home directory...\n");
 				home = "/tmp";
 			}
 		} else {
@@ -111,12 +111,12 @@ int init_x11(void)
 	}
 
 	if(verbose) {
-		printf("trying to open X11 display \"%s\"\n", getenv("DISPLAY"));
-		printf("   XAUTHORITY=%s\n", getenv("XAUTHORITY"));
+		logmsg(LOG_INFO, "trying to open X11 display \"%s\"\n", getenv("DISPLAY"));
+		logmsg(LOG_INFO, "   XAUTHORITY=%s\n", getenv("XAUTHORITY"));
 	}
 
 	if(!(dpy = XOpenDisplay(0))) {
-		fprintf(stderr, "failed to open X11 display \"%s\"\n", getenv("DISPLAY"));
+		logmsg(LOG_ERR, "failed to open X11 display \"%s\"\n", getenv("DISPLAY"));
 
 		xdet_start();
 		return -1;
@@ -186,7 +186,7 @@ void close_x11(void)
 
 	if(dpy && setjmp(jbuf) == 0) {
 		if(verbose) {
-			printf("closing X11 connection to display \"%s\"\n", getenv("DISPLAY"));
+			logmsg(LOG_INFO, "closing X11 connection to display \"%s\"\n", getenv("DISPLAY"));
 		}
 
 		/* first delete all the CommandEvent properties from all root windows */
@@ -368,7 +368,7 @@ void drop_xinput(void)
 	}
 
 	if(!(xidevs = XIQueryDevice(dpy, XIAllDevices, &num_devs))) {
-		fprintf(stderr, "failed to query XInput2 devices\n");
+		logmsg(LOG_ERR, "failed to query XInput2 devices\n");
 		return;
 	}
 
@@ -377,7 +377,7 @@ void drop_xinput(void)
 		while(dev) {
 			if(strcmp(dev->name, xidevs[i].name) == 0 && xidevs[i].enabled) {
 				unsigned char zero = 0;
-				printf("Removing device \"%s\" from X server\n", dev->name);
+				logmsg(LOG_INFO, "Removing device \"%s\" from X server\n", dev->name);
 
 				XIChangeProperty(dpy, xidevs[i].deviceid, atom_enabled, XA_INTEGER, 8, PropModeReplace, &zero, 1);
 				break;
@@ -397,7 +397,7 @@ static int xerr(Display *dpy, XErrorEvent *err)
 	char buf[512];
 
 	if(verbose) {
-		fprintf(stderr, "xerr(%p, %p)\n", (void*)dpy, (void*)err);
+		logmsg(LOG_ERR, "xerr(%p, %p)\n", (void*)dpy, (void*)err);
 	}
 
 	if(err->error_code == BadWindow) {
@@ -407,7 +407,7 @@ static int xerr(Display *dpy, XErrorEvent *err)
 		remove_client_window((Window)err->resourceid);
 	} else {
 		XGetErrorText(dpy, err->error_code, buf, sizeof buf);
-		fprintf(stderr, "Caught unexpected X error: %s\n", buf);
+		logmsg(LOG_ERR, "Caught unexpected X error: %s\n", buf);
 	}
 	return 0;
 }
@@ -417,7 +417,7 @@ static int xerr(Display *dpy, XErrorEvent *err)
  */
 static int xioerr(Display *display)
 {
-	fprintf(stderr, "Lost the X server!\n");
+	logmsg(LOG_ERR, "Lost the X server!\n");
 	dpy = 0;
 	close_x11();
 	xdet_start();

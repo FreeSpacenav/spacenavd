@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2018 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -45,7 +45,7 @@ int init_unix(void)
 	if(lsock >= 0) return 0;
 
 	if((s = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
-		perror("failed to create socket");
+		logmsg(LOG_ERR, "failed to create socket: %s\n", strerror(errno));
 		return -1;
 	}
 
@@ -58,7 +58,7 @@ int init_unix(void)
 	prev_umask = umask(0);
 
 	if(bind(s, (struct sockaddr*)&addr, sizeof addr) == -1) {
-		fprintf(stderr, "failed to bind unix socket: %s: %s\n", SOCK_NAME, strerror(errno));
+		logmsg(LOG_ERR, "failed to bind unix socket: %s: %s\n", SOCK_NAME, strerror(errno));
 		close(s);
 		return -1;
 	}
@@ -66,7 +66,7 @@ int init_unix(void)
 	umask(prev_umask);
 
 	if(listen(s, 8) == -1) {
-		perror("listen failed");
+		logmsg(LOG_ERR, "listen failed: %s\n", strerror(errno));
 		close(s);
 		unlink(SOCK_NAME);
 		return -1;
@@ -135,10 +135,10 @@ int handle_uevents(fd_set *rset)
 		int s;
 
 		if((s = accept(lsock, 0, 0)) == -1) {
-			perror("error while accepting connection on the UNIX socket");
+			logmsg(LOG_ERR, "error while accepting connection on the UNIX socket: %s\n", strerror(errno));
 		} else {
 			if(!add_client(CLIENT_UNIX, &s)) {
-				perror("failed to add client");
+				logmsg(LOG_ERR, "failed to add client: %s\n", strerror(errno));
 			}
 		}
 	}

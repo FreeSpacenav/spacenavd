@@ -45,6 +45,9 @@ struct cfg {
 
 	char *devname[MAX_CUSTOM];	/* custom USB device name list */
 	int devid[MAX_CUSTOM][2];	/* custom USB vendor/product id list */
+
+	char logfile[PATH_MAX];
+	int use_logfile, use_syslog;
 };
 
 void default_cfg(struct cfg *cfg);

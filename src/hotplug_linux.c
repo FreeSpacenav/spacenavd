@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config.h"
 #include <stdio.h>
 #include <string.h>
+#include <errno.h>
 #include <signal.h>
 #include <unistd.h>
 
@@ -43,7 +44,7 @@ static int poll_time, poll_pipe;
 int init_hotplug(void)
 {
 	if(hotplug_fd != -1) {
-		fprintf(stderr, "WARNING: calling init_hotplug while hotplug is running!\n");
+		logmsg(LOG_WARNING, "WARNING: calling init_hotplug while hotplug is running!\n");
 		return hotplug_fd;
 	}
 
@@ -51,11 +52,11 @@ int init_hotplug(void)
 		int pfd[2];
 
 		if(verbose) {
-			printf("hotplug failed will resort to polling\n");
+			logmsg(LOG_WARNING, "hotplug failed will resort to polling\n");
 		}
 
 		if(pipe(pfd) == -1) {
-			perror("failed to open polling self-pipe");
+			logmsg(LOG_ERR, "failed to open polling self-pipe: %s\n", strerror(errno));
 			return -1;
 		}
 		poll_pipe = pfd[1];
@@ -92,12 +93,13 @@ int handle_hotplug(void)
 	char buf[512];
 	read(hotplug_fd, buf, sizeof buf);
 
-	if(verbose)
-		printf("\nhandle_hotplug called\n");
+	if(verbose) {
+		logmsg(LOG_DEBUG, "\nhandle_hotplug called\n");
+	}
 
-	if (init_devices() == -1)
+	if(init_devices() == -1) {
 		return -1;
-
+	}
 	return 0;
 }
 
@@ -109,7 +111,7 @@ static int con_hotplug(void)
 	struct sockaddr_nl addr;
 
 	if((s = socket(PF_NETLINK, SOCK_DGRAM, NETLINK_KOBJECT_UEVENT)) == -1) {
-		perror("failed to open hotplug netlink socket");
+		logmsg(LOG_ERR, "failed to open hotplug netlink socket: %s\n", strerror(errno));
 		return -1;
 	}
 
@@ -119,7 +121,7 @@ static int con_hotplug(void)
 	addr.nl_groups = -1;
 
 	if(bind(s, (struct sockaddr*)&addr, sizeof addr) == -1) {
-		perror("failed to bind to hotplug netlink socket");
+		logmsg(LOG_ERR, "failed to bind to hotplug netlink socket: %s\n", strerror(errno));
 		close(s);
 		return -1;
 	}

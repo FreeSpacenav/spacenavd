@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2011 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -41,13 +41,13 @@ int xdet_start(void)
 	struct kevent kev;
 
 	if((kq = kqueue()) == -1) {
-		perror("failed to create kqueue");
+		logmsg(LOG_ERR, "failed to create kqueue: %s\n", strerror(errno));
 		return -1;
 	}
 
 	if((fd_x11 = open("/tmp/.X11-unix", O_RDONLY)) == -1) {
 		if((fd_tmp = open("/tmp", O_RDONLY)) == -1) {
-			perror("failed to open /tmp");
+			logmsg(LOG_ERR, "failed to open /tmp: %s\n", strerror(errno));
 			goto err;
 		}
 	}
@@ -55,12 +55,12 @@ int xdet_start(void)
 	EV_SET(&kev, fd_x11 != -1 ? fd_x11 : fd_tmp, EVFILT_VNODE, EV_ADD | EV_CLEAR, NOTE_WRITE, 0, 0);
 
 	if(kevent(kq, &kev, 1, 0, 0, &ts) == -1) {
-		perror("failed to register kqueue event notification");
+		logmsg(LOG_ERR, "failed to register kqueue event notification: %s\n", strerror(errno));
 		goto err;
 	}
 
 	if(verbose) {
-		printf("waiting for the X socket file to appear\n");
+		logmsg(LOG_INFO, "waiting for the X socket file to appear\n");
 	}
 	return kq;
 
@@ -79,7 +79,7 @@ void xdet_stop(void)
 {
 	if(kq != -1) {
 		if(verbose) {
-			printf("stopping X watch\n");
+			logmsg(LOG_INFO, "stopping X watch\n");
 		}
 
 		if(fd_x11 != -1)
@@ -121,7 +121,7 @@ int handle_xdet_events(fd_set *rset)
 		EV_SET(&kev, fd_x11, EVFILT_VNODE, EV_ADD | EV_CLEAR, NOTE_WRITE, 0, 0);
 
 		if(kevent(kq, &kev, 1, 0, 0, &ts) == -1) {
-			perror("failed to register kqueue event notification for /tmp/.X11-unix");
+			logmsg(LOG_ERR, "failed to register kqueue event notification for /tmp/.X11-unix: %s\n", strerror(errno));
 			close(fd_x11);
 			fd_x11 = -1;
 			return -1;
@@ -138,7 +138,7 @@ int handle_xdet_events(fd_set *rset)
 		int i;
 
 		if(verbose) {
-			printf("found X socket, will now attempt to connect to the X server\n");
+			logmsg(LOG_INFO, "found X socket, will now attempt to connect to the X server\n");
 		}
 
 		/* poll for approximately 30 seconds (well a bit more than that) */
@@ -153,7 +153,7 @@ int handle_xdet_events(fd_set *rset)
 			}
 		}
 
-		fprintf(stderr, "found X socket yet failed to connect\n");
+		logmsg(LOG_ERR, "found X socket yet failed to connect\n");
 	}
 
 	return -1;

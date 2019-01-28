@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,6 +19,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config.h"
 #include <stdio.h>
+#include <string.h>
+#include <errno.h>
 #include <IOKit/IOKitLib.h>
 #include <IOKit/hid/IOHIDLib.h>
 #include "spnavd.h"
@@ -51,7 +53,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 
 	/* fetch... */
 	if(IOServiceGetMatchingServices(kIOMasterPortDefault, match_dict, &iter) != kIOReturnSuccess) {
-		fprintf(stderr, "failed to retrieve USB HID devices\n");
+		logmsg(LOG_ERR, "failed to retrieve USB HID devices\n");
 		return 0;
 	}
 
@@ -60,7 +62,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 
 		IORegistryEntryGetPath(dev, kIOServicePlane, dev_path);
 		if(!(devinfo.devfiles[0] = strdup(dev_path))) {
-			perror("failed to allocate device file path buffer");
+			logmsg(LOG_ERR, "failed to allocate device file path buffer: %s\n", strerror(errno));
 			continue;
 		}
 		devinfo.num_devfiles = 1;
@@ -71,7 +73,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 			struct usb_device_info *node = malloc(sizeof *node);
 			if(node) {
 				if(verbose) {
-					printf("found usb device: ");
+					logmsg(LOG_INFO, "found usb device: ");
 					print_usb_device_info(&devinfo);
 				}
 
@@ -80,7 +82,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 				devlist = node;
 			} else {
 				free(devinfo.devfiles[0]);
-				perror("failed to allocate usb device info node");
+				logmsg(LOG_ERR, "failed to allocate usb device info node: %s\n", strerror(errno));
 			}
 		}
 	}

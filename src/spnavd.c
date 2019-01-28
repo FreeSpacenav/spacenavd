@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -28,6 +28,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <sys/un.h>
 #include "spnavd.h"
+#include "logger.h"
 #include "dev.h"
 #include "hotplug.h"
 #include "client.h"
@@ -43,6 +44,7 @@ static int find_running_daemon(void);
 static void handle_events(fd_set *rset);
 static void sig_handler(int s);
 
+static const char *cfgfile = DEF_CFGFILE;
 
 int main(int argc, char **argv)
 {
@@ -55,6 +57,14 @@ int main(int argc, char **argv)
 				become_daemon = !become_daemon;
 				break;
 
+			case 'c':
+				if(!argv[++i]) {
+					fprintf(stderr, "-c must be followed by the config file name\n");
+					return 1;
+				}
+				cfgfile = argv[i];
+				break;
+
 			case 'v':
 				verbose = 1;
 				break;
@@ -62,9 +72,10 @@ int main(int argc, char **argv)
 			case 'h':
 				printf("usage: %s [options]\n", argv[0]);
 				printf("options:\n");
-				printf("  -d\tdo not daemonize\n");
-				printf("  -v\tverbose output\n");
-				printf("  -h\tprint this usage information\n");
+				printf(" -d         do not daemonize\n");
+				printf(" -c <file>  config file path (default: " DEF_CFGFILE ")\n");
+				printf(" -v         verbose output\n");
+				printf(" -h         print usage information and exit\n");
 				return 0;
 
 			default:
@@ -87,9 +98,18 @@ int main(int argc, char **argv)
 	}
 	write_pid_file();
 
-	puts("Spacenav daemon " VERSION);
+	logmsg(LOG_INFO, "Spacenav daemon " VERSION "\n");
 
-	read_cfg("/etc/spnavrc", &cfg);
+	read_cfg(cfgfile, &cfg);
+
+	if(become_daemon) {
+		if(cfg.use_syslog) {
+			start_syslog(SYSLOG_ID);
+		}
+		if(cfg.use_logfile) {
+			start_logfile(cfg.logfile[0] ? cfg.logfile : DEF_LOGFILE);
+		}
+	}
 
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
@@ -236,13 +256,8 @@ static void daemonize(void)
 	}
 
 	open("/dev/zero", O_RDONLY);
-	if(open(LOGFILE, O_WRONLY | O_CREAT | O_TRUNC, 0644) == -1) {
-		open("/dev/null", O_WRONLY);
-	}
+	open("/dev/null", O_WRONLY);
 	dup(1);
-
-	setvbuf(stdout, 0, _IOLBF, 0);
-	setvbuf(stderr, 0, _IONBF, 0);
 }
 
 static int write_pid_file(void)
@@ -340,13 +355,13 @@ static void sig_handler(int s)
 
 	switch(s) {
 	case SIGHUP:
-		read_cfg("/etc/spnavrc", &cfg);
+		read_cfg(cfgfile, &cfg);
 		if(cfg.led != prev_led) {
 			struct device *dev = get_devices();
 			while(dev) {
 				if(is_device_valid(dev)) {
 					if(verbose) {
-						printf("turn led %s, device: %s\n", cfg.led ? "on": "off", dev->name);
+						logmsg(LOG_INFO, "turn led %s, device: %s\n", cfg.led ? "on": "off", dev->name);
 					}
 					set_device_led(dev, cfg.led);
 				}
@@ -356,7 +371,7 @@ static void sig_handler(int s)
 		break;
 
 	case SIGSEGV:
-		fprintf(stderr, "Segmentation fault caught, trying to exit gracefully\n");
+		logmsg(LOG_ERR, "Segmentation fault caught, trying to exit gracefully\n");
 	case SIGINT:
 	case SIGTERM:
 		exit(0);

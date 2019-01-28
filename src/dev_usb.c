@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -17,7 +17,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "dev_usb.h"
+#ifdef HAVE_ALLOCA_H
+#include <alloca.h>
+#endif
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
+#include "logger.h"
 
 
 void free_usb_devices_list(struct usb_device_info *list)
@@ -37,13 +45,22 @@ void free_usb_devices_list(struct usb_device_info *list)
 
 void print_usb_device_info(struct usb_device_info *devinfo)
 {
-	int i;
+	int i, sz = 64;
+	char *devname, *buf, *s;
 
-	printf("[%x:%x]: \"%s\" (", devinfo->vendorid, devinfo->productid,
-			devinfo->name ? devinfo->name : "unknown");
-
+	devname = devinfo->name ? devinfo->name : "unknown";
+	sz += strlen(devname);
 	for(i=0; i<devinfo->num_devfiles; i++) {
-		printf("%s ", devinfo->devfiles[i]);
+		sz += strlen(devinfo->devfiles[i]) + 1;
 	}
-	fputs(")\n", stdout);
+
+	s = buf = alloca(sz);
+	s += sprintf(s, "[%x:%x]: \"%s\" (", devinfo->vendorid, devinfo->productid,
+			devinfo->name ? devinfo->name : "unknown");
+	for(i=0; i<devinfo->num_devfiles; i++) {
+		s += sprintf(s, "%s ", devinfo->devfiles[i]);
+	}
+	sprintf(s, ")\n");
+
+	logmsg(LOG_INFO, buf);
 }

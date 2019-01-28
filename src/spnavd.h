@@ -21,10 +21,15 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #include "config.h"
 #include "cfgfile.h"
+#include "logger.h"
+
+#define DEF_CFGFILE		"/etc/spnavrc"
+#define DEF_LOGFILE		"/var/log/spnavd.log"
 
 #define SOCK_NAME	"/var/run/spnav.sock"
 #define PIDFILE		"/var/run/spnavd.pid"
-#define LOGFILE		"/var/log/spnavd.log"
+#define SYSLOG_ID	"spnavd"
+
 /* Multiple devices support */
 #ifndef MAX_DEVICES
 #define MAX_DEVICES 8

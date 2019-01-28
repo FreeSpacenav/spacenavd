@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -41,14 +41,14 @@ static int watch_tmp = -1, watch_x11 = -1;
 int xdet_start(void)
 {
 	if((fd = inotify_init()) == -1) {
-		perror("failed to create inotify queue");
+		logmsg(LOG_ERR, "failed to create inotify queue: %s\n", strerror(errno));
 		return -1;
 	}
 	fcntl(fd, F_SETFL, fcntl(fd, F_GETFL, 0) | O_NONBLOCK);
 
 	if((watch_x11 = inotify_add_watch(fd, "/tmp/.X11-unix", IN_CREATE)) == -1) {
 		if((watch_tmp = inotify_add_watch(fd, "/tmp", IN_CREATE)) == -1) {
-			perror("failed to watch /tmp for file events");
+			logmsg(LOG_ERR, "failed to watch /tmp for file events: %s\n", strerror(errno));
 			close(fd);
 			fd = -1;
 			return -1;
@@ -56,7 +56,7 @@ int xdet_start(void)
 	}
 
 	if(verbose) {
-		printf("waiting for the X socket file to appear\n");
+		logmsg(LOG_INFO, "waiting for the X socket file to appear\n");
 	}
 
 	return fd;
@@ -67,7 +67,7 @@ void xdet_stop(void)
 {
 	if(fd != -1) {
 		if(verbose) {
-			printf("stopping X watch\n");
+			logmsg(LOG_INFO, "stopping X watch\n");
 		}
 
 		close(fd);
@@ -98,7 +98,7 @@ int handle_xdet_events(fd_set *rset)
 			}
 			if(errno == EINTR) continue;
 			if(errno != EAGAIN) {
-				perror("failed to read inotify event");
+				logmsg(LOG_ERR, "failed to read inotify event: %s\n", strerror(errno));
 			}
 			return -1;
 		}
@@ -111,7 +111,7 @@ int handle_xdet_events(fd_set *rset)
 
 			if(ev->len > 0 && strcmp(ev->name, ".X11-unix") == 0) {
 				if((watch_x11 = inotify_add_watch(fd, "/tmp/.X11-unix", IN_CREATE)) == -1) {
-					perror("failed to add /tmp/.X11-unix to the watch queue");
+					logmsg(LOG_ERR, "failed to add /tmp/.X11-unix to the watch queue: %s\n", strerror(errno));
 					continue;
 				}
 				if(try_xconnect() == 0) {
@@ -133,13 +133,13 @@ int handle_xdet_events(fd_set *rset)
 
 			if(ev->len > 0 && strcmp(ev->name, sock_file) == 0) {
 				if(verbose) {
-					printf("found X socket, will now attempt to connect to the X server\n");
+					logmsg(LOG_INFO, "found X socket, will now attempt to connect to the X server\n");
 				}
 
 				if(try_xconnect() == 0) {
 					return 0;
 				}
-				fprintf(stderr, "found X socket yet failed to connect\n");
+				logmsg(LOG_ERR, "found X socket yet failed to connect\n");
 			}
 		}
 	}

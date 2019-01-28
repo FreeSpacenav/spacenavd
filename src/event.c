@@ -94,7 +94,7 @@ void remove_dev_event(struct device *dev)
 			iter->next = ev->next;
 
 			if(verbose) {
-				printf("removing pending device event of: %s\n", dev->path);
+				logmsg(LOG_INFO, "removing pending device event of: %s\n", dev->path);
 			}
 			free(ev);
 		} else {
@@ -140,9 +140,9 @@ void process_input(struct device *dev, struct dev_input *inp)
 
 		dev_ev = device_event_in_use(dev);
 		if(verbose && dev_ev == NULL)
-			printf("adding dev event for device: %s\n", dev->path);
+			logmsg(LOG_INFO, "adding dev event for device: %s\n", dev->path);
 		if(dev_ev == NULL && (dev_ev = add_dev_event(dev)) == NULL) {
-			fprintf(stderr, "failed to get dev_event\n");
+			logmsg(LOG_ERR, "failed to get dev_event\n");
 			break;
 		}
 		dev_ev->event.type = EVENT_MOTION;
@@ -159,7 +159,9 @@ void process_input(struct device *dev, struct dev_input *inp)
 		if(cfg.kbmap_str[inp->idx]) {
 			if(!cfg.kbmap[inp->idx]) {
 				cfg.kbmap[inp->idx] = kbemu_keysym(cfg.kbmap_str[inp->idx]);
-				printf("mapping ``%s'' to keysym %d\n", cfg.kbmap_str[inp->idx], (int)cfg.kbmap[inp->idx]);
+				if(verbose) {
+					logmsg(LOG_DEBUG, "mapping ``%s'' to keysym %d\n", cfg.kbmap_str[inp->idx], (int)cfg.kbmap[inp->idx]);
+				}
 			}
 			send_kbevent(cfg.kbmap[inp->idx], inp->val);
 			break;

@@ -1,6 +1,7 @@
 #ifdef WIN32
 #include <stdio.h>
 #include <windows.h>
+#include "logger.h"
 
 static void WINAPI svc_main(unsigned long argc, char **argv);
 static unsigned long WINAPI svc_handler(unsigned long op, unsigned long evtype, void *evdata, void *cls);
@@ -15,7 +16,7 @@ int main(int argc, char **argv)
 	};
 
 	if(!StartServiceCtrlDispatcher(serv_tbl)) {
-		fprintf(stderr, "failed to start the spacenavd service\n");
+		logmsg(LOG_ERR, "failed to start the spacenavd service\n");
 		return 1;
 	}
 	return 0;
@@ -44,7 +45,7 @@ static void WINAPI svc_main(unsigned long argc, char **argv)
 
 static unsigned long WINAPI svc_handler(unsigned long op, unsigned long evtype, void *evdata, void *cls)
 {
-	printf("received service control message: %ld\n", op);
+	logmsg(LOG_ERR, "received service control message: %ld\n", op);
 	switch(op) {
 	case SERVICE_CONTROL_INTERROGATE:
 		return 0;
