@@ -36,6 +36,7 @@ int start_logfile(const char *fname)
 int start_syslog(const char *id)
 {
 	openlog(id, LOG_NDELAY, LOG_DAEMON);
+	use_syslog = 1;
 	return 0;
 }
 
@@ -43,22 +44,11 @@ void logmsg(int prio, const char *fmt, ...)
 {
 	va_list ap;
 
-	/* if a logfile isn't open, assume we are not daemonized, and try to output
-	 * to stdout/stderr as usual. If we are daemonized but don't have a log file
-	 * this will end up writing harmlessly to /dev/null (see daemonize in spnavd.c)
-	 */
-	va_start(ap, fmt);
 	if(logfile) {
+		va_start(ap, fmt);
 		vfprintf(logfile, fmt, ap);
-	} else {
-		if(prio <= LOG_WARNING) {
-			vfprintf(stderr, fmt, ap);
-		} else {
-			vprintf(fmt, ap);
-		}
+		va_end(ap);
 	}
-	va_end(ap);
-
 	if(use_syslog) {
 		va_start(ap, fmt);
 		vsyslog(prio, fmt, ap);

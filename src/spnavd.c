@@ -45,6 +45,7 @@ static void handle_events(fd_set *rset);
 static void sig_handler(int s);
 
 static const char *cfgfile = DEF_CFGFILE;
+static const char *logfile = DEF_LOGFILE;
 
 int main(int argc, char **argv)
 {
@@ -65,6 +66,18 @@ int main(int argc, char **argv)
 				cfgfile = argv[i];
 				break;
 
+			case 'l':
+				if(!argv[++i]) {
+					fprintf(stderr, "-l must be followed by a logfile name or \"syslog\"\n");
+					return 1;
+				}
+				if(strcmp(argv[i], "syslog") == 0) {
+					logfile = 0;
+				} else {
+					logfile = argv[i];
+				}
+				break;
+
 			case 'v':
 				verbose = 1;
 				break;
@@ -72,10 +85,11 @@ int main(int argc, char **argv)
 			case 'h':
 				printf("usage: %s [options]\n", argv[0]);
 				printf("options:\n");
-				printf(" -d         do not daemonize\n");
-				printf(" -c <file>  config file path (default: " DEF_CFGFILE ")\n");
-				printf(" -v         verbose output\n");
-				printf(" -h         print usage information and exit\n");
+				printf(" -d: do not daemonize\n");
+				printf(" -c <file>: config file path (default: " DEF_CFGFILE ")\n");
+				printf(" -l <file>|syslog: log file path or log to syslog (default: " DEF_LOGFILE ")\n");
+				printf(" -v: verbose output\n");
+				printf(" -h: print usage information and exit\n");
 				return 0;
 
 			default:
@@ -101,15 +115,6 @@ int main(int argc, char **argv)
 	logmsg(LOG_INFO, "Spacenav daemon " VERSION "\n");
 
 	read_cfg(cfgfile, &cfg);
-
-	if(become_daemon) {
-		if(cfg.use_syslog) {
-			start_syslog(SYSLOG_ID);
-		}
-		if(cfg.use_logfile) {
-			start_logfile(cfg.logfile[0] ? cfg.logfile : DEF_LOGFILE);
-		}
-	}
 
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
@@ -250,14 +255,24 @@ static void daemonize(void)
 	setsid();
 	chdir("/");
 
-	/* redirect standard input/output/error */
+	/* redirect standard input/output/error
+	 * best effort attempt to make either the logfile or the syslog socket
+	 * accessible through stdout/stderr, just in case any printfs survived
+	 * the logmsg conversion.
+	 */
 	for(i=0; i<3; i++) {
 		close(i);
 	}
 
 	open("/dev/zero", O_RDONLY);
-	open("/dev/null", O_WRONLY);
+
+	if(!logfile || start_logfile(logfile) == -1) {
+		start_syslog(SYSLOG_ID);
+	}
 	dup(1);
+
+	setvbuf(stdout, 0, _IOLBF, 0);
+	setvbuf(stderr, 0, _IONBF, 0);
 }
 
 static int write_pid_file(void)

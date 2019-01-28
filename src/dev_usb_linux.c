@@ -311,7 +311,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 	buf_len = sizeof(buf) - 1;
 	if(!(fp = fopen(PROC_DEV, "r"))) {
 		if(verbose) {
-			logmsg(LOG_ERR, "failed to open " PROC_DEV);
+			logmsg(LOG_ERR, "failed to open " PROC_DEV ": %s\n", strerror(errno));
 		}
 		goto alt_detect;
 	}

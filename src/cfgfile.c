@@ -66,9 +66,6 @@ void default_cfg(struct cfg *cfg)
 		cfg->devname[i] = 0;
 		cfg->devid[i][0] = cfg->devid[i][1] = -1;
 	}
-
-	cfg->use_logfile = 1;
-	cfg->use_syslog = 1;
 }
 
 #define EXPECT(cond) \
@@ -315,13 +312,6 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				continue;
 			}
 
-		} else if(strcmp(key_str, "logfile") == 0) {
-			strncpy(cfg->logfile, val_str, PATH_MAX - 1);
-
-		} else if(strcmp(key_str, "log") == 0) {
-			cfg->use_logfile = strstr(val_str, "file") == 0 ? 1 : 0;
-			cfg->use_syslog = strstr(val_str, "syslog") == 0 ? 1 : 0;
-
 		} else {
 			logmsg(LOG_WARNING, "unrecognized config option: %s\n", key_str);
 		}
@@ -472,33 +462,6 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		}
 	}
 	fprintf(fp, "\n");
-
-	fprintf(fp, "# Log file path\n");
-	if(cfg->logfile[0]) {
-		fprintf(fp, "logfile = %s\n\n", cfg->logfile);
-	} else {
-		fprintf(fp, "#logfile = " DEF_LOGFILE "\n\n");
-	}
-
-	fprintf(fp, "# Log targets\n");
-	fprintf(fp, "#\n");
-	fprintf(fp, "# Valid options are:\n");
-	fprintf(fp, "#  - file: log messages to a file defined by the logfile option.\n");
-	fprintf(fp, "#  - syslog: log messages to the system logging daemon.\n");
-	fprintf(fp, "#  Combine multiple options by listing them on the same line.\n");
-	fprintf(fp, "#\n");
-	if(cfg->use_logfile || cfg->use_syslog) {
-		fprintf(fp, "log =");
-		if(cfg->use_logfile) {
-			fprintf(fp, " file");
-		}
-		if(cfg->use_syslog) {
-			fprintf(fp, " syslog");
-		}
-		fputc('\n', fp);
-	} else {
-		fprintf(fp, "#log = file, syslog\n");
-	}
 
 	/* unlock */
 	flk.l_type = F_UNLCK;
