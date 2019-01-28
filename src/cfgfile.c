@@ -86,6 +86,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 	default_cfg(cfg);
 
+	logmsg(LOG_INFO, "reading config file: %s\n", fname);
 	if(!(fp = fopen(fname, "r"))) {
 		logmsg(LOG_WARNING, "failed to open config file %s: %s. using defaults.\n", fname, strerror(errno));
 		return -1;

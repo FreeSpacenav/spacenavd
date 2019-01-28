@@ -43,9 +43,10 @@ static int write_pid_file(void);
 static int find_running_daemon(void);
 static void handle_events(fd_set *rset);
 static void sig_handler(int s);
+static char *fix_path(char *str);
 
-static const char *cfgfile = DEF_CFGFILE;
-static const char *logfile = DEF_LOGFILE;
+static char *cfgfile = DEF_CFGFILE;
+static char *logfile = DEF_LOGFILE;
 
 int main(int argc, char **argv)
 {
@@ -63,7 +64,7 @@ int main(int argc, char **argv)
 					fprintf(stderr, "-c must be followed by the config file name\n");
 					return 1;
 				}
-				cfgfile = argv[i];
+				cfgfile = fix_path(argv[i]);
 				break;
 
 			case 'l':
@@ -74,7 +75,10 @@ int main(int argc, char **argv)
 				if(strcmp(argv[i], "syslog") == 0) {
 					logfile = 0;
 				} else {
-					logfile = argv[i];
+					logfile = fix_path(argv[i]);
+					if(strcmp(logfile, argv[i]) != 0) {
+						printf("logfile: %s\n", logfile);
+					}
 				}
 				break;
 
@@ -245,14 +249,6 @@ static void daemonize(void)
 {
 	int i, pid;
 
-	if((pid = fork()) == -1) {
-		perror("failed to fork");
-		exit(1);
-	} else if(pid) {
-		exit(0);
-	}
-
-	setsid();
 	chdir("/");
 
 	/* redirect standard input/output/error
@@ -273,6 +269,16 @@ static void daemonize(void)
 
 	setvbuf(stdout, 0, _IOLBF, 0);
 	setvbuf(stderr, 0, _IONBF, 0);
+
+	/* release controlling terminal */
+	if((pid = fork()) == -1) {
+		perror("failed to fork");
+		exit(1);
+	} else if(pid) {
+		exit(0);
+	}
+
+	setsid();
 }
 
 static int write_pid_file(void)
@@ -406,3 +412,38 @@ static void sig_handler(int s)
 	}
 }
 
+
+static char *fix_path(char *str)
+{
+	char *buf, *tmp;
+	int sz, len;
+
+	if(str[0] == '/') return str;
+
+	len = strlen(str) + 1;	/* +1 for the path separator */
+	sz = PATH_MAX;
+
+	if(!(buf = malloc(sz + len))) {
+		perror("failed to allocate path buffer");
+		return 0;
+	}
+
+	while(!getcwd(buf, sz)) {
+		if(errno == ERANGE) {
+			sz *= 2;
+			if(!(tmp = realloc(buf, sz + len))) {
+				perror("failed to reallocate path buffer");
+				free(buf);
+				return 0;
+			}
+			buf = tmp;
+		} else {
+			perror("getcwd failed");
+			free(buf);
+			return 0;
+		}
+	}
+
+	sprintf(buf + strlen(buf), "/%s", str);
+	return buf;
+}

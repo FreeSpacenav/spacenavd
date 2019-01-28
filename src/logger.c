@@ -26,7 +26,7 @@ static int use_syslog;
 int start_logfile(const char *fname)
 {
 	if(!(logfile = fopen(fname, "w"))) {
-		logmsg(LOG_ERR, "failed to open log file: %s\n", fname);
+		fprintf(stderr, "failed to open log file: %s\n", fname);
 		return -1;
 	}
 	setvbuf(logfile, 0, _IONBF, 0);
