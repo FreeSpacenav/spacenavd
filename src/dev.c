@@ -212,7 +212,8 @@ static int devid_list[][2] = {
 	{0x046d, 0xc629},	/* space pilot pro*/
 	{0x046d, 0xc62b},	/* space mouse pro*/
 	{0x046d, 0xc640},	/* nulooq */
-	{0x256f, 0xc62e},	/* spacemouse wireless */
+	{0x256f, 0xc62e},	/* spacemouse wireless (USB cable) */
+	{0x256f, 0xc62f},	/* spacemouse wireless  receiver */
 	{0x256f, 0xc631},	/* spacemouse pro wireless */
 	{0x256f, 0xc632},	/* spacemouse pro wireless receiver */
 	{0x256f, 0xc633},	/* spacemouse enterprise */
@@ -223,10 +224,9 @@ static int devid_list[][2] = {
 };
 
 /* 3Dconnexion devices which we don't want to match, because they are
- * not 6dof space-mice. reported by: Herbert Graeber in github issue #4
+ * not 6dof space-mice. reported by: Herbert Graeber in github pull request #4
  */
 static int devid_blacklist[][2] = {
-	{0x256f, 0xc62f},	/* spacemouse wireless receiver */
 	{0x256f, 0xc652},
 	{0x256f, 0xc650},	/* cadmouse */
 	{0x256f, 0xc651},	/* cadmouse wireless */
