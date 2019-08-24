@@ -118,6 +118,12 @@ int open_dev_usb(struct device *dev)
 		}
 	}
 
+    // Lets ignore all devices with less than 6 axis to avoid the daemon to grab mice
+	if (dev->num_axes < 6) {
+		close_evdev(dev);
+		return -1;
+	}
+
 	/* get number of buttons */
 	dev->num_buttons = 0;
 	if(ioctl(dev->fd, EVIOCGBIT(EV_KEY, sizeof evtype_mask), evtype_mask) != -1) {
