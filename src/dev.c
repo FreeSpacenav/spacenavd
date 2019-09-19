@@ -33,6 +33,18 @@ static int match_usbdev(const struct usb_device_info *devinfo);
 
 static struct device *dev_list = NULL;
 
+static int device_evt_num(const char* path)
+{
+	const char needle[] = "/dev/input/event";
+	char* pos = strstr(path, needle);
+
+	if (pos == NULL) return 0;
+
+	pos += strlen(needle);
+
+	return (int)strtol(pos, NULL, 10);
+}
+
 int init_devices(void)
 {
 	struct device *dev;
@@ -44,6 +56,7 @@ int init_devices(void)
 		if(!dev_path_in_use(cfg.serial_dev)) {
 			dev = add_device();
 			strcpy(dev->path, cfg.serial_dev);
+			dev->evt_num = device_evt_num(cfg.serial_dev);
 			if(open_dev_serial(dev) == -1) {
 				remove_device(dev);
 			} else {
@@ -69,6 +82,7 @@ int init_devices(void)
 
 			dev = add_device();
 			strcpy(dev->path, usbdev->devfiles[i]);
+			dev->evt_num = device_evt_num(usbdev->devfiles[i]);
 
 			if(open_dev_usb(dev) == -1) {
 				remove_device(dev);
@@ -91,6 +105,8 @@ int init_devices(void)
 	drop_xinput();
 	return 0;
 }
+
+
 
 static struct device *add_device(void)
 {

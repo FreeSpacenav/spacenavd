@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "event.h"
 #include "client.h"
 #include "proto_unix.h"
@@ -146,6 +147,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 			break;
 		}
 		dev_ev->event.type = EVENT_MOTION;
+		dev_ev->event.dev = dev_ev->dev->evt_num;
 		dev_ev->event.motion.data = (int*)&dev_ev->event.motion.x;
 		dev_ev->event.motion.data[inp->idx] = sign * inp->val;
 		dev_ev->pending = 1;
@@ -179,6 +181,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 			struct dev_event dev_button_event;
 			dev_button_event.dev = dev;
 			dev_button_event.event.type = EVENT_BUTTON;
+			dev_button_event.event.dev = dev_ev->dev->evt_num;
 			dev_button_event.event.button.press = inp->val;
 			dev_button_event.event.button.bnum = inp->idx;
 			dispatch_event(&dev_button_event);

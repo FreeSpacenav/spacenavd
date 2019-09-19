@@ -93,7 +93,7 @@ int get_unix_socket(void)
 
 void send_uevent(spnav_event *ev, struct client *c)
 {
-	int i, data[8] = {0};
+	int i, data[9] = {0};
 	float motion_mul;
 
 	if(lsock == -1) return;
@@ -101,18 +101,20 @@ void send_uevent(spnav_event *ev, struct client *c)
 	switch(ev->type) {
 	case EVENT_MOTION:
 		data[0] = UEV_TYPE_MOTION;
+		data[1] = ev->dev;
 
 		motion_mul = get_client_sensitivity(c);
 		for(i=0; i<6; i++) {
 			float val = (float)ev->motion.data[i] * motion_mul;
-			data[i + 1] = (int)val;
+			data[i + 2] = (int)val;
 		}
-		data[7] = ev->motion.period;
+		data[8] = ev->motion.period;
 		break;
 
 	case EVENT_BUTTON:
 		data[0] = ev->button.press ? UEV_TYPE_PRESS : UEV_TYPE_RELEASE;
-		data[1] = ev->button.bnum;
+		data[1] = ev->dev;
+		data[2] = ev->button.bnum;
 		break;
 
 	default:

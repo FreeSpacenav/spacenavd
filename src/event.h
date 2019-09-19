@@ -29,7 +29,10 @@ enum {
 };
 
 struct event_motion {
-	int type;
+	struct {
+		int type;
+		int dev;
+	};
 	int x, y, z;
 	int rx, ry, rz;
 	unsigned int period;
@@ -37,13 +40,19 @@ struct event_motion {
 };
 
 struct event_button {
-	int type;
+	struct {
+		int type;
+		int dev;
+	};
 	int press;
 	int bnum;
 };
 
 typedef union spnav_event {
-	int type;
+	struct {
+		int type;
+		int dev;
+	};
 	struct event_motion motion;
 	struct event_button button;
 } spnav_event;

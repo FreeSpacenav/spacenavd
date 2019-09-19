@@ -30,6 +30,7 @@ struct device {
 	void *data;
 	char name[MAX_DEV_NAME];
 	char path[PATH_MAX];
+	int evt_num;
 
 	int num_axes, num_buttons;
 	int *minval, *maxval;	/* input value range (default: -500, 500) */
