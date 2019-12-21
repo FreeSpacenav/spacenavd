@@ -227,7 +227,6 @@ static int devid_list[][2] = {
  * not 6dof space-mice. reported by: Herbert Graeber in github pull request #4
  */
 static int devid_blacklist[][2] = {
-	{0x256f, 0xc652},
 	{0x256f, 0xc650},	/* cadmouse */
 	{0x256f, 0xc651},	/* cadmouse wireless */
 	{0x256f, 0xc62c},	/* lipari(?) */
@@ -266,6 +265,10 @@ static int match_usbdev(const struct usb_device_info *devinfo)
 
 		/* match any device with the new 3Dconnexion device id */
 		if(vid == VENDOR_3DCONNEXION) {
+			if (devinfo->productid == 0xc652 && strstr(devinfo->name, "Universal Receiver Mouse")) {
+				return 0;
+			}
+			
 			return 1;
 		}
 
