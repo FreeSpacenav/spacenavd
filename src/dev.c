@@ -265,10 +265,12 @@ static int match_usbdev(const struct usb_device_info *devinfo)
 
 		/* match any device with the new 3Dconnexion device id */
 		if(vid == VENDOR_3DCONNEXION) {
-			if (devinfo->productid == 0xc652 && strstr(devinfo->name, "Universal Receiver Mouse")) {
+			/* avoid matching and trying to grab the CAD mouse, when connected
+			 * on the same universal receiver as the spacemouse.
+			 */
+			if(pid == 0xc652 && strstr(devinfo->name, "Universal Receiver Mouse")) {
 				return 0;
 			}
-			
 			return 1;
 		}
 
