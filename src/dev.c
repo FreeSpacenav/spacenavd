@@ -88,7 +88,9 @@ int init_devices(void)
 		return -1;
 	}
 
+#ifdef USE_X11
 	drop_xinput();
+#endif
 	return 0;
 }
 
