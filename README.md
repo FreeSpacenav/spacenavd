@@ -14,7 +14,7 @@ For more info on the spacenav project, visit: http://spacenav.sourceforge.net
 
 License
 -------
-Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2020 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software. Feel free to copy, modify and/or redistribute it
 under the terms of the GNU General Public Licens version 3, or at your option,
@@ -26,8 +26,8 @@ Dependencies
 In order to compile the spacenavd daemon, you'll need the following:
  - GNU C Compiler
  - GNU make
- - libX11 headers (optional)
- - libXi headers (optional)
+ - Xlib (libX11, optional)
+ - XInput2 (libXi, optional)
 
 You can compile the daemon without Xlib, but it won't be compatible with
 applications that where written for the original proprietary 3Dconnexion driver
