@@ -1,0 +1,35 @@
+name: Build
+
+on:
+- pull_request
+- push
+
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: 'Install build dependencies'
+        run: |-
+          set -e
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends \
+            libx11-dev \
+            libxi-dev
+
+      - name: Checkout Git branch
+        uses: actions/checkout@v2.0.0
+
+      - name: 'Configure'
+        run: |-
+          ./configure --enable-x11
+
+      - name: 'Build'
+        run: |-
+          make
+
+      - name: 'Install'
+        run: |-
+          set -e
+          make DESTDIR="$PWD/ROOT" install
+          find ROOT/ | sort

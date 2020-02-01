@@ -1,3 +1,5 @@
+![](https://github.com/FreeSpacenav/spacenavd/workflows/Build/badge.svg)
+
 spacenavd
 =========
 
