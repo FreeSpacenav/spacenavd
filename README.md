@@ -26,7 +26,8 @@ Dependencies
 In order to compile the spacenavd daemon, you'll need the following:
  - GNU C Compiler
  - GNU make
- - Xlib headers (optional)
+ - libX11 headers (optional)
+ - libXi headers (optional)
 
 You can compile the daemon without Xlib, but it won't be compatible with
 applications that where written for the original proprietary 3Dconnexion driver
