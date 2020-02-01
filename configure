@@ -146,11 +146,11 @@ if [ "$X11" = 'yes' ]; then
 	fi
 fi
 
-if [ -n "$add_cflags" ]; then
-	echo "add_cflags = $add_cflags" >>Makefile
+if [ -n "$CFLAGS" ]; then
+	echo "add_cflags = $CFLAGS" >>Makefile
 fi
-if [ -n "$add_ldflags" ]; then
-	echo "add_ldflags = $add_ldflags" >>Makefile
+if [ -n "$LDFLAGS" ]; then
+	echo "add_ldflags = $LDFLAGS" >>Makefile
 fi
 
 cat "$srcdir/Makefile.in" >>Makefile
