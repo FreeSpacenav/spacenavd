@@ -1,0 +1,40 @@
+#!/bin/sh
+# helper script to prepare a release
+
+if [ -z "$1" ]; then
+	echo 'pass the release version number' >&2
+	exit 1
+fi
+if echo $1 | grep -v '[0-9\.]' >/dev/null; then
+	echo 'invalid release number, try something like "1.2"' >&2
+	exit 1
+fi
+
+ver=$1
+name=$(pwd | xargs basename)
+fullname=$name-$ver
+
+if git tag | grep "^v$ver$" >/dev/null; then
+	echo "release tag v$ver already exists" >&2
+	exit 1
+fi
+
+echo "tagging v$ver ..."
+git tag v$ver
+echo "preparing tarball: $fullname.tar.gz ..."
+git archive -o $fullname.tar.gz --prefix=$fullname/ v$ver
+
+# fixup VER in the configure script
+echo "fixing up version in configure script to not rely on git ..."
+orig_pwd=`pwd`
+mkdir -p /tmp/mkrelfix
+cd /tmp/mkrelfix
+tar xzvf $orig_pwd/$fullname.tar.gz
+sed -i "s/^VER=.*/VER=$ver/" $fullname/configure
+# also while we're at it, remove this script too
+rm -f $fullname/`basename $0`
+tar czvf $orig_pwd/$fullname.tar.gz $fullname
+
+echo
+echo "Done. If there was some mistake delete the tag with: git tag -d v$ver"
+echo 'Otherwise, push the new tag with: git push --tags, and upload the tarball.'
