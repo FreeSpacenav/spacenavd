@@ -19,7 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include "smag_event.h"
 
-int evpool_size = 0;
+static int evpool_size;
 static struct smag_event *ev_free_list;
 
 struct smag_event *alloc_event(void)
@@ -30,8 +30,9 @@ struct smag_event *alloc_event(void)
 		ev = ev_free_list;
 		ev_free_list = ev->next;
 	} else {
-		ev = malloc(sizeof *ev);
-		evpool_size++;
+		if((ev = malloc(sizeof *ev))) {
+			evpool_size++;
+		}
 	}
 	return ev;
 }

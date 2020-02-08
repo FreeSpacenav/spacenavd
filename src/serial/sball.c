@@ -60,7 +60,7 @@ struct event {
 };
 
 static struct event *ev_free_list;
-int evpool_size;
+static int evpool_size;
 
 static struct event *alloc_event(void);
 static void free_event(struct event *ev);
@@ -661,8 +661,9 @@ static struct event *alloc_event(void)
 		ev = ev_free_list;
 		ev_free_list = ev->next;
 	} else {
-		ev = malloc(sizeof *ev);
-		evpool_size++;
+		if((ev = malloc(sizeof *ev))) {
+			evpool_size++;
+		}
 	}
 	return ev;
 }
