@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2020 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -53,53 +53,68 @@ int main(int argc, char **argv)
 	int i, pid, ret, become_daemon = 1;
 
 	for(i=1; i<argc; i++) {
-		if(argv[i][0] == '-' && argv[i][2] == 0) {
-			switch(argv[i][1]) {
-			case 'd':
-				become_daemon = !become_daemon;
-				break;
+		if(argv[i][0] == '-') {
+			if(argv[i][2] == 0) {
+				switch(argv[i][1]) {
+				case 'd':
+					become_daemon = !become_daemon;
+					break;
 
-			case 'c':
-				if(!argv[++i]) {
-					fprintf(stderr, "-c must be followed by the config file name\n");
-					return 1;
-				}
-				cfgfile = fix_path(argv[i]);
-				break;
-
-			case 'l':
-				if(!argv[++i]) {
-					fprintf(stderr, "-l must be followed by a logfile name or \"syslog\"\n");
-					return 1;
-				}
-				if(strcmp(argv[i], "syslog") == 0) {
-					logfile = 0;
-				} else {
-					logfile = fix_path(argv[i]);
-					if(strcmp(logfile, argv[i]) != 0) {
-						printf("logfile: %s\n", logfile);
+				case 'c':
+					if(!argv[++i]) {
+						fprintf(stderr, "-c must be followed by the config file name\n");
+						return 1;
 					}
+					cfgfile = fix_path(argv[i]);
+					break;
+
+				case 'l':
+					if(!argv[++i]) {
+						fprintf(stderr, "-l must be followed by a logfile name or \"syslog\"\n");
+						return 1;
+					}
+					if(strcmp(argv[i], "syslog") == 0) {
+						logfile = 0;
+					} else {
+						logfile = fix_path(argv[i]);
+						if(strcmp(logfile, argv[i]) != 0) {
+							printf("logfile: %s\n", logfile);
+						}
+					}
+					break;
+
+				case 'v':
+					verbose = 1;
+					break;
+
+				case 'V':
+					printf("spacenavd " VERSION "\n");
+					return 0;
+
+				case 'h':
+					printf("usage: %s [options]\n", argv[0]);
+					printf("options:\n");
+					printf(" -d: do not daemonize\n");
+					printf(" -c <file>: config file path (default: " DEF_CFGFILE ")\n");
+					printf(" -l <file>|syslog: log file path or log to syslog (default: " DEF_LOGFILE ")\n");
+					printf(" -v: verbose output\n");
+					printf(" -V,-version: print version number and exit\n");
+					printf(" -h: print usage information and exit\n");
+					return 0;
+
+				default:
+					fprintf(stderr, "invalid option: %s\n", argv[i]);
+					return 1;
 				}
-				break;
 
-			case 'v':
-				verbose = 1;
-				break;
-
-			case 'h':
-				printf("usage: %s [options]\n", argv[0]);
-				printf("options:\n");
-				printf(" -d: do not daemonize\n");
-				printf(" -c <file>: config file path (default: " DEF_CFGFILE ")\n");
-				printf(" -l <file>|syslog: log file path or log to syslog (default: " DEF_LOGFILE ")\n");
-				printf(" -v: verbose output\n");
-				printf(" -h: print usage information and exit\n");
+			} else if(strcmp(argv[i], "-version") == 0) {
+				printf("spacenavd " VERSION "\n");
 				return 0;
-
-			default:
-				fprintf(stderr, "unrecognized argument: %s\n", argv[i]);
+			} else {
+				fprintf(stderr, "invalid option: %s\n", argv[i]);
 				return 1;
 			}
+
 		} else {
 			fprintf(stderr, "unexpected argument: %s\n", argv[i]);
 			return 1;
