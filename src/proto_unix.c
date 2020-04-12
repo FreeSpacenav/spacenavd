@@ -26,6 +26,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/stat.h>
 #include <sys/un.h>
 #include "proto_unix.h"
+#include "userpriv.h"
 #include "spnavd.h"
 
 enum {
@@ -44,8 +45,11 @@ int init_unix(void)
 
 	if(lsock >= 0) return 0;
 
+        stop_daemon_privileges();
+
 	if((s = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
 		logmsg(LOG_ERR, "failed to create socket: %s\n", strerror(errno));
+                start_daemon_privileges();
 		return -1;
 	}
 
@@ -60,8 +64,11 @@ int init_unix(void)
 	if(bind(s, (struct sockaddr*)&addr, sizeof addr) == -1) {
 		logmsg(LOG_ERR, "failed to bind unix socket: %s: %s\n", SOCK_NAME, strerror(errno));
 		close(s);
+                start_daemon_privileges();
 		return -1;
 	}
+
+	start_daemon_privileges();
 
 	umask(prev_umask);
 
@@ -79,10 +86,14 @@ int init_unix(void)
 void close_unix(void)
 {
 	if(lsock != -1) {
+                stop_daemon_privileges();
+
 		close(lsock);
 		lsock = -1;
 
 		unlink(SOCK_NAME);
+
+                start_daemon_privileges();
 	}
 }
 
