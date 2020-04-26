@@ -59,6 +59,10 @@ use the provided `init_script` file as a starting point.
 For systems running systemd, there is a spacenavd.service file under
 `contrib/systemd`. Follow your system documentation for how to use it.
 
+Spacenavd (in daemonmode) can drop root privileges and run under an other user or
+group. For this, start spacenavd with -u <username> / -g <group> or specify the
+user / group in `/etc/spnavrc`.
+
 Configuration
 -------------
 The spacenavd daemon reads a number of options from `/etc/spnavrc`. If
