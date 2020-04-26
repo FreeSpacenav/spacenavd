@@ -59,7 +59,7 @@ int main(int argc, char **argv)
         int use_groupname = 0;
 
         /* allocate memory the userprivilege struct */
-        userids = (userid_struct *) malloc(sizeof(userid_struct));
+        userids = malloc(sizeof(userid_struct));
 
         /* prefill the userid struct */
         set_initial_user_privileges();
