@@ -133,3 +133,26 @@
 # the re-centering power of the device.
 #
 #repeat-interval = -1
+
+
+# Log file path
+#
+#logfile = /var/log/spnavd.log
+
+# Log targets
+#
+# Valid options are:
+#  - file: log messages to a file defined by the logfile option.
+#  - syslog: log messages to the system logging daemon.
+# Combine multiple options by listing them on the same line.
+#
+#log = file, syslog
+
+
+# User and group settings
+#
+# When a user or a group is specified, spacenavd drops for serveral functions
+# the root privileges and run this codeparts under the given user- and groupname. 
+#
+#user = <valid-username>
+#group = <valid-groupname>
