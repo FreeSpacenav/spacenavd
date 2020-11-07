@@ -8,7 +8,7 @@ ctl = spnavd_ctl
 CC = gcc
 INSTALL = install
 CFLAGS = -pedantic -Wall $(dbg) $(opt) -fno-strict-aliasing -fcommon \
-		 -I$(srcdir)/src -I/usr/local/include $(add_cflags)
+		 -I$(srcdir)/src -I/usr/local/include -MMD $(add_cflags)
 LDFLAGS = -L/usr/local/lib $(xlib) $(add_ldflags)
 
 $(bin): $(obj)
@@ -21,9 +21,6 @@ tags: $(src) $(hdr)
 
 %.o: $(srcdir)/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
-
-%.d: $(srcdir)/%.c
-	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: clean
 clean:
