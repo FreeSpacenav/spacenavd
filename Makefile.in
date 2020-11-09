@@ -1,5 +1,5 @@
-src = $(sort $(wildcard src/*.c) $(wildcard src/serial/*.c) $(wildcard src/magellan/*.c))
-hdr = $(wildcard src/*.h) $(wildcard src/serial/*.h) $(wildcard src/magellan/*.h)
+src = $(sort $(wildcard src/*.c))
+hdr = $(wildcard src/*.h)
 obj = $(src:.c=.o)
 dep = $(obj:.o=.d)
 bin = spacenavd
