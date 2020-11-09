@@ -20,6 +20,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include "userpriv.h"
 #include "dev.h"
 #include "dev_usb.h"
 #include "dev_serial.h"
@@ -41,6 +42,9 @@ int init_devices(void)
 	struct device *dev;
 	int i, device_added = 0;
 	struct usb_device_info *usblist, *usbdev;
+
+        /* restore initial uid / gid */
+        stop_daemon_privileges();
 
 	/* try to open a serial device if specified in the config file */
 	if(cfg.serial_dev[0]) {
@@ -85,6 +89,9 @@ int init_devices(void)
 	}
 
 	free_usb_devices_list(usblist);
+
+        /* use daemon uid / gid again */
+        start_daemon_privileges();
 
 	if(!usblist) {
 		logmsg(LOG_ERR, "failed to find any supported devices\n");

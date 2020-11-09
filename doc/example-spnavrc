@@ -136,3 +136,12 @@
 # Combine multiple options by listing them on the same line.
 #
 #log = file, syslog
+
+
+# User and group settings
+#
+# When a user or a group is specified, spacenavd drops for serveral functions
+# the root privileges and run this codeparts under the given user- and groupname. 
+#
+#user = <valid-username>
+#group = <valid-groupname>

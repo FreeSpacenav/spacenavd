@@ -29,6 +29,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/un.h>
 #include "spnavd.h"
 #include "logger.h"
+#include "userpriv.h"
 #include "dev.h"
 #include "hotplug.h"
 #include "client.h"
@@ -48,9 +49,20 @@ static char *fix_path(char *str);
 static char *cfgfile = DEF_CFGFILE;
 static char *logfile = DEF_LOGFILE;
 
+/* struct for privilege changes */
+userid_struct *userids = NULL;
+
 int main(int argc, char **argv)
 {
 	int i, pid, ret, become_daemon = 1;
+        int use_username = 0;
+        int use_groupname = 0;
+
+        /* allocate memory the userprivilege struct */
+        userids = malloc(sizeof(userid_struct));
+
+        /* prefill the userid struct */
+        set_initial_user_privileges();
 
 	for(i=1; i<argc; i++) {
 		if(argv[i][0] == '-') {
@@ -87,6 +99,34 @@ int main(int argc, char **argv)
 					verbose = 1;
 					break;
 
+                                case 'u':
+                                        /* optional username for daemonize */
+                                        use_username = 1;
+					if(!argv[++i]) {
+						fprintf(stderr, "-u must be followed by a username\n");
+						return 1;
+					}
+					if(set_runas_uid(argv[i]) == 0)
+                                        {
+                                            fprintf(stderr, "Invalid username: %s\n", argv[i]);
+                                            return 1;
+                                        }
+                                        break;
+
+                                case 'g':
+                                        /* optional groupname for daemonize */
+                                        use_groupname = 1;
+					if(!argv[++i]) {
+						fprintf(stderr, "-g must be followed by a groupname\n");
+						return 1;
+					}
+					if(set_runas_gid(argv[i]) == 0)
+                                        {
+                                            fprintf(stderr, "Invalid groupname: %s\n", argv[i]);
+                                            return 1;
+                                        }
+                                        break;
+
 				case 'V':
 					printf("spacenavd " VERSION "\n");
 					return 0;
@@ -98,6 +138,8 @@ int main(int argc, char **argv)
 					printf(" -c <file>: config file path (default: " DEF_CFGFILE ")\n");
 					printf(" -l <file>|syslog: log file path or log to syslog (default: " DEF_LOGFILE ")\n");
 					printf(" -v: verbose output\n");
+                                        printf(" -u <username>: username for daemonize (optional)\n");
+                                        printf(" -g <groupname>: groupname for daemonize (optional)\n");
 					printf(" -V,-version: print version number and exit\n");
 					printf(" -h: print usage information and exit\n");
 					return 0;
@@ -121,6 +163,20 @@ int main(int argc, char **argv)
 		}
 	}
 
+	if ((use_username || use_groupname) && !become_daemon) {
+            fprintf(stderr, "-u / -g needs daemonmode (omit -d option) - not valid in standalone mode\n");
+            free(userids);
+            return 1;
+        }
+
+        if(userids != NULL) {
+            userids->runas_daemon = become_daemon;
+            userids->has_cmd_user = use_username;
+            userids->has_cmd_group = use_groupname;
+        }
+
+        test_initial_user_privileges();
+
 	if((pid = find_running_daemon()) != -1) {
 		fprintf(stderr, "Spacenav daemon already running (pid: %d). Aborting.\n", pid);
 		return 1;
@@ -129,7 +185,10 @@ int main(int argc, char **argv)
 	if(become_daemon) {
 		daemonize();
 	}
-	write_pid_file();
+        write_pid_file();
+
+        /* change uid / gid */
+        start_daemon_privileges();
 
 	logmsg(LOG_INFO, "Spacenav daemon " VERSION "\n");
 
@@ -257,7 +316,11 @@ static void cleanup(void)
 		remove_device(tmp);
 	}
 
+	stop_daemon_privileges();
 	remove(PIDFILE);
+        start_daemon_privileges();
+
+        free(userids);
 }
 
 static void daemonize(void)
