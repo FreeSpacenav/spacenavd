@@ -125,7 +125,7 @@ int open_dev_serial(struct device *dev)
 	}
 	write(fd, "\r@RESET\r", 8);
 
-	if((sz = read_timeout(fd, buf, sizeof buf - 1, 2000000)) > 0 && strstr(buf, "\r@1")) {
+	if((sz = read_timeout(fd, buf, sizeof buf - 1, 2000000)) > 0 && (buf[sz] = 0, strstr(buf, "\r@1"))) {
 		/* we got a response, so it's a spaceball */
 		make_printable(buf, sz);
 		printf("Spaceball detected: %s\n", buf);
