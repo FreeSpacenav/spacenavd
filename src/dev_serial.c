@@ -631,6 +631,10 @@ static void enqueue_motion(struct sball *sb, int axis, int val)
 	struct dev_input *inp = sb->evqueue + sb->evq_wr;
 
 	sb->evq_wr = (sb->evq_wr + 1) & (EVQUEUE_SZ - 1);
+	if(sb->evq_wr == sb->evq_rd) {
+		/* overflow, drop the oldest event */
+		sb->evq_rd = (sb->evq_rd + 1) & (EVQUEUE_SZ - 1);
+	}
 
 	if(axis >= 0) {
 		inp->type = INP_MOTION;
@@ -652,6 +656,10 @@ static void gen_button_events(struct sball *sb, unsigned int prev)
 		if(diff & bit) {
 			inp = sb->evqueue + sb->evq_wr;
 			sb->evq_wr = (sb->evq_wr + 1) & (EVQUEUE_SZ - 1);
+			if(sb->evq_wr == sb->evq_rd) {
+				/* overflow, drop the oldest event */
+				sb->evq_rd = (sb->evq_rd + 1) & (EVQUEUE_SZ - 1);
+			}
 
 			inp->type = INP_BUTTON;
 			inp->idx = i;
