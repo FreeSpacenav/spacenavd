@@ -37,6 +37,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto_x11.h"
 #endif
 
+static void print_usage(const char *argv0);
 static void cleanup(void);
 static void daemonize(void);
 static int write_pid_file(void);
@@ -92,14 +93,7 @@ int main(int argc, char **argv)
 					return 0;
 
 				case 'h':
-					printf("usage: %s [options]\n", argv[0]);
-					printf("options:\n");
-					printf(" -d: do not daemonize\n");
-					printf(" -c <file>: config file path (default: " DEF_CFGFILE ")\n");
-					printf(" -l <file>|syslog: log file path or log to syslog (default: " DEF_LOGFILE ")\n");
-					printf(" -v: verbose output\n");
-					printf(" -V,-version: print version number and exit\n");
-					printf(" -h: print usage information and exit\n");
+					print_usage(argv[0]);
 					return 0;
 
 				default:
@@ -110,13 +104,20 @@ int main(int argc, char **argv)
 			} else if(strcmp(argv[i], "-version") == 0) {
 				printf("spacenavd " VERSION "\n");
 				return 0;
+
+			} else if(strcmp(argv[i], "-help") == 0 || strcmp(argv[i], "--help") == 0) {
+				print_usage(argv[0]);
+				return 0;
+
 			} else {
-				fprintf(stderr, "invalid option: %s\n", argv[i]);
+				fprintf(stderr, "invalid option: %s\n\n", argv[i]);
+				print_usage(argv[0]);
 				return 1;
 			}
 
 		} else {
-			fprintf(stderr, "unexpected argument: %s\n", argv[i]);
+			fprintf(stderr, "unexpected argument: %s\n\n", argv[i]);
+			print_usage(argv[0]);
 			return 1;
 		}
 	}
@@ -237,6 +238,18 @@ int main(int argc, char **argv)
 		}
 	}
 	return 0;	/* unreachable */
+}
+
+static void print_usage(const char *argv0)
+{
+	printf("usage: %s [options]\n", argv0);
+	printf("options:\n");
+	printf(" -d: do not daemonize\n");
+	printf(" -c <file>: config file path (default: " DEF_CFGFILE ")\n");
+	printf(" -l <file>|syslog: log file path or log to syslog (default: " DEF_LOGFILE ")\n");
+	printf(" -v: verbose output\n");
+	printf(" -V,-version: print version number and exit\n");
+	printf(" -h,-help: print usage information and exit\n");
 }
 
 static void cleanup(void)
