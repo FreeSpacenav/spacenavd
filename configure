@@ -44,6 +44,12 @@ VER=`git describe --tags 2>/dev/null`
 
 if [ -z "$VER" ]; then
 	VER=`git rev-parse --short HEAD`
+	if [ -z "$VER" ]; then
+		VER=v`pwd | grep 'spacenavd-[0-9]\+\.' | sed 's/.*spacenavd-\(\([0-9]\+\.\)\+[0-9]\+\).*$/\1/'`
+		if [ $VER = v ]; then
+			VER='<unknown version>'
+		fi
+	fi
 fi
 
 echo "configuring spacenavd - $VER"
