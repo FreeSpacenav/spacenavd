@@ -105,12 +105,12 @@ int open_dev_serial(struct device *dev)
 	struct sball *sb = 0;
 
 	if((fd = open(dev->path, O_RDWR | O_NOCTTY | O_NONBLOCK)) == -1) {
-		fprintf(stderr, "sball_open: failed to open device: %s: %s\n", dev->path, strerror(errno));
+		fprintf(stderr, "open_dev_serial: failed to open device: %s: %s\n", dev->path, strerror(errno));
 		return 0;
 	}
 
 	if(!(sb = calloc(1, sizeof *sb))) {
-		fprintf(stderr, "sball_open: failed to allocate sball object\n");
+		fprintf(stderr, "open_dev_serial: failed to allocate sball object\n");
 		goto err;
 	}
 	dev->data = sb;
@@ -234,7 +234,7 @@ static int stty_sball(struct sball *sb)
 	cfsetospeed(&term, B9600);
 
 	if(tcsetattr(sb->fd, TCSAFLUSH, &term) == -1) {
-		perror("sball_open: tcsetattr");
+		perror("open_dev_serial: tcsetattr");
 		return -1;
 	}
 	tcflush(sb->fd, TCIOFLUSH);
@@ -244,9 +244,13 @@ static int stty_sball(struct sball *sb)
 	return 0;
 }
 
-/* Logicad magellan spacemouse: 9600 8n2 CTS/RTS
+/* Logicad magellan spacemouse: 9600 8n1 CTS/RTS (see NOTE)
  * Since the magellan devices don't seem to send any newlines, we can rely on
  * canonical mode to feed us nice whole lines at a time.
+ *
+ * NOTE: the documentation specifies 2 stop bits instead of 1, but this seems to
+ * cause incompatibilities with certain USB-serial converters, using one 1 stop
+ * bit seems to work fine in all cases, so we'll go with that.
  */
 static int stty_mag(struct sball *sb)
 {
@@ -264,7 +268,7 @@ static int stty_mag(struct sball *sb)
 	term.c_cc[VERASE] = 0;
 	term.c_cc[VKILL] = 0;
 
-	term.c_cflag = CLOCAL | CREAD | CS8 | CSTOPB | HUPCL;
+	term.c_cflag = CLOCAL | CREAD | CS8 | HUPCL;
 #ifdef CCTS_OFLOW
 	term.c_cflag |= CCTS_OFLOW;
 #elif defined(CRTSCTS)
@@ -276,7 +280,7 @@ static int stty_mag(struct sball *sb)
 	cfsetospeed(&term, B9600);
 
 	if(tcsetattr(sb->fd, TCSAFLUSH, &term) == -1) {
-		perror("sball_open: tcsetattr");
+		perror("open_dev_serial: tcsetattr");
 		return -1;
 	}
 	tcflush(sb->fd, TCIOFLUSH);
