@@ -63,7 +63,7 @@ if [ "$sys" = Linux ]; then
 		HOTPLUG=no
 	fi
 elif [ "$sys" = Darwin ]; then
-	add_ldflags='-framework CoreFoundation -framework IOKit'
+	LDFLAGS='-framework CoreFoundation -framework IOKit'
 else
 	# TODO implement hotplug for other systems then switch this on
 	HOTPLUG=no
