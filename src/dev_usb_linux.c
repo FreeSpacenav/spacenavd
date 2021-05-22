@@ -473,7 +473,7 @@ alt_detect:
 		devinfo.num_devfiles = 1;
 
 		if(verbose) {
-			logmsg(LOG_INFO, "  trying \"%s\" ... ", devinfo.devfiles[0]);
+			logmsg(LOG_INFO, "  trying \"%s\" ... \n", devinfo.devfiles[0]);
 		}
 
 		if(stat(devinfo.devfiles[0], &st) == -1 || !S_ISCHR(st.st_mode)) {
