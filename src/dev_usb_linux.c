@@ -178,8 +178,12 @@ int open_dev_usb(struct device *dev)
 	/* set non-blocking */
 	fcntl(dev->fd, F_SETFL, fcntl(dev->fd, F_GETFL) | O_NONBLOCK);
 
-	if(cfg.led == 1 || (cfg.led == 2 && first_client())) {
+	if(cfg.led == LED_ON || (cfg.led == LED_AUTO && first_client())) {
 		set_led_evdev(dev, 1);
+	} else {
+		/* required on some devices to turn off led after plugging in */
+		set_led_evdev(dev, 1);
+		set_led_evdev(dev, 0);
 	}
 
 	/* fill the device function pointers */
