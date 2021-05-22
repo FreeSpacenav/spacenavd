@@ -178,8 +178,21 @@ int open_dev_usb(struct device *dev)
 	/* set non-blocking */
 	fcntl(dev->fd, F_SETFL, fcntl(dev->fd, F_GETFL) | O_NONBLOCK);
 
-	if(cfg.led == 1 || (cfg.led == 2 && first_client())) {
+	if(cfg.led == LED_ON || (cfg.led == LED_AUTO && first_client())) {
 		set_led_evdev(dev, 1);
+	} else {
+		/* Some devices start with the LED enabled, make sure to turn it off
+		 * explicitly if necessary.
+		 *
+		 * XXX G.Ebner reports that some devices (SpaceMouse Compact at least)
+		 * fail to turn their LED off at startup if it's not turned explicitly
+		 * on first. We'll need to investigate further, but it doesn't seem to
+		 * cause any visible blinking, so let's leave the redundant call to
+		 * enable it first for now. See github pull request #39:
+		 * https://github.com/FreeSpacenav/spacenavd/pull/39
+		 */
+		set_led_evdev(dev, 1);
+		set_led_evdev(dev, 0);
 	}
 
 	/* fill the device function pointers */
