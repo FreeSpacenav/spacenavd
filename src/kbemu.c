@@ -19,8 +19,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config.h"
 
 #ifdef USE_X11
+#include <math.h>  // round.
 #include <stdio.h>
 #include <string.h>
+#include <X11/extensions/XTest.h>  // XTestFakeKeyEvent.
 #include "kbemu.h"
 
 static Display *dpy;
@@ -37,26 +39,13 @@ KeySym kbemu_keysym(const char *str)
 
 void send_kbevent(KeySym key, int press)
 {
-	XEvent xevent;
-	Window win;
-	int rev_state;
-
 	if(!dpy) return;
 
+	Window win;
+	int rev_state;
 	XGetInputFocus(dpy, &win, &rev_state);
 
-	xevent.type = press ? KeyPress : KeyRelease;
-	xevent.xkey.display = dpy;
-	xevent.xkey.root = DefaultRootWindow(dpy);
-	xevent.xkey.window = win;
-	xevent.xkey.subwindow = None;
-	xevent.xkey.keycode = XKeysymToKeycode(dpy, key);
-	xevent.xkey.state = 0;
-	xevent.xkey.time = CurrentTime;
-	xevent.xkey.x = xevent.xkey.y = 1;
-	xevent.xkey.x_root = xevent.xkey.y_root = 1;
-
-	XSendEvent(dpy, win, True, press ? KeyPressMask : KeyReleaseMask, &xevent);
+	XTestFakeKeyEvent(dpy, XKeysymToKeycode(dpy, key), press, 0);
 	XFlush(dpy);
 }
 #endif	/* USE_X11 */
