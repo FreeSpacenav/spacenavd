@@ -146,9 +146,12 @@ if [ "$OPT" = 'yes' ]; then
 fi
 
 if [ "$X11" = 'yes' ]; then
-	echo 'xlib = -L/usr/X11/lib -lX11 -lXtst -lm' >>Makefile
+	echo 'xlib = -L/usr/X11/lib -lX11' >>Makefile
 	if [ -n "`check_header X11/extensions/XInput2.h 2>&1`" ]; then
 		echo 'xlib += -lXi' >>Makefile
+	fi
+	if [ -n "`check_header X11/extensions/XTest.h 2>&1`" ]; then
+		echo xlib += -lXtst >>Makefile
 	fi
 fi
 
@@ -181,6 +184,7 @@ echo >>src/config.h
 # check for alloca.h
 check_header alloca.h >>src/config.h
 check_header X11/extensions/XInput2.h >>src/config.h
+check_header X11/extensions/XTest.h >>src/config.h
 
 echo >>src/config.h
 echo '#endif	/* CONFIG_H_ */' >>src/config.h
