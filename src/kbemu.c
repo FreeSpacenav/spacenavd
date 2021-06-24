@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2012 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2021 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -21,13 +21,31 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef USE_X11
 #include <stdio.h>
 #include <string.h>
+#include "logger.h"
 #include "kbemu.h"
 
+#ifdef HAVE_XTEST_H
+#include <X11/extensions/XTest.h>
+#endif
+
 static Display *dpy;
+static int use_xtest;
 
 void kbemu_set_display(Display *d)
 {
 	dpy = d;
+
+	if(d) {
+#ifdef HAVE_XTEST_H
+		int tmp;
+		use_xtest = XTestQueryExtension(dpy, &tmp, &tmp, &tmp, &tmp);
+
+		if(use_xtest)
+			logmsg(LOG_DEBUG, "Using XTEST to send key events\n");
+		else
+#endif
+			logmsg(LOG_DEBUG, "Using XSendEvent to send key events\n");
+	}
 }
 
 KeySym kbemu_keysym(const char *str)
@@ -42,6 +60,14 @@ void send_kbevent(KeySym key, int press)
 	int rev_state;
 
 	if(!dpy) return;
+
+#ifdef HAVE_XTEST_H
+	if(use_xtest) {
+		XTestFakeKeyEvent(dpy, XKeysymToKeycode(dpy, key), press, 0);
+		XFlush(dpy);
+		return;
+	}
+#endif
 
 	XGetInputFocus(dpy, &win, &rev_state);
 

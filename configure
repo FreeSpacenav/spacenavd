@@ -150,6 +150,9 @@ if [ "$X11" = 'yes' ]; then
 	if [ -n "`check_header X11/extensions/XInput2.h 2>&1`" ]; then
 		echo 'xlib += -lXi' >>Makefile
 	fi
+	if [ -n "`check_header X11/extensions/XTest.h 2>&1`" ]; then
+		echo xlib += -lXtst >>Makefile
+	fi
 fi
 
 if [ -n "$CFLAGS" ]; then
@@ -181,6 +184,7 @@ echo >>src/config.h
 # check for alloca.h
 check_header alloca.h >>src/config.h
 check_header X11/extensions/XInput2.h >>src/config.h
+check_header X11/extensions/XTest.h >>src/config.h
 
 echo >>src/config.h
 echo '#endif	/* CONFIG_H_ */' >>src/config.h
