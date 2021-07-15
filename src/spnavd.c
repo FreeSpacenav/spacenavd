@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2020 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2021 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -39,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 static void print_usage(const char *argv0);
 static void cleanup(void);
+static void redir_log(int fallback_syslog);
 static void daemonize(void);
 static int write_pid_file(void);
 static int find_running_daemon(void);
@@ -52,6 +53,7 @@ static char *logfile = DEF_LOGFILE;
 int main(int argc, char **argv)
 {
 	int i, pid, ret, become_daemon = 1;
+	int force_logfile = 0;
 
 	for(i=1; i<argc; i++) {
 		if(argv[i][0] == '-') {
@@ -81,6 +83,11 @@ int main(int argc, char **argv)
 						if(strcmp(logfile, argv[i]) != 0) {
 							printf("logfile: %s\n", logfile);
 						}
+						/* when the user specifies a log file in the command line
+						 * the expectation is to use it, regardless of whether
+						 * spacenavd is started daemonized or not.
+						 */
+						force_logfile = 1;
 					}
 					break;
 
@@ -129,6 +136,10 @@ int main(int argc, char **argv)
 
 	if(become_daemon) {
 		daemonize();
+	} else {
+		if(force_logfile) {
+			redir_log(0);
+		}
 	}
 	write_pid_file();
 
@@ -273,30 +284,45 @@ static void cleanup(void)
 	remove(PIDFILE);
 }
 
-static void daemonize(void)
+static void redir_log(int fallback_syslog)
 {
-	int i, pid;
+	int i, fd = -1;
 
-	chdir("/");
-
-	/* redirect standard input/output/error
-	 * best effort attempt to make either the logfile or the syslog socket
-	 * accessible through stdout/stderr, just in case any printfs survived
-	 * the logmsg conversion.
-	 */
-	for(i=0; i<3; i++) {
-		close(i);
+	if(logfile) {
+		fd = start_logfile(logfile);
 	}
 
-	open("/dev/zero", O_RDONLY);
+	if(fd >= 0 || fallback_syslog) {
+		/* redirect standard input/output/error
+		 * best effort attempt to make either the logfile or the syslog socket
+		 * accessible through stdout/stderr, just in case any printfs survived
+		 * the logmsg conversion.
+		 */
+		for(i=0; i<3; i++) {
+			close(i);
+		}
 
-	if(!logfile || start_logfile(logfile) == -1) {
-		start_syslog(SYSLOG_ID);
+		open("/dev/zero", O_RDONLY);
+
+		if(fd == -1) {
+			fd = start_syslog(SYSLOG_ID);
+			dup(1);		/* not guaranteed to work */
+		} else {
+			dup(fd);
+		}
 	}
-	dup(1);
 
 	setvbuf(stdout, 0, _IOLBF, 0);
 	setvbuf(stderr, 0, _IONBF, 0);
+}
+
+static void daemonize(void)
+{
+	int pid;
+
+	chdir("/");
+
+	redir_log(1);
 
 	/* release controlling terminal */
 	if((pid = fork()) == -1) {

@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2020 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2021 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -23,6 +23,12 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <ctype.h>
 #include <time.h>
 #include <errno.h>
+#ifdef HAVE_ALLOCA_H
+#include <alloca.h>
+#endif
+#ifdef HAVE_MALLOC_H
+#include <malloc.h>
+#endif
 #include <unistd.h>
 #include <fcntl.h>
 #include <termios.h>
@@ -33,6 +39,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dev_serial.h"
 #include "dev.h"
 #include "event.h"
+#include "logger.h"
 
 #if  defined(__i386__) || defined(__ia64__) || defined(WIN32) || \
     (defined(__alpha__) || defined(__alpha)) || \
@@ -105,12 +112,12 @@ int open_dev_serial(struct device *dev)
 	struct sball *sb = 0;
 
 	if((fd = open(dev->path, O_RDWR | O_NOCTTY | O_NONBLOCK)) == -1) {
-		fprintf(stderr, "open_dev_serial: failed to open device: %s: %s\n", dev->path, strerror(errno));
+		logmsg(LOG_ERR, "open_dev_serial: failed to open device: %s: %s\n", dev->path, strerror(errno));
 		return 0;
 	}
 
 	if(!(sb = calloc(1, sizeof *sb))) {
-		fprintf(stderr, "open_dev_serial: failed to allocate sball object\n");
+		logmsg(LOG_ERR, "open_dev_serial: failed to allocate sball object\n");
 		goto err;
 	}
 	dev->data = sb;
@@ -128,11 +135,11 @@ int open_dev_serial(struct device *dev)
 	if((sz = read_timeout(fd, buf, sizeof buf - 1, 2000000)) > 0 && (buf[sz] = 0, strstr(buf, "\r@1"))) {
 		/* we got a response, so it's a spaceball */
 		make_printable(buf, sz);
-		printf("Spaceball detected: %s\n", buf);
+		logmsg(LOG_INFO, "Spaceball detected: %s\n", buf);
 
 		sb->nbuttons = guess_num_buttons(buf);
 		sb->keymask = 0xffff >> (16 - sb->nbuttons);
-		printf("%d buttons\n", sb->nbuttons);
+		logmsg(LOG_INFO, "%d buttons\n", sb->nbuttons);
 
 		/* set binary mode and enable automatic data packet sending. also request
 		 * a key event to find out as soon as possible if this is a 4000flx with
@@ -152,11 +159,11 @@ int open_dev_serial(struct device *dev)
 
 	if((sz = read_timeout(fd, buf, sizeof buf - 1, 250000)) > 0 && buf[0] == 'v') {
 		make_printable(buf, sz);
-		printf("Magellan SpaceMouse detected:\n%s\n", buf);
+		logmsg(LOG_INFO, "Magellan SpaceMouse detected:\n%s\n", buf);
 
 		sb->nbuttons = guess_num_buttons(buf);
 		sb->keymask = 0xffff >> (16 - sb->nbuttons);
-		printf("%d buttons\n", sb->nbuttons);
+		logmsg(LOG_INFO, "%d buttons\n", sb->nbuttons);
 
 		/* set 3D mode, not-dominant-axis, pass through motion and button packets */
 		write(fd, "m3\r", 3);
@@ -335,12 +342,12 @@ static int mag_parsepkt(struct sball *sb, int id, char *data, int len)
 	int i, prev, motion_pending = 0;
 	unsigned int prev_key;
 
-	/*printf("magellan packet: %c - %s (%d bytes)\n", (char)id, data, len);*/
+	/*logmsg(LOG_DEBUG, "magellan packet: %c - %s (%d bytes)\n", (char)id, data, len);*/
 
 	switch(id) {
 	case 'd':
 		if(len != 24) {
-			fprintf(stderr, "magellan: invalid data packet, expected 24 bytes, got: %d\n", len);
+			logmsg(LOG_WARNING, "magellan: invalid data packet, expected 24 bytes, got: %d\n", len);
 			return -1;
 		}
 		for(i=0; i<6; i++) {
@@ -361,7 +368,7 @@ static int mag_parsepkt(struct sball *sb, int id, char *data, int len)
 
 	case 'k':
 		if(len < 3) {
-			fprintf(stderr, "magellan: invalid keyboard pakcet, expected 3 bytes, got: %d\n", len);
+			logmsg(LOG_WARNING, "magellan: invalid keyboard pakcet, expected 3 bytes, got: %d\n", len);
 			return -1;
 		}
 		prev_key = sb->keystate;
@@ -377,11 +384,11 @@ static int mag_parsepkt(struct sball *sb, int id, char *data, int len)
 
 	case 'e':
 		if(data[0] == 1) {
-			fprintf(stderr, "magellan error: illegal command: %c%c\n", data[1], data[2]);
+			logmsg(LOG_WARNING, "magellan error: illegal command: %c%c\n", data[1], data[2]);
 		} else if(data[0] == 2) {
-			fprintf(stderr, "magellan error: framing error\n");
+			logmsg(LOG_WARNING, "magellan error: framing error\n");
 		} else {
-			fprintf(stderr, "magellan error: unknown device error\n");
+			logmsg(LOG_WARNING, "magellan error: unknown device error\n");
 		}
 		return -1;
 
@@ -396,6 +403,9 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 	int i, prev, motion_pending = 0;
 	char c, *rd, *wr;
 	unsigned int prev_key;
+	char *errbuf, *errbuf_end;
+
+	errbuf = alloca(len * 16 + 32);
 
 	/* decode data packet, replacing escaped values with the correct ones */
 	rd = wr = data;
@@ -415,7 +425,7 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 				*wr++ = '^';
 				break;
 			default:
-				fprintf(stderr, "sball decode: ignoring invalid escape code: %xh\n", (unsigned int)c);
+				logmsg(LOG_WARNING, "sball decode: ignoring invalid escape code: %xh\n", (unsigned int)c);
 			}
 		} else {
 			*wr++ = c;
@@ -426,7 +436,7 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 	switch(id) {
 	case 'D':
 		if(len != 14) {
-			fprintf(stderr, "sball: invalid data packet, expected 14 bytes, got: %d\n", len);
+			logmsg(LOG_WARNING, "sball: invalid data packet, expected 14 bytes, got: %d\n", len);
 			return -1;
 		}
 
@@ -459,7 +469,7 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 
 	case 'K':
 		if(len != 2) {
-			fprintf(stderr, "sball: invalid key packet, expected 2 bytes, got: %d\n", len);
+			logmsg(LOG_WARNING, "sball: invalid key packet, expected 2 bytes, got: %d\n", len);
 			return -1;
 		}
 		if(sb->flags & SB4000) break;	/* ignore K packets from spaceball 4000 devices */
@@ -480,12 +490,12 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 
 	case '.':
 		if(len != 2) {
-			fprintf(stderr, "sball: invalid sb4k key packet, expected 2 bytes, got: %d\n", len);
+			logmsg(LOG_WARNING, "sball: invalid sb4k key packet, expected 2 bytes, got: %d\n", len);
 			return -1;
 		}
 		/* spaceball 4000 key packet */
 		if(!(sb->flags & SB4000)) {
-			printf("Switching to spaceball 4000flx/5000flx-a mode (12 buttons)            \n");
+			logmsg(LOG_INFO, "Switching to spaceball 4000flx/5000flx-a mode (12 buttons)            \n");
 			sb->flags |= SB4000;
 			sb->nbuttons = 12;	/* might have guessed 8 before */
 			sb->keymask = 0xfff;
@@ -511,14 +521,16 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 		break;
 
 	case 'E':
-		fprintf(stderr, "sball: error:");
+		strcpy(errbuf, "sball: error:");
+		errbuf_end = errbuf + 13;
 		for(i=0; i<len; i++) {
 			if(isprint((int)data[i])) {
-				fprintf(stderr, " %c", data[i]);
+				errbuf_end += sprintf(errbuf_end, " %c", data[i]);
 			} else {
-				fprintf(stderr, " %02xh", (unsigned int)data[i]);
+				errbuf_end += sprintf(errbuf_end, " %02xh", (unsigned int)data[i]);
 			}
 		}
+		logmsg(LOG_WARNING, errbuf);
 		break;
 
 	case 'M':	/* ignore MSS responses */
@@ -527,11 +539,12 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 
 	default:
 		/* DEBUG */
-		fprintf(stderr, "sball: got '%c' packet:", (char)id);
+		errbuf_end = errbuf + sprintf(errbuf, "sball: got '%c' packet:", (char)id);
 		for(i=0; i<len; i++) {
-			fprintf(stderr, " %02x", (unsigned int)data[i]);
+			errbuf_end += sprintf(errbuf_end, " %02x", (unsigned int)data[i]);
 		}
-		fputc('\n', stderr);
+		strcpy(errbuf_end, "\n");
+		logmsg(LOG_WARNING, errbuf);
 	}
 	return 0;
 }
@@ -574,7 +587,7 @@ static int guess_num_buttons(const char *verstr)
 		return 4;
 	}
 
-	fprintf(stderr, "Can't guess number of buttons, default to 8, report this as a bug!\n");
+	logmsg(LOG_DEBUG, "Can't guess number of buttons, default to 8, report this as a bug!\n");
 	return 8;
 }
 

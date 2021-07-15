@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2021 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -30,7 +30,7 @@ int start_logfile(const char *fname)
 		return -1;
 	}
 	setvbuf(logfile, 0, _IONBF, 0);
-	return 0;
+	return fileno(logfile);
 }
 
 int start_syslog(const char *id)
@@ -44,14 +44,12 @@ void logmsg(int prio, const char *fmt, ...)
 {
 	va_list ap;
 
-	if(logfile) {
-		va_start(ap, fmt);
-		vfprintf(logfile, fmt, ap);
-		va_end(ap);
-	}
 	if(use_syslog) {
 		va_start(ap, fmt);
 		vsyslog(prio, fmt, ap);
 		va_end(ap);
 	}
+	va_start(ap, fmt);
+	vfprintf(logfile ? logfile : stdout, fmt, ap);
+	va_end(ap);
 }
