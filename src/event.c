@@ -44,6 +44,7 @@ struct dev_event {
 
 static struct dev_event *add_dev_event(struct device *dev);
 static struct dev_event *device_event_in_use(struct device *dev);
+static void handle_button_action(int act);
 static void dispatch_event(struct dev_event *dev);
 static void send_event(spnav_event *ev, struct client *c);
 static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
@@ -152,6 +153,12 @@ void process_input(struct device *dev, struct dev_input *inp)
 		break;
 
 	case INP_BUTTON:
+		/* check to see if the button has been bound to an action */
+		if(cfg.bnact[inp->idx] > 0) {
+			handle_button_action(cfg.bnact[inp->idx]);
+			break;
+		}
+
 #ifdef USE_X11
 		/* check to see if we must emulate a keyboard event instead of a
 		 * retular button event for this button
@@ -202,6 +209,21 @@ void process_input(struct device *dev, struct dev_input *inp)
 		break;
 
 	default:
+		break;
+	}
+}
+
+static void handle_button_action(int act)
+{
+	switch(act) {
+	case BNACT_SENS_INC:
+		cfg.sensitivity *= 1.1f;
+		break;
+	case BNACT_SENS_DEC:
+		cfg.sensitivity *= 0.9f;
+		break;
+	case BNACT_SENS_RESET:
+		cfg.sensitivity = 1.0f;
 		break;
 	}
 }

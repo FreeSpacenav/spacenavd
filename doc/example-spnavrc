@@ -68,6 +68,17 @@
 #...
 #bnmapN = N  (N < 64)
 
+# Button action mapping
+# Use the following syntax:
+#    bnactN = <action>
+# Where N is the button number (zero-based), and action is one of the following
+# available actions:
+#    none,
+#    sensitivity-up, sensitivity-down, sensitivity-reset
+#
+#bnact16 = sensitivity-up
+#bnact17 = sensitivity-down
+#bnact18 = sensitivity-reset
 
 # Map buttons to keyboard keys (experimental)
 # By default no such mappings are active. Use the following syntax:

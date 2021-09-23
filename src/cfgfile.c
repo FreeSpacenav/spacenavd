@@ -26,6 +26,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "logger.h"
 #include "spnavd.h"
 
+static int parse_bnact(const char *s);
+
 enum {TX, TY, TZ, RX, RY, RZ};
 
 static const int def_axmap[] = {0, 2, 1, 3, 5, 4};
@@ -258,6 +260,17 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			cfg->map_button[bnidx] = ival;
 
+		} else if(sscanf(key_str, "bnact%d", &bnidx) == 1) {
+			if(bnidx < 0 || bnidx >= MAX_BUTTONS) {
+				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a number from 0 to %d\n", key_str, MAX_BUTTONS);
+				continue;
+			}
+			if((cfg->bnact[bnidx] = parse_bnact(val_str)) == -1) {
+				cfg->bnact[bnidx] = BNACT_NONE;
+				logmsg(LOG_WARNING, "invalid button action: \"%s\"\n", val_str);
+				continue;
+			}
+
 		} else if(sscanf(key_str, "kbmap%d", &bnidx) == 1) {
 			if(bnidx < 0 || bnidx >= MAX_BUTTONS) {
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a number from 0 to %d\n", key_str, MAX_BUTTONS);
@@ -472,4 +485,26 @@ int write_cfg(const char *fname, struct cfg *cfg)
 
 	fclose(fp);
 	return 0;
+}
+
+static struct {
+	const char *name;
+	int act;
+} bnact_strtab[] = {
+	{"none", BNACT_NONE},
+	{"sensitivity-up", BNACT_SENS_INC},
+	{"sensitivity-down", BNACT_SENS_DEC},
+	{"sensitivity-reset", BNACT_SENS_RESET},
+	{0, 0}
+};
+
+static int parse_bnact(const char *s)
+{
+	int i;
+	for(i=0; bnact_strtab[i].name; i++) {
+		if(strcmp(bnact_strtab[i].name, s) == 0) {
+			return bnact_strtab[i].act;
+		}
+	}
+	return -1;
 }
