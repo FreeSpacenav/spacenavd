@@ -26,9 +26,13 @@ test_kver() {
 }
 
 check_header() {
+	printf "Looking for header: $1 ... " >&2
 	echo "#include <$1>" >.chkhdr.c
 	if cpp .chkhdr.c >/dev/null 2>&1; then
+		echo found >&2
 		echo "#define HAVE_`basename $1 | tr '[:lower:]' '[:upper:]' | sed 's/\./_/g'`"
+	else
+		echo not found >&2
 	fi
 	rm -f .chkhdr.c
 }
@@ -124,11 +128,23 @@ echo "  x11 communication method: $X11"
 echo "  use hotplug: $HOTPLUG"
 echo ""
 
+
+HAVE_ALLOCA_H=`check_header alloca.h`
+HAVE_MALLOC_H=`check_header malloc.h`
+
 if [ "$X11" = "no" ]; then
 	echo "WARNING: you have disabled the X11 interface, the resulting daemon \
 won't be compatible with applications written for the proprietary 3Dconnexion \
 daemon (3dxserv)!"
 	echo
+else
+	HAVE_XINPUT2_H=`check_header X11/extensions/XInput2.h`
+	HAVE_XTEST_H=`check_header X11/extensions/XTest.h`
+
+	if [ -z "$HAVE_XTEST_H" ]; then
+		echo "WARNING: building without XTEST support, makes keyboard emulation \
+less reliable (fallback to XSendEvent)."
+	fi
 fi
 
 # create Makefile
@@ -147,10 +163,10 @@ fi
 
 if [ "$X11" = 'yes' ]; then
 	echo 'xlib = -L/usr/X11/lib -lX11' >>Makefile
-	if [ -n "`check_header X11/extensions/XInput2.h 2>&1`" ]; then
+	if [ -n "$HAVE_XINPUT2_H" ]; then
 		echo 'xlib += -lXi' >>Makefile
 	fi
-	if [ -n "`check_header X11/extensions/XTest.h 2>&1`" ]; then
+	if [ -n "$HAVE_XTEST_H" ]; then
 		echo xlib += -lXtst >>Makefile
 	fi
 fi
@@ -166,28 +182,31 @@ cat "$srcdir/Makefile.in" >>Makefile
 
 
 # create config.h
+cfgheader=$srcdir/src/config.h
+
 echo 'creating config.h'
-echo '#ifndef CONFIG_H_' >src/config.h
-echo '#define CONFIG_H_' >>src/config.h
-echo >>src/config.h
+echo '#ifndef CONFIG_H_' >$cfgheader
+echo '#define CONFIG_H_' >>$cfgheader
+echo >>$cfgheader
 if [ "$X11" = yes ]; then
-	echo '#define USE_X11' >>src/config.h
-	echo >>src/config.h
+	echo '#define USE_X11' >>$cfgheader
+	echo >>$cfgheader
 fi
 if [ "$HOTPLUG" = yes ]; then
-	echo '#define USE_NETLINK' >>src/config.h
-	echo >>src/config.h
+	echo '#define USE_NETLINK' >>$cfgheader
+	echo >>$cfgheader
 fi
-echo '#define VERSION "'$VER'"' >>src/config.h
-echo >>src/config.h
+echo '#define VERSION "'$VER'"' >>$cfgheader
+echo >>$cfgheader
 
 # check for alloca.h
-check_header alloca.h >>src/config.h
-check_header X11/extensions/XInput2.h >>src/config.h
-check_header X11/extensions/XTest.h >>src/config.h
+[ -n "$HAVE_ALLOCA_H" ] && echo $HAVE_ALLOCA_H >>$cfgheader
+[ -n "$HAVE_MALLOC_H" ] && echo $HAVE_MALLOC_H >>$cfgheader
+[ -n "$HAVE_XINPUT2_H" ] && echo $HAVE_XINPUT2_H >>$cfgheader
+[ -n "$HAVE_XTEST_H" ] && echo $HAVE_XTEST_H >>$cfgheader
 
-echo >>src/config.h
-echo '#endif	/* CONFIG_H_ */' >>src/config.h
+echo >>$cfgheader
+echo '#endif	/* CONFIG_H_ */' >>$cfgheader
 
 echo ''
 echo 'Done. You can now type make (or gmake) to compile spacenavd.'
