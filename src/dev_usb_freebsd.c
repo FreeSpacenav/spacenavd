@@ -278,6 +278,7 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 		}
 		close(fd);
 	}
+	globfree(&gl);
 
 	return devlist;
 }
