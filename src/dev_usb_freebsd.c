@@ -182,11 +182,14 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 					return 0;
 				}
 				return -1;
+			case 23: // Battery char level
+				logmsg(LOG_INFO, "Battery level: %%%d\n", iev[1]);
+				break;
 			default:
 				if(verbose) {
 					logmsg(LOG_DEBUG, "unhandled event: %d\n", iev[0]);
 				}
-				return -1;
+				break;
 		}
 	}
 
