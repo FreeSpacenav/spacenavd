@@ -39,9 +39,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "event.h"
 
 #define AXES		6
-#define DEF_MINVAL	(-500)
-#define DEF_MAXVAL	500
-#define DEF_RANGE	(DEF_MAXVAL - DEF_MINVAL)
 #define IS_DEV_OPEN(dev) ((dev)->fd >= 0)
 
 static void close_hid(struct device *dev)
