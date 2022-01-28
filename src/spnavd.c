@@ -153,6 +153,7 @@ int main(int argc, char **argv)
 	signal(SIGHUP, sig_handler);
 	signal(SIGUSR1, sig_handler);
 	signal(SIGUSR2, sig_handler);
+	signal(SIGPIPE, SIG_IGN);
 
 	init_devices();
 	init_hotplug();
