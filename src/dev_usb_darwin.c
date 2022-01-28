@@ -32,10 +32,10 @@ int open_dev_usb(struct device *dev)
 	return -1;
 }
 
-struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_info*))
+struct sn_usb_device_info *find_usb_devices(int (*match)(const struct sn_usb_device_info*))
 {
-	struct usb_device_info *devlist = 0;
-	struct usb_device_info devinfo;
+	struct sn_usb_device_info *devlist = 0;
+	struct sn_usb_device_info devinfo;
 	/*static const int vendor_id = 1133;*/	/* 3dconnexion */
 	static char dev_path[512];
 	io_object_t dev;
@@ -70,7 +70,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 		/* TODO retrieve vendor id and product id */
 
 		if(!match || match(&devinfo)) {
-			struct usb_device_info *node = malloc(sizeof *node);
+			struct sn_usb_device_info *node = malloc(sizeof *node);
 			if(node) {
 				if(verbose) {
 					logmsg(LOG_INFO, "found usb device: ");

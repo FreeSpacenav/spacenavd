@@ -15,26 +15,27 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#ifndef SPNAV_DEV_USB_H_
-#define SPNAV_DEV_USB_H_
+#if defined(__FreeBSD__)
 
-struct device;
+int init_hotplug(void)
+{
+	return -1;
+}
 
-int open_dev_usb(struct device *dev);
+void shutdown_hotplug(void)
+{
+}
 
-/* USB device enumeration and matching */
-#define MAX_USB_DEV_FILES	16
-struct sn_usb_device_info {
-	char *name;
-	int num_devfiles;
-	char *devfiles[MAX_USB_DEV_FILES];
-	int vendorid, productid;
+int get_hotplug_fd(void)
+{
+	return -1;
+}
 
-	struct sn_usb_device_info *next;
-};
+int handle_hotplug(void)
+{
+	return -1;
+}
 
-struct sn_usb_device_info *find_usb_devices(int (*match)(const struct sn_usb_device_info*));
-void free_usb_devices_list(struct sn_usb_device_info *list);
-void print_usb_device_info(struct sn_usb_device_info *devinfo);
-
-#endif	/* SPNAV_DEV_USB_H_ */
+#else
+int spacenavd_hotplug_darwin_shut_up_empty_source_warning;
+#endif	/* __FreeBSD */

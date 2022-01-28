@@ -304,9 +304,9 @@ static void set_led_evdev(struct device *dev, int state)
 }
 
 #define PROC_DEV	"/proc/bus/input/devices"
-struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_info*))
+struct sn_usb_device_info *find_usb_devices(int (*match)(const struct sn_usb_device_info*))
 {
-	struct usb_device_info *devlist = 0, devinfo;
+	struct sn_usb_device_info *devlist = 0, devinfo;
 	int i, buf_used, buf_len, bytes_read;
 	char buf[1024];
 	char *buf_pos, *section_start, *next_section = 0, *cur_line, *next_line;
@@ -421,7 +421,7 @@ struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_in
 			 */
 			if(devinfo.num_devfiles > 0 && (!match || match(&devinfo))) {
 				/* add it to the list */
-				struct usb_device_info *node = malloc(sizeof *node);
+				struct sn_usb_device_info *node = malloc(sizeof *node);
 				if(node) {
 					if(verbose) {
 						logmsg(LOG_INFO, "found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
@@ -515,7 +515,7 @@ alt_detect:
 		}
 
 		if(!match || match(&devinfo)) {
-			struct usb_device_info *node = malloc(sizeof *node);
+			struct sn_usb_device_info *node = malloc(sizeof *node);
 			if(node) {
 				if(verbose) {
 					logmsg(LOG_INFO, "found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
@@ -541,4 +541,6 @@ alt_detect:
 	return devlist;
 }
 
+#else
+int spacenavd_dev_usb_freebsd_silence_empty_warning;
 #endif	/* __linux__ */
