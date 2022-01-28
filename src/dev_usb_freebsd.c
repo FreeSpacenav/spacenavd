@@ -155,9 +155,18 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 		switch (iev[0]) {
 			case 1: // Three axis... X, Y, Z
 				flush = true;
-				curr_pos[0] = iev[1] | (iev[2] << 8);
-				curr_pos[1] = iev[3] | (iev[4] << 8);
-				curr_pos[2] = iev[5] | (iev[6] << 8);
+				if (rdbytes > 2)
+					curr_pos[0] = iev[1] | (iev[2] << 8);
+				if (rdbytes > 4)
+					curr_pos[1] = iev[3] | (iev[4] << 8);
+				if (rdbytes > 6)
+					curr_pos[2] = iev[5] | (iev[6] << 8);
+				if (rdbytes > 8)
+					curr_pos[3] = iev[5] | (iev[6] << 8);
+				if (rdbytes > 10)
+					curr_pos[4] = iev[5] | (iev[6] << 8);
+				if (rdbytes > 12)
+					curr_pos[5] = iev[5] | (iev[6] << 8);
 				return axis_event(inp, last_pos, curr_pos);
 			case 2: // Three axis... rX, rY, rZ
 				flush = true;
