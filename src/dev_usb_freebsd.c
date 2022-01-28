@@ -38,7 +38,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dev_usb.h"
 #include "event.h"
 
-#define MAX_AXES	6
+#define AXES		6
 #define DEF_MINVAL	(-500)
 #define DEF_MAXVAL	500
 #define DEF_RANGE	(DEF_MAXVAL - DEF_MINVAL)
@@ -95,9 +95,9 @@ static uint32_t button_event(struct dev_input *inp, uint32_t last, uint32_t curr
 	return last;
 }
 
-static uint32_t axis_event(struct dev_input *inp, int16_t last[MAX_AXES], int16_t curr[MAX_AXES])
+static uint32_t axis_event(struct dev_input *inp, int16_t last[AXES], int16_t curr[AXES])
 {
-	for (int i = 0; i < MAX_AXES; i++) {
+	for (int i = 0; i < AXES; i++) {
 		if (last[i] != curr[i]) {
 			inp->type = INP_MOTION;
 			inp->idx = i;
@@ -116,8 +116,8 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 	int rdbytes;
 	static uint32_t last_buttons;
 	static uint32_t curr_buttons;
-	static int16_t last_pos[MAX_AXES];
-	static int16_t curr_pos[MAX_AXES];
+	static int16_t last_pos[AXES];
+	static int16_t curr_pos[AXES];
 	static bool flush = false;
 
 	if(!IS_DEV_OPEN(dev))
@@ -193,6 +193,7 @@ int open_dev_usb(struct device *dev)
 		}
 		logmsg(LOG_WARNING, "opened device read-only, LEDs won't work\n");
 	}
+	dev->num_axes = AXES;
 #if NEED_STUFF
 	/*
 	 * TODO: Fetch these...
@@ -201,7 +202,6 @@ int open_dev_usb(struct device *dev)
 	 * - min/max is easy, not sure what fuzz even is.
 	 * - Also, it seems nothing actually uses these things...
 	 */
-	dev->num_axes = MAX_AXES;
 	dev->num_buttons = 21;
 	dev->minval = malloc(dev->num_axes * sizeof *dev->minval);
 	dev->maxval = malloc(dev->num_axes * sizeof *dev->maxval);
