@@ -37,5 +37,5 @@ int handle_hotplug(void)
 }
 
 #else
-int spacenavd_hotplug_darwin_shut_up_empty_source_warning;
+int spacenavd_hotplug_freebsd_shut_up_empty_source_warning;
 #endif	/* __FreeBSD */
