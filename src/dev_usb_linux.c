@@ -542,5 +542,5 @@ alt_detect:
 }
 
 #else
-int spacenavd_dev_usb_freebsd_silence_empty_warning;
+int spacenavd_dev_usb_linux_silence_empty_warning;
 #endif	/* __linux__ */
