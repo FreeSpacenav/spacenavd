@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 static void close_hid(struct device *dev)
 {
-	if(IS_DEV_OPEN(dev)) {
+	if (IS_DEV_OPEN(dev)) {
 		dev->set_led(dev, 0);
 		close(dev->fd);
 		dev->fd = -1;
@@ -59,7 +59,7 @@ static void set_led_hid(struct device *dev, int state)
 	 * - What bits should be set?
 	 */
 
-	if(!IS_DEV_OPEN(dev))
+	if (!IS_DEV_OPEN(dev))
 		return;
 
 	struct usb_gen_descriptor d = {0};
@@ -112,7 +112,7 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 	static int16_t curr_pos[AXES];
 	static bool flush = false;
 
-	if(!IS_DEV_OPEN(dev))
+	if (!IS_DEV_OPEN(dev))
 		return -1;
 
 	if (last_buttons != curr_buttons) {
@@ -135,15 +135,15 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 	} while(rdbytes == -1 && errno == EINTR);
 
 	/* disconnect? */
-	if(rdbytes == -1) {
-		if(errno != EAGAIN) {
+	if (rdbytes == -1) {
+		if (errno != EAGAIN) {
 			logmsg(LOG_ERR, "read error: %s\n", strerror(errno));
 			remove_device(dev);
 		}
 		return -1;
 	}
 
-	if(rdbytes > 0) {
+	if (rdbytes > 0) {
 		switch (iev[0]) {
 			case 1: /* Three axis... X, Y, Z */
 				flush = true;
@@ -178,7 +178,7 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 				logmsg(LOG_INFO, "Battery level: %%%d\n", iev[1]);
 				break;
 			default:
-				if(verbose) {
+				if (verbose) {
 					logmsg(LOG_DEBUG, "unhandled event: %d\n", iev[0]);
 				}
 				break;
@@ -190,15 +190,15 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 
 int open_dev_usb(struct device *dev)
 {
-	if((dev->fd = open(dev->path, O_RDWR)) == -1) {
-		if((dev->fd = open(dev->path, O_RDONLY)) == -1) {
+	if ((dev->fd = open(dev->path, O_RDWR)) == -1) {
+		if ((dev->fd = open(dev->path, O_RDONLY)) == -1) {
 			logmsg(LOG_ERR, "failed to open device: %s\n", strerror(errno));
 			return -1;
 		}
 		logmsg(LOG_WARNING, "opened device read-only, LEDs won't work\n");
 	}
 
-	if(cfg.led == LED_ON || (cfg.led == LED_AUTO && first_client())) {
+	if (cfg.led == LED_ON || (cfg.led == LED_AUTO && first_client())) {
 		set_led_hid(dev, 1);
 	} else {
 		/* Some devices start with the LED enabled, make sure to turn it off
@@ -230,7 +230,7 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 	glob_t gl;
 	int i;
 
-	if(verbose) {
+	if (verbose) {
 		logmsg(LOG_INFO, "Device detection, checking \"/dev/uhid*\"\n");
 	}
 
@@ -247,7 +247,7 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 		}
 		if (ioctl(fd, USB_GET_DEVICEINFO, &devinfo) != -1) {
 			struct usb_dev_info *node = calloc(1, sizeof *node);
-			if(node) {
+			if (node) {
 				node->vendorid = devinfo.udi_vendorNo;
 				node->productid = devinfo.udi_productNo;
 				node->name = strdup(devinfo.udi_product);
@@ -261,13 +261,12 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 			if (node == NULL || node->num_devfiles == 0) {
 				logmsg(LOG_ERR, "failed to allocate usb device info node: %s\n", strerror(errno));
 				free_usb_devices_list(node);
-			}
-			else if(verbose) {
+			} else if (verbose) {
 				logmsg(LOG_INFO, "found usb device [%x:%x]: \"%s\" (%s) \n", node->vendorid, node->productid,
 						node->name ? node->name : "unknown", node->devfiles[0]);
 			}
 			if (!match || match(node)) {
-				if(verbose) {
+				if (verbose) {
 					logmsg(LOG_INFO, "found usb device: ");
 					print_usb_device_info(node);
 				}
