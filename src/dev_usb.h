@@ -24,17 +24,17 @@ int open_dev_usb(struct device *dev);
 
 /* USB device enumeration and matching */
 #define MAX_USB_DEV_FILES	16
-struct sn_usb_device_info {
+struct usb_dev_info {
 	char *name;
 	int num_devfiles;
 	char *devfiles[MAX_USB_DEV_FILES];
 	int vendorid, productid;
 
-	struct sn_usb_device_info *next;
+	struct usb_dev_info *next;
 };
 
-struct sn_usb_device_info *find_usb_devices(int (*match)(const struct sn_usb_device_info*));
-void free_usb_devices_list(struct sn_usb_device_info *list);
-void print_usb_device_info(struct sn_usb_device_info *devinfo);
+struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*));
+void free_usb_devices_list(struct usb_dev_info *list);
+void print_usb_device_info(struct usb_dev_info *devinfo);
 
 #endif	/* SPNAV_DEV_USB_H_ */

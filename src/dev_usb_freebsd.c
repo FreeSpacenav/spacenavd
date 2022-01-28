@@ -15,7 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#if defined(__FreeBSD__)
+#ifdef __FreeBSD__
 
 #include "config.h"
 #include <dev/usb/usb_ioctl.h>
@@ -50,11 +50,6 @@ static void close_hid(struct device *dev)
 		dev->set_led(dev, 0);
 		close(dev->fd);
 		dev->fd = -1;
-#if NEED_STUFF
-		free(dev->minval);
-		free(dev->maxval);
-		free(dev->fuzz);
-#endif
 	}
 }
 
@@ -153,7 +148,7 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 
 	if(rdbytes > 0) {
 		switch (iev[0]) {
-			case 1: // Three axis... X, Y, Z
+			case 1: /* Three axis... X, Y, Z */
 				flush = true;
 				if (rdbytes > 2)
 					curr_pos[0] = iev[1] | (iev[2] << 8);
@@ -168,13 +163,13 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 				if (rdbytes > 12)
 					curr_pos[5] = iev[5] | (iev[6] << 8);
 				return axis_event(inp, last_pos, curr_pos);
-			case 2: // Three axis... rX, rY, rZ
+			case 2: /* Three axis... rX, rY, rZ */
 				flush = true;
 				curr_pos[3] = iev[1] | (iev[2] << 8);
 				curr_pos[4] = iev[3] | (iev[4] << 8);
 				curr_pos[5] = iev[5] | (iev[6] << 8);
 				return axis_event(inp, last_pos, curr_pos);
-			case 3: // Button change event.
+			case 3: /* Button change event. */
 				flush = true;
 				curr_buttons = iev[1] | (iev[2] << 8) | (iev[3] << 16);
 				if (last_buttons != curr_buttons) {
@@ -182,7 +177,7 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 					return 0;
 				}
 				return -1;
-			case 23: // Battery char level
+			case 23: /* Battery char level */
 				logmsg(LOG_INFO, "Battery level: %%%d\n", iev[1]);
 				break;
 			default:
@@ -205,35 +200,6 @@ int open_dev_usb(struct device *dev)
 		}
 		logmsg(LOG_WARNING, "opened device read-only, LEDs won't work\n");
 	}
-	dev->num_axes = AXES;
-#if NEED_STUFF
-	/*
-	 * TODO: Fetch these...
-	 * - num_axes needs to be a bit complex, there's two reports each with three axis...
-	 * - num_buttons is trivial though.
-	 * - min/max is easy, not sure what fuzz even is.
-	 * - Also, it seems nothing actually uses these things...
-	 */
-	dev->num_buttons = 21;
-	dev->minval = malloc(dev->num_axes * sizeof *dev->minval);
-	dev->maxval = malloc(dev->num_axes * sizeof *dev->maxval);
-	dev->fuzz = malloc(dev->num_axes * sizeof *dev->fuzz);
-
-	if(!dev->minval || !dev->maxval || !dev->fuzz) {
-		free(dev->minval);
-		free(dev->maxval);
-		free(dev->fuzz);
-		logmsg(LOG_ERR, "failed to allocate memory: %s\n", strerror(errno));
-		return -1;
-	}
-
-	/* if the device is an absolute device, find the minimum and maximum axis values */
-	for(int i=0; i<dev->num_axes; i++) {
-		dev->minval[i] = DEF_MINVAL;
-		dev->maxval[i] = DEF_MAXVAL;
-		dev->fuzz[i] = 0;
-	}
-#endif
 
 	if(cfg.led == LED_ON || (cfg.led == LED_AUTO && first_client())) {
 		set_led_hid(dev, 1);
@@ -260,9 +226,9 @@ int open_dev_usb(struct device *dev)
 	return 0;
 }
 
-struct sn_usb_device_info *find_usb_devices(int (*match)(const struct sn_usb_device_info*))
+struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 {
-	struct sn_usb_device_info *devlist = NULL;
+	struct usb_dev_info *devlist = NULL;
 	struct usb_device_info devinfo;
 	glob_t gl;
 	int i;
@@ -283,7 +249,7 @@ struct sn_usb_device_info *find_usb_devices(int (*match)(const struct sn_usb_dev
 			continue;
 		}
 		if (ioctl(fd, USB_GET_DEVICEINFO, &devinfo) != -1) {
-			struct sn_usb_device_info *node = calloc(1, sizeof *node);
+			struct usb_dev_info *node = calloc(1, sizeof *node);
 			if(node) {
 				node->vendorid = devinfo.udi_vendorNo;
 				node->productid = devinfo.udi_productNo;
