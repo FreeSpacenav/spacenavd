@@ -23,7 +23,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "cfgfile.h"
 #include "logger.h"
 
+#if defined(__FreeBSD__)
+#define DEF_CFGFILE		"/usr/local/etc/spnavrc"
+#else
 #define DEF_CFGFILE		"/etc/spnavrc"
+#endif
 #define DEF_LOGFILE		"/var/log/spnavd.log"
 
 #define SOCK_NAME	"/var/run/spnav.sock"
