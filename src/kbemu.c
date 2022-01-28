@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifdef HAVE_XTEST_H
 #include <X11/extensions/XTest.h>
+static int use_xtest;
 #endif
 
 static Display *dpy;
-static int use_xtest;
 
 void kbemu_set_display(Display *d)
 {
