@@ -23,7 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "cfgfile.h"
 #include "logger.h"
 
-#define DEF_CFGFILE		"/etc/spnavrc"
+#define DEF_CFGFILE		CFGDIR "/spnavrc"
 #define DEF_LOGFILE		"/var/log/spnavd.log"
 
 #define SOCK_NAME	"/var/run/spnav.sock"

@@ -45,6 +45,7 @@ X11=yes
 HOTPLUG=yes
 XINPUT=yes
 VER=`git describe --tags 2>/dev/null`
+CFGDIR=/etc
 
 if [ -z "$VER" ]; then
 	VER=`git rev-parse --short HEAD`
@@ -81,6 +82,11 @@ for arg; do
 	--prefix=*)
 		value=`echo $arg | sed 's/--prefix=//'`
 		PREFIX=${value:-$prefix}
+		;;
+
+	--cfgdir=*)
+		value=`echo $arg | sed 's/--cfgdir=//'`
+		CFGDIR=${value:-$cfgdir}
 		;;
 	
 	--enable-opt)
@@ -122,6 +128,7 @@ for arg; do
 done
 
 echo "  prefix: $PREFIX"
+echo "  config dir: $CFGDIR"
 echo "  optimize for speed: $OPT"
 echo "  include debugging symbols: $DBG"
 echo "  x11 communication method: $X11"
@@ -204,8 +211,11 @@ echo >>$cfgheader
 [ -n "$HAVE_MALLOC_H" ] && echo $HAVE_MALLOC_H >>$cfgheader
 [ -n "$HAVE_XINPUT2_H" ] && echo $HAVE_XINPUT2_H >>$cfgheader
 [ -n "$HAVE_XTEST_H" ] && echo $HAVE_XTEST_H >>$cfgheader
-
 echo >>$cfgheader
+
+echo "#define CFGDIR \"$CFGDIR\"" >>$cfgheader
+echo >>$cfgheader
+
 echo '#endif	/* CONFIG_H_ */' >>$cfgheader
 
 echo ''
