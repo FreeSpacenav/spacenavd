@@ -85,4 +85,6 @@ void send_kbevent(KeySym key, int press)
 	XSendEvent(dpy, win, True, press ? KeyPressMask : KeyReleaseMask, &xevent);
 	XFlush(dpy);
 }
+#else
+int spacenavd_kbemu_shut_up_empty_source_warning;
 #endif	/* USE_X11 */
