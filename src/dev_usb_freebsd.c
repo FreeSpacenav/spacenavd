@@ -43,7 +43,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 static void close_hid(struct device *dev)
 {
-	if (IS_DEV_OPEN(dev)) {
+	if(IS_DEV_OPEN(dev)) {
 		dev->set_led(dev, 0);
 		close(dev->fd);
 		dev->fd = -1;
@@ -52,6 +52,9 @@ static void close_hid(struct device *dev)
 
 static void set_led_hid(struct device *dev, int state)
 {
+	struct usb_gen_descriptor d = {0};
+	uint8_t buf[2];
+
 	/*
 	 * TODO: Get stuff from report descriptor:
 	 * - Is there an LED?
@@ -59,26 +62,29 @@ static void set_led_hid(struct device *dev, int state)
 	 * - What bits should be set?
 	 */
 
-	if (!IS_DEV_OPEN(dev))
+	if(!IS_DEV_OPEN(dev))
 		return;
 
-	struct usb_gen_descriptor d = {0};
-	uint8_t buf[2] = {4,state ? 15 : 0};
+	buf[0] = 4;
+	buf[1] = state ? 15 : 0;
 	d.ugd_data = buf;
-	d.ugd_maxlen = sizeof(buf);
+	d.ugd_maxlen = sizeof buf;
 	d.ugd_report_type = UHID_OUTPUT_REPORT;
 
-	if (ioctl(dev->fd, USB_SET_REPORT, &d) == -1) {
+	if(ioctl(dev->fd, USB_SET_REPORT, &d) == -1) {
 		logmsg(LOG_ERR, "Unable to set LED: %s\n", strerror(errno));
 	}
 }
 
 static uint32_t button_event(struct dev_input *inp, uint32_t last, uint32_t curr)
 {
-	uint32_t new = last ^ curr;
-	int b = ffs(new) - 1;
+	uint32_t new;
+	int b;
 
-	if (new) {
+	new = last ^ curr;
+	b = ffs(new) - 1;
+
+	if(new) {
 		inp->type = INP_BUTTON;
 		inp->idx = b;
 		inp->val = (curr >> b) & 1;
@@ -87,14 +93,14 @@ static uint32_t button_event(struct dev_input *inp, uint32_t last, uint32_t curr
 	return last;
 }
 
-static uint32_t axis_event(struct dev_input *inp, int16_t curr[AXES], unsigned *flush)
+static uint32_t axis_event(struct dev_input *inp, int16_t *curr, unsigned int *flush)
 {
-	int axis = ffs(*flush);
+	int axis;
 
-	if (axis > 0) {
+	if((axis = ffs(*flush)) > 0) {
 		axis--;
 		*flush &= ~(1 << axis);
-		if (axis < AXES) {
+		if(axis < AXES) {
 			inp->type = INP_MOTION;
 			inp->idx = axis;
 			inp->val = curr[axis];
@@ -115,17 +121,17 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 	static uint32_t last_buttons;
 	static uint32_t curr_buttons;
 	static int16_t curr_pos[AXES];
-	static unsigned flush = 0;
+	static unsigned int flush = 0;
 
-	if (!IS_DEV_OPEN(dev))
+	if(!IS_DEV_OPEN(dev))
 		return -1;
 
-	if (last_buttons != curr_buttons) {
+	if(last_buttons != curr_buttons) {
 		last_buttons = button_event(inp, last_buttons, curr_buttons);
 		return 0;
 	}
 
-	if (axis_event(inp, curr_pos, &flush) == 0) {
+	if(axis_event(inp, curr_pos, &flush) == 0) {
 		return 0;
 	}
 
@@ -134,45 +140,45 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 	} while(rdbytes == -1 && errno == EINTR);
 
 	/* disconnect? */
-	if (rdbytes == -1) {
-		if (errno != EAGAIN) {
+	if(rdbytes == -1) {
+		if(errno != EAGAIN) {
 			logmsg(LOG_ERR, "read error: %s\n", strerror(errno));
 			remove_device(dev);
 		}
 		return -1;
 	}
 
-	if (rdbytes > 0) {
-		switch (iev[0]) {
-			case 1: /* Three axis... X, Y, Z */
-				flush = 0x40;
-				for (i = 0; i < rdbytes / 2 && i < AXES; i++) {
-					flush |= (1 << i);
-					curr_pos[i] = iev[i * 2 + 1] | (iev[i * 2 + 2] << 8);
-				}
-				return axis_event(inp, curr_pos, &flush);
-			case 2: /* Three axis... rX, rY, rZ */
-				flush = 0x78;
-				curr_pos[3] = iev[1] | (iev[2] << 8);
-				curr_pos[4] = iev[3] | (iev[4] << 8);
-				curr_pos[5] = iev[5] | (iev[6] << 8);
-				return axis_event(inp, curr_pos, &flush);
-			case 3: /* Button change event. */
-				flush = true;
-				curr_buttons = iev[1] | (iev[2] << 8) | (iev[3] << 16);
-				if (last_buttons != curr_buttons) {
-					last_buttons = button_event(inp, last_buttons, curr_buttons);
-					return 0;
-				}
-				return -1;
-			case 23: /* Battery char level */
-				logmsg(LOG_INFO, "Battery level: %%%d\n", iev[1]);
-				break;
-			default:
-				if (verbose) {
-					logmsg(LOG_DEBUG, "unhandled event: %d\n", iev[0]);
-				}
-				break;
+	if(rdbytes > 0) {
+		switch(iev[0]) {
+		case 1: /* Three axis... X, Y, Z */
+			flush = 0x40;
+			for(i=0; i<rdbytes/2 && i<AXES; i++) {
+				flush |= (1 << i);
+				curr_pos[i] = iev[i * 2 + 1] | (iev[i * 2 + 2] << 8);
+			}
+			return axis_event(inp, curr_pos, &flush);
+		case 2: /* Three axis... rX, rY, rZ */
+			flush = 0x78;
+			curr_pos[3] = iev[1] | (iev[2] << 8);
+			curr_pos[4] = iev[3] | (iev[4] << 8);
+			curr_pos[5] = iev[5] | (iev[6] << 8);
+			return axis_event(inp, curr_pos, &flush);
+		case 3: /* Button change event. */
+			flush = 1;
+			curr_buttons = iev[1] | (iev[2] << 8) | (iev[3] << 16);
+			if(last_buttons != curr_buttons) {
+				last_buttons = button_event(inp, last_buttons, curr_buttons);
+				return 0;
+			}
+			return -1;
+		case 23: /* Battery char level */
+			logmsg(LOG_INFO, "Battery level: %%%d\n", iev[1]);
+			break;
+		default:
+			if(verbose) {
+				logmsg(LOG_DEBUG, "unhandled event: %d\n", iev[0]);
+			}
+			break;
 		}
 	}
 
@@ -181,15 +187,15 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 
 int open_dev_usb(struct device *dev)
 {
-	if ((dev->fd = open(dev->path, O_RDWR | O_NONBLOCK)) == -1) {
-		if ((dev->fd = open(dev->path, O_RDONLY | O_NONBLOCK)) == -1) {
+	if((dev->fd = open(dev->path, O_RDWR | O_NONBLOCK)) == -1) {
+		if((dev->fd = open(dev->path, O_RDONLY | O_NONBLOCK)) == -1) {
 			logmsg(LOG_ERR, "failed to open device: %s\n", strerror(errno));
 			return -1;
 		}
 		logmsg(LOG_WARNING, "opened device read-only, LEDs won't work\n");
 	}
 
-	if (cfg.led == LED_ON || (cfg.led == LED_AUTO && first_client())) {
+	if(cfg.led == LED_ON || (cfg.led == LED_AUTO && first_client())) {
 		set_led_hid(dev, 1);
 	} else {
 		/* Some devices start with the LED enabled, make sure to turn it off
@@ -216,48 +222,47 @@ int open_dev_usb(struct device *dev)
 
 struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 {
-	struct usb_dev_info *devlist = NULL;
+	struct usb_dev_info *node, *devlist = 0;
 	struct usb_device_info devinfo;
 	glob_t gl;
-	int i;
+	int i, fd;
 
-	if (verbose) {
+	if(verbose) {
 		logmsg(LOG_INFO, "Device detection, checking \"/dev/uhid*\"\n");
 	}
 
-	if (glob("/dev/uhid*", 0, NULL, &gl) != 0)
+	if(glob("/dev/uhid*", 0, NULL, &gl) != 0) {
 		return devlist;
+	}
 
-	for (i = 0; i < gl.gl_pathc; i++) {
+	for(i=0; i<gl.gl_pathc; i++) {
 		logmsg(LOG_INFO, "checking \"%s\"... ", gl.gl_pathv[i]);
 
-		int fd = open(gl.gl_pathv[i], O_RDWR);
-		if (fd == -1) {
+		if((fd = open(gl.gl_pathv[i], O_RDWR)) == -1) {
 			logmsg(LOG_ERR, "Failed to open \"%s\": %s\n", gl.gl_pathv[i], strerror(errno));
 			continue;
 		}
-		if (ioctl(fd, USB_GET_DEVICEINFO, &devinfo) != -1) {
-			struct usb_dev_info *node = calloc(1, sizeof *node);
-			if (node) {
+		if(ioctl(fd, USB_GET_DEVICEINFO, &devinfo) != -1) {
+			if((node = calloc(1, sizeof *node))) {
 				node->vendorid = devinfo.udi_vendorNo;
 				node->productid = devinfo.udi_productNo;
 				node->name = strdup(devinfo.udi_product);
-				if (node->name != NULL) {
+				if(node->name != NULL) {
 					node->devfiles[0] = strdup(gl.gl_pathv[i]);
-					if (node->devfiles[0] != NULL) {
+					if(node->devfiles[0] != NULL) {
 						node->num_devfiles = 1;
 					}
 				}
 			}
-			if (node == NULL || node->num_devfiles == 0) {
+			if(!node || !node->num_devfiles) {
 				logmsg(LOG_ERR, "failed to allocate usb device info node: %s\n", strerror(errno));
 				free_usb_devices_list(node);
-			} else if (verbose) {
+			} else if(verbose) {
 				logmsg(LOG_INFO, "found usb device [%x:%x]: \"%s\" (%s) \n", node->vendorid, node->productid,
 						node->name ? node->name : "unknown", node->devfiles[0]);
 			}
-			if (!match || match(node)) {
-				if (verbose) {
+			if(!match || match(node)) {
+				if(verbose) {
 					logmsg(LOG_INFO, "found usb device: ");
 					print_usb_device_info(node);
 				}
