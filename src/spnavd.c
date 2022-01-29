@@ -51,8 +51,6 @@ static char *fix_path(char *str);
 static char *cfgfile = DEF_CFGFILE;
 static char *logfile = DEF_LOGFILE;
 
-/* struct for privilege changes */
-userid_struct userids;
 
 int main(int argc, char **argv)
 {
@@ -169,9 +167,9 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	userids->runas_daemon = become_daemon;
-	userids->has_cmd_user = use_username;
-	userids->has_cmd_group = use_groupname;
+	userids.runas_daemon = become_daemon;
+	userids.has_cmd_user = use_username;
+	userids.has_cmd_group = use_groupname;
 
 	test_initial_user_privileges();
 

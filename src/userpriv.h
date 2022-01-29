@@ -22,19 +22,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/types.h>
 
 /* struct for user id's */
-typedef struct {
-    uid_t daemon_uid;         /* the uid for the daemon */
-    gid_t daemon_gid;         /* the gid for the daemon */
-    uid_t invoked_uid;        /* spnavd was started with this uid (0-no / 1-yes) */
-    gid_t invoked_gid;        /* spnavd was started with this gid (0-no / 1-yes) */
-    int   can_restore_uid;    /* spnavd can restore the invoked uid (0-no / 1-yes) */
-    int   can_restore_gid;    /* spnavd can restore the invoked gid (0-no / 1-yes) */
-    int   runas_daemon;       /* flag for running in daemonmode (0-no / 1-yes) */
-    int   has_cmd_user;       /* spnavd started with -u (0-no / 1-yes) */
-    int   has_cmd_group;      /* spnavd started with -g (0-no / 1-yes) */
-} userid_struct;
+struct userpriv {
+	uid_t daemon_uid;         /* the uid for the daemon */
+	gid_t daemon_gid;         /* the gid for the daemon */
+	uid_t invoked_uid;        /* spnavd was started with this uid */
+	gid_t invoked_gid;        /* spnavd was started with this gid */
+	int can_restore_uid;    /* spnavd can restore the invoked uid */
+	int can_restore_gid;    /* spnavd can restore the invoked gid */
+	int runas_daemon;       /* flag for running in daemonmode */
+	int has_cmd_user;       /* spnavd started with -u */
+	int has_cmd_group;      /* spnavd started with -g */
+};
 
-extern userid_struct *userids;
+struct userpriv userids;
 
 void set_initial_user_privileges(void);
 void test_initial_user_privileges(void);
