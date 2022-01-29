@@ -28,7 +28,7 @@ test_kver() {
 check_header() {
 	printf "Looking for header: $1 ... " >&2
 	echo "#include <$1>" >.chkhdr.c
-	if cpp .chkhdr.c >/dev/null 2>&1; then
+	if cpp -I/usr/local/include .chkhdr.c >/dev/null 2>&1; then
 		echo found >&2
 		echo "#define HAVE_`basename $1 | tr '[:lower:]' '[:upper:]' | sed 's/\./_/g'`"
 	else

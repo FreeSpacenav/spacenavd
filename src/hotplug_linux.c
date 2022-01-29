@@ -145,4 +145,6 @@ static void poll_timeout(int sig)
 
 
 
+#else
+int spacenavd_hotplug_linux_shut_up_empty_source_warning;
 #endif	/* __linux__ */

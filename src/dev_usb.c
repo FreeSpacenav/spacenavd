@@ -28,11 +28,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "logger.h"
 
 
-void free_usb_devices_list(struct usb_device_info *list)
+void free_usb_devices_list(struct usb_dev_info *list)
 {
 	while(list) {
 		int i;
-		struct usb_device_info *tmp = list;
+		struct usb_dev_info *tmp = list;
 		list = list->next;
 
 		free(tmp->name);
@@ -43,7 +43,7 @@ void free_usb_devices_list(struct usb_device_info *list)
 	}
 }
 
-void print_usb_device_info(struct usb_device_info *devinfo)
+void print_usb_device_info(struct usb_dev_info *devinfo)
 {
 	int i, sz = 64;
 	char *devname, *buf, *s;

@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 static struct device *add_device(void);
 static struct device *dev_path_in_use(char const * dev_path);
-static int match_usbdev(const struct usb_device_info *devinfo);
+static int match_usbdev(const struct usb_dev_info *devinfo);
 
 static struct device *dev_list = NULL;
 
@@ -40,7 +40,7 @@ int init_devices(void)
 {
 	struct device *dev;
 	int i, device_added = 0;
-	struct usb_device_info *usblist, *usbdev;
+	struct usb_dev_info *usblist, *usbdev;
 
 	/* try to open a serial device if specified in the config file */
 	if(cfg.serial_dev[0]) {
@@ -241,7 +241,7 @@ static int devid_blacklist[][2] = {
 };
 
 
-static int match_usbdev(const struct usb_device_info *devinfo)
+static int match_usbdev(const struct usb_dev_info *devinfo)
 {
 	int i;
 

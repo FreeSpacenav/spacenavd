@@ -15,7 +15,7 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
-#if !defined(__linux__) && !(defined(__APPLE__) && defined(__MACH__))
+#if !defined(__linux__) && !(defined(__APPLE__) && defined(__MACH__)) && !defined(__FreeBSD__)
 
 #include <stdio.h>
 #include "logger.h"
@@ -25,13 +25,13 @@ static const char *message =
 	"Unfortunately this version of spacenavd does not support USB devices on your "
 	"platform yet. Make sure you are using the latest version of spacenavd.\n";
 
-struct usb_device_info *find_usb_devices(int (*match)(const struct usb_device_info*))
+struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 {
 	logmsg(LOG_ERR, message);
 	return 0;
 }
 
-void free_usb_devices_list(struct usb_device_info *list)
+void free_usb_devices_list(struct usb_dev_info *list)
 {
 }
 
