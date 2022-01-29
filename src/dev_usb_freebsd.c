@@ -87,16 +87,21 @@ static uint32_t button_event(struct dev_input *inp, uint32_t last, uint32_t curr
 	return last;
 }
 
-static uint32_t axis_event(struct dev_input *inp, int16_t last[AXES], int16_t curr[AXES])
+static uint32_t axis_event(struct dev_input *inp, int16_t curr[AXES], unsigned *flush)
 {
-	for (int i = 0; i < AXES; i++) {
-		if (last[i] != curr[i]) {
+	int axis = ffs(*flush);
+
+	if (axis > 0) {
+		axis--;
+		*flush &= ~(1 << axis);
+		if (axis < AXES) {
 			inp->type = INP_MOTION;
-			inp->idx = i;
-			inp->val = curr[i];
-			last[i] = curr[i];
+			inp->idx = axis;
+			inp->val = curr[axis];
 			return 0;
 		}
+		inp->type = INP_FLUSH;
+		return 0;
 	}
 
 	return -1;
@@ -106,11 +111,11 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 {
 	uint8_t iev[1024];
 	int rdbytes;
+	int i;
 	static uint32_t last_buttons;
 	static uint32_t curr_buttons;
-	static int16_t last_pos[AXES];
 	static int16_t curr_pos[AXES];
-	static bool flush = false;
+	static unsigned flush = 0;
 
 	if (!IS_DEV_OPEN(dev))
 		return -1;
@@ -120,13 +125,7 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 		return 0;
 	}
 
-	if (axis_event(inp, last_pos, curr_pos) == 0) {
-		return 0;
-	}
-
-	if (flush) {
-		inp->type = INP_FLUSH;
-		flush = false;
+	if (axis_event(inp, curr_pos, &flush) == 0) {
 		return 0;
 	}
 
@@ -146,26 +145,18 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 	if (rdbytes > 0) {
 		switch (iev[0]) {
 			case 1: /* Three axis... X, Y, Z */
-				flush = true;
-				if (rdbytes > 2)
-					curr_pos[0] = iev[1] | (iev[2] << 8);
-				if (rdbytes > 4)
-					curr_pos[1] = iev[3] | (iev[4] << 8);
-				if (rdbytes > 6)
-					curr_pos[2] = iev[5] | (iev[6] << 8);
-				if (rdbytes > 8)
-					curr_pos[3] = iev[5] | (iev[6] << 8);
-				if (rdbytes > 10)
-					curr_pos[4] = iev[5] | (iev[6] << 8);
-				if (rdbytes > 12)
-					curr_pos[5] = iev[5] | (iev[6] << 8);
-				return axis_event(inp, last_pos, curr_pos);
+				flush = 0x40;
+				for (i = 0; i < rdbytes / 2 && i < AXES; i++) {
+					flush |= (1 << i);
+					curr_pos[i] = iev[i * 2 + 1] | (iev[i * 2 + 2] << 8);
+				}
+				return axis_event(inp, curr_pos, &flush);
 			case 2: /* Three axis... rX, rY, rZ */
-				flush = true;
+				flush = 0x78;
 				curr_pos[3] = iev[1] | (iev[2] << 8);
 				curr_pos[4] = iev[3] | (iev[4] << 8);
 				curr_pos[5] = iev[5] | (iev[6] << 8);
-				return axis_event(inp, last_pos, curr_pos);
+				return axis_event(inp, curr_pos, &flush);
 			case 3: /* Button change event. */
 				flush = true;
 				curr_buttons = iev[1] | (iev[2] << 8) | (iev[3] << 16);
