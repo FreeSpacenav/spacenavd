@@ -181,8 +181,8 @@ static int read_hid(struct device *dev, struct dev_input *inp)
 
 int open_dev_usb(struct device *dev)
 {
-	if ((dev->fd = open(dev->path, O_RDWR)) == -1) {
-		if ((dev->fd = open(dev->path, O_RDONLY)) == -1) {
+	if ((dev->fd = open(dev->path, O_RDWR | O_NONBLOCK)) == -1) {
+		if ((dev->fd = open(dev->path, O_RDONLY | O_NONBLOCK)) == -1) {
 			logmsg(LOG_ERR, "failed to open device: %s\n", strerror(errno));
 			return -1;
 		}
