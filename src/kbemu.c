@@ -26,10 +26,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #ifdef HAVE_XTEST_H
 #include <X11/extensions/XTest.h>
+static int use_xtest;
 #endif
 
 static Display *dpy;
-static int use_xtest;
 
 void kbemu_set_display(Display *d)
 {
@@ -85,4 +85,6 @@ void send_kbevent(KeySym key, int press)
 	XSendEvent(dpy, win, True, press ? KeyPressMask : KeyReleaseMask, &xevent);
 	XFlush(dpy);
 }
+#else
+int spacenavd_kbemu_shut_up_empty_source_warning;
 #endif	/* USE_X11 */
