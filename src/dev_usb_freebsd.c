@@ -225,7 +225,8 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 	struct usb_dev_info *node, *devlist = 0;
 	struct usb_device_info devinfo;
 	glob_t gl;
-	int i, fd;
+	size_t si;
+	int fd;
 
 	if(verbose) {
 		logmsg(LOG_INFO, "Device detection, checking \"/dev/uhid*\"\n");
@@ -235,11 +236,11 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 		return devlist;
 	}
 
-	for(i=0; i<gl.gl_pathc; i++) {
-		logmsg(LOG_INFO, "checking \"%s\"... ", gl.gl_pathv[i]);
+	for(si=0; si<gl.gl_pathc; si++) {
+		logmsg(LOG_INFO, "checking \"%s\"... ", gl.gl_pathv[si]);
 
-		if((fd = open(gl.gl_pathv[i], O_RDWR)) == -1) {
-			logmsg(LOG_ERR, "Failed to open \"%s\": %s\n", gl.gl_pathv[i], strerror(errno));
+		if((fd = open(gl.gl_pathv[si], O_RDWR)) == -1) {
+			logmsg(LOG_ERR, "Failed to open \"%s\": %s\n", gl.gl_pathv[si], strerror(errno));
 			continue;
 		}
 		if(ioctl(fd, USB_GET_DEVICEINFO, &devinfo) != -1) {
@@ -248,7 +249,7 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 				node->productid = devinfo.udi_productNo;
 				node->name = strdup(devinfo.udi_product);
 				if(node->name != NULL) {
-					node->devfiles[0] = strdup(gl.gl_pathv[i]);
+					node->devfiles[0] = strdup(gl.gl_pathv[si]);
 					if(node->devfiles[0] != NULL) {
 						node->num_devfiles = 1;
 					}
