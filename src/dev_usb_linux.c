@@ -349,7 +349,7 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 				/* break to read from file again */
 				break;
 			}
-			/* set second newline to teminating null */
+			/* set second newline to terminating null */
 			next_section[1] = 0;
 			/* point to start of next section */
 			next_section += 2;

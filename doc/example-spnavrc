@@ -17,7 +17,7 @@
 #sensitivity-translation = 1.0
 #sensitivity-rotation = 1.0
 
-# Separate sensitivity for each roation and translation axis.
+# Separate sensitivity for each rotation and translation axis.
 #
 #sensitivity-translation-x = 1.0
 #sensitivity-translation-y = 1.0
