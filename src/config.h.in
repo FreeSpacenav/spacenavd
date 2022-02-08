@@ -1,0 +1,17 @@
+#ifndef CONFIG_H_'
+#define CONFIG_H_'
+
+#mesondefine X11
+#mesondefine USE_NETLINK
+#mesondefine VERSION
+
+/*
+[ -n "$HAVE_ALLOCA_H" ] && echo $HAVE_ALLOCA_H >>$cfgheader
+[ -n "$HAVE_MALLOC_H" ] && echo $HAVE_MALLOC_H >>$cfgheader
+[ -n "$HAVE_XINPUT2_H" ] && echo $HAVE_XINPUT2_H >>$cfgheader
+[ -n "$HAVE_XTEST_H" ] && echo $HAVE_XTEST_H >>$cfgheader
+*/
+
+#mesondefine CFGDIR
+
+#endif	/* CONFIG_H_ */

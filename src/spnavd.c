@@ -50,6 +50,9 @@ static char *fix_path(char *str);
 static char *cfgfile = DEF_CFGFILE;
 static char *logfile = DEF_LOGFILE;
 
+struct cfg cfg;
+int verbose;
+
 int main(int argc, char **argv)
 {
 	int i, pid, ret, become_daemon = 1;
