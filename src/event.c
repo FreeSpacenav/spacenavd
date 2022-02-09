@@ -34,6 +34,11 @@ enum {
 	MOT_RX, MOT_RY, MOT_RZ
 };
 
+enum {
+	BTN_RELEASE = 0,
+	BTN_PRESS = 1
+};
+
 struct dev_event {
 	spnav_event event;
 	struct timeval timeval;
@@ -44,7 +49,7 @@ struct dev_event {
 
 static struct dev_event *add_dev_event(struct device *dev);
 static struct dev_event *device_event_in_use(struct device *dev);
-static void handle_button_action(int act);
+static void handle_button_action(int act, int val);
 static void dispatch_event(struct dev_event *dev);
 static void send_event(spnav_event *ev, struct client *c);
 static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
@@ -127,6 +132,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 {
 	int sign;
 	struct dev_event *dev_ev;
+	float sens_rot, sens_trans;
 
 	switch(inp->type) {
 	case INP_MOTION:
@@ -137,7 +143,10 @@ void process_input(struct device *dev, struct dev_input *inp)
 		}
 		sign = cfg.invert[inp->idx] ? -1 : 1;
 
-		inp->val = (int)((float)inp->val * cfg.sensitivity * (inp->idx < 3 ? cfg.sens_trans[inp->idx] : cfg.sens_rot[inp->idx - 3]));
+		sens_rot = cfg.disable_rotation ? 0 : cfg.sens_rot[inp->idx - 3];
+		sens_trans = cfg.disable_translation ? 0 : cfg.sens_trans[inp->idx];
+
+		inp->val = (int)((float)inp->val * cfg.sensitivity * (inp->idx < 3 ? sens_trans : sens_rot));
 
 		dev_ev = device_event_in_use(dev);
 		if(verbose && dev_ev == NULL)
@@ -155,7 +164,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 	case INP_BUTTON:
 		/* check to see if the button has been bound to an action */
 		if(cfg.bnact[inp->idx] > 0) {
-			handle_button_action(cfg.bnact[inp->idx]);
+			handle_button_action(cfg.bnact[inp->idx], inp->val);
 			break;
 		}
 
@@ -213,7 +222,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 	}
 }
 
-static void handle_button_action(int act)
+static void handle_button_action(int act, int pressed)
 {
 	switch(act) {
 	case BNACT_SENS_INC:
@@ -224,6 +233,20 @@ static void handle_button_action(int act)
 		break;
 	case BNACT_SENS_RESET:
 		cfg.sensitivity = 1.0f;
+		break;
+	case BNACT_DISABLE_ROTATION:
+		if(pressed == BTN_RELEASE) {
+			cfg.disable_rotation = !cfg.disable_rotation;
+			if (cfg.disable_rotation)
+				cfg.disable_translation = 0;
+		}
+		break;
+	case BNACT_DISABLE_TRANSLATION:
+		if(pressed == BTN_RELEASE) {
+			cfg.disable_translation = !cfg.disable_translation;
+			if (cfg.disable_translation)
+				cfg.disable_rotation = 0;
+		}
 		break;
 	}
 }

@@ -75,6 +75,8 @@
 # available actions:
 #    none,
 #    sensitivity-up, sensitivity-down, sensitivity-reset
+#    disable-rotation
+#    disable-translation
 #
 #bnact16 = sensitivity-up
 #bnact17 = sensitivity-down
