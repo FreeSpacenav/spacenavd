@@ -28,21 +28,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <X11/Xutil.h>
 #endif
 
-struct client {
-	int type;
-
-	int sock;	/* UNIX domain socket */
-#ifdef USE_X11
-	Window win;	/* X11 client window */
-#endif
-
-	float sens;	/* sensitivity */
-	int dev_idx; /* device index */
-
-	struct client *next;
-};
-
-
 static struct client *client_list = NULL;
 static struct client *client_iter;	/* iterator (used by first/next calls) */
 
@@ -75,9 +60,11 @@ struct client *add_client(int type, void *cdata)
 		client->win = *(Window*)cdata;
 #endif
 	}
+	/* default to protocol version 0 until the client changes it */
+	client->proto = 0;
 
 	client->sens = 1.0f;
-	client->dev_idx = 0; /* default/first device */
+	client->dev = 0; /* default/first device */
 
 	if(!client_list && cfg.led == LED_AUTO) {
 		/* on first client, turn the led on */
@@ -144,14 +131,14 @@ float get_client_sensitivity(struct client *client)
 	return client->sens;
 }
 
-void set_client_device_index(struct client *client, int dev_idx)
+void set_client_device(struct client *client, struct device *dev)
 {
-	client->dev_idx = dev_idx;
+	client->dev = dev;
 }
 
-int get_client_device_index(struct client *client)
+struct device *get_client_device(struct client *client)
 {
-	return client->dev_idx;
+	return client->dev ? client->dev : get_devices();
 }
 
 struct client *first_client(void)

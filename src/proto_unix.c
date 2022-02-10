@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -20,13 +20,56 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 #include <errno.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
 #include "proto_unix.h"
 #include "spnavd.h"
+
+/* maximum supported protocol version */
+#define MAX_PROTO_VER	1
+
+struct reqresp {
+	int type;
+	int data[7];
+};
+
+/* REQ_S* are set, REQ_G* are get requests.
+ * Quick-reference for request-response data in the comments next to each
+ * request: Q[n] defines request data item n, R[n] defines response data item n
+ *
+ * status responses are 0 for success, non-zero for failure
+ */
+enum {
+	/* per-client settings */
+	REQ_SET_SENS,			/* set client sensitivity:	Q[0] float - R[6] status */
+	REQ_GET_SENS,			/* get client sensitivity:	R[0] float R[6] status */
+
+	/* device queries */
+	REQ_DEV_NAME = 0x1000,	/* get device name:	R[0] length R[6] status followed
+							   by <length> bytes */
+	REQ_DEV_PATH,			/* get device path: same as above */
+	REQ_DEV_NAXES,			/* get number of axes:		R[0] num axes R[6] status */
+	REQ_DEV_NBUTTONS,		/* get number of buttons: same as above */
+	/* TODO: features like LCD, LEDs ... */
+
+	/* configuration settings */
+	REQ_SCFG_SENS = 0x2000,	/* set global sensitivity:	Q[0] float - R[6] status */
+	REQ_GCFG_SENS,			/* get global sens:			R[0] float R[6] status */
+	REQ_SCFG_SENS_AXIS,		/* set per-axis sens/ty:	Q[0-5] values - R[6] status */
+	REQ_GCFG_SENS_AXIS,		/* get per-axis sens/ty:	R[0-5] values R[6] status */
+	REQ_SCFG_DEADZONE,		/* set deadzones:			Q[0-5] values - R[6] status */
+	REQ_GCFG_DEADZONE,		/* get deadzones:			R[0-5] values R[6] status */
+	REQ_SCFG_INVERT,		/* set invert axes:			Q[0-5] invert - R[6] status */
+	REQ_GCFG_INVERT,		/* get invert axes:			R[0-5] invert R[6] status */
+	/* TODO ... more */
+
+	REQ_CHANGE_PROTO	= 0x7faa5500
+};
 
 enum {
 	UEV_TYPE_MOTION,
@@ -35,6 +78,10 @@ enum {
 };
 
 static int lsock = -1;
+
+
+static int handle_request(struct client *c, struct reqresp *req);
+
 
 int init_unix(void)
 {
@@ -125,6 +172,9 @@ void send_uevent(spnav_event *ev, struct client *c)
 int handle_uevents(fd_set *rset)
 {
 	struct client *citer;
+	static char reqbuf[64];
+	static int reqbytes;
+	struct reqresp *req;
 
 	if(lsock == -1) {
 		return -1;
@@ -137,6 +187,9 @@ int handle_uevents(fd_set *rset)
 		if((s = accept(lsock, 0, 0)) == -1) {
 			logmsg(LOG_ERR, "error while accepting connection on the UNIX socket: %s\n", strerror(errno));
 		} else {
+			/* set socket as non-blocking and add client to the list */
+			fcntl(s, F_SETFL, fcntl(s, F_GETFL) | O_NONBLOCK);
+
 			if(!add_client(CLIENT_UNIX, &s)) {
 				logmsg(LOG_ERR, "failed to add client: %s\n", strerror(errno));
 			}
@@ -153,22 +206,178 @@ int handle_uevents(fd_set *rset)
 			int s = get_client_socket(c);
 
 			if(FD_ISSET(s, rset)) {
-				int rdbytes;
+				int rdbytes, msg;
 				float sens;
 
-				/* got a request from a client, decode and execute it */
-				/* XXX currently only sensitivity comes from clients */
+				/* handle client requests */
 
-				while((rdbytes = read(s, &sens, sizeof sens)) <= 0 && errno == EINTR);
+				while((rdbytes = read(s, &msg, sizeof msg)) <= 0 && errno == EINTR);
 				if(rdbytes <= 0) {	/* something went wrong... disconnect client */
 					close(get_client_socket(c));
 					remove_client(c);
 					continue;
 				}
 
-				set_client_sensitivity(c, sens);
+				/* only handle magic NaN protocol change requests, when the
+				 * client is operating in protocol 0 mode
+				 */
+				if(c->proto == 0 && (msg & 0xffffff00) == REQ_CHANGE_PROTO) {
+					c->proto = msg & 0xff;
+
+					/* if the client requests a protocol version higher than the
+					 * daemon supports, return the maximum supported version and
+					 * switch to that.
+					 */
+					if(c->proto > MAX_PROTO_VER) {
+						c->proto = MAX_PROTO_VER;
+						msg = REQ_CHANGE_PROTO | MAX_PROTO_VER;
+						write(s, &msg, sizeof msg);
+					}
+					continue;
+				}
+
+				switch(c->proto) {
+				case 0:
+					/* protocol v0: only sensitivity comes from clients */
+					sens = *(float*)&msg;
+					if(isfinite(sens)) {
+						set_client_sensitivity(c, sens);
+					}
+					break;
+
+				case 1:
+					/* protocol v1: accumulate request bytes, and process */
+					reqbytes += read(s, reqbuf + reqbytes, sizeof *req - reqbytes);
+					if(reqbytes >= sizeof *req) {
+						reqbytes = 0;
+						req = (struct reqresp*)reqbuf;
+						if(handle_request(c, req) == -1) {
+							close(s);
+							remove_client(c);
+						}
+					}
+					break;
+				}
 			}
 		}
+	}
+
+	return 0;
+}
+
+static int sendresp(struct client *c, struct reqresp *rr, int status)
+{
+	rr->data[6] = status;
+	return write(get_client_socket(c), rr, sizeof *rr);
+}
+
+static int handle_request(struct client *c, struct reqresp *req)
+{
+	int i;
+	float fval, fvec[6];
+	struct device *dev;
+
+	switch(req->type) {
+	case REQ_SET_SENS:
+		fval = *(float*)req->data;
+		if(isfinite(fval)) {
+			set_client_sensitivity(c, fval);
+			sendresp(c, req, 0);
+		} else {
+			logmsg(LOG_WARNING, "client attempted to set invalid client sensitivity\n");
+			sendresp(c, req, -1);
+		}
+		break;
+
+	case REQ_GET_SENS:
+		fval = get_client_sensitivity(c);
+		req->data[0] = *(int*)&fval;
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_DEV_NAME:
+		if((dev = get_client_device(c))) {
+			req->data[0] = strlen(dev->name);
+			sendresp(c, req, 0);
+			write(get_client_socket(c), dev->name, req->data[0]);
+		} else {
+			sendresp(c, req, -1);
+		}
+		break;
+
+	case REQ_DEV_PATH:
+		if((dev = get_client_device(c))) {
+			req->data[0] = strlen(dev->name);
+			sendresp(c, req, 0);
+			write(get_client_socket(c), dev->path, req->data[0]);
+		} else {
+			sendresp(c, req, -1);
+		}
+		break;
+
+	case REQ_DEV_NAXES:
+		if((dev = get_client_device(c))) {
+			req->data[0] = dev->num_axes;
+			sendresp(c, req, 0);
+		} else {
+			sendresp(c, req, -1);
+		}
+		break;
+
+	case REQ_DEV_NBUTTONS:
+		if((dev = get_client_device(c))) {
+			req->data[0] = dev->num_buttons;
+			sendresp(c, req, 0);
+		} else {
+			sendresp(c, req, -1);
+		}
+		break;
+
+	case REQ_SCFG_SENS:
+		fval = *(float*)req->data;
+		if(isfinite(fval)) {
+			cfg.sensitivity = fval;
+			sendresp(c, req, 0);
+		} else {
+			logmsg(LOG_WARNING, "client attempted to set invalid global sensitivity\n");
+			sendresp(c, req, -1);
+		}
+		break;
+
+	case REQ_GCFG_SENS:
+		req->data[0] = *(int*)&cfg.sensitivity;
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_SENS_AXIS:
+		for(i=0; i<6; i++) {
+			fvec[i] = ((float*)req->data)[i];
+			if(!isfinite(fvec[i])) {
+				logmsg(LOG_WARNING, "client attempted to set invalid axis %d sensitivity\n", i);
+				sendresp(c, req, -1);
+				return 0;
+			}
+		}
+		for(i=0; i<3; i++) {
+			cfg.sens_trans[i] = fvec[i];
+			cfg.sens_rot[i] = fvec[i + 3];
+		}
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GCFG_SENS_AXIS:
+		for(i=0; i<3; i++) {
+			req->data[i] = *(int*)(cfg.sens_trans + i);
+			req->data[i + 3] = *(int*)(cfg.sens_rot + i);
+		}
+		sendresp(c, req, 0);
+		break;
+
+		/* TODO ... more */
+
+	default:
+		logmsg(LOG_WARNING, "invalid client request: %04xh\n", (unsigned int)req->type);
+		sendresp(c, req, -1);
 	}
 
 	return 0;

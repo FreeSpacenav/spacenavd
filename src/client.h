@@ -31,8 +31,22 @@ enum {
 	CLIENT_UNIX		/* through the new UNIX domain socket */
 };
 
+struct device;
 
-struct client;
+struct client {
+	int type;
+
+	int sock;	/* UNIX domain socket */
+	int proto;	/* protocol version */
+#ifdef USE_X11
+	Window win;	/* X11 client window */
+#endif
+
+	float sens;	/* sensitivity */
+	struct device *dev;
+
+	struct client *next;
+};
 
 struct client *add_client(int type, void *cdata);
 void remove_client(struct client *client);
@@ -46,8 +60,8 @@ Window get_client_window(struct client *client);
 void set_client_sensitivity(struct client *client, float sens);
 float get_client_sensitivity(struct client *client);
 
-void set_client_device_index(struct client *client, int dev_idx);
-int get_client_device_index(struct client *client);
+void set_client_device(struct client *client, struct device *dev);
+struct device *get_client_device(struct client *client);
 
 /* these two can be used to iterate over all clients */
 struct client *first_client(void);

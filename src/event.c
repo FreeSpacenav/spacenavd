@@ -278,7 +278,7 @@ void repeat_last_event(struct device *dev)
 static void dispatch_event(struct dev_event *dev_ev)
 {
 	struct client *c, *client_iter;
-	int dev_idx;
+	struct device *client_dev;
 
 	if(dev_ev->event.type == EVENT_MOTION) {
 		struct timeval tv;
@@ -288,13 +288,18 @@ static void dispatch_event(struct dev_event *dev_ev)
 		dev_ev->timeval = tv;
 	}
 
-	dev_idx = get_device_index(dev_ev->dev);
 	client_iter = first_client();
 	while(client_iter) {
 		c = client_iter;
 		client_iter = next_client();
-		if(get_client_device_index(c) <= dev_idx) /* use <= until API changes, else == */
+
+		/* if the client has selected a single device to get input from, then
+		 * don't send the event if it originates from a different device
+		 */
+		client_dev = get_client_device(c);
+		if(!client_dev || client_dev == dev_ev->dev) {
 			send_event(&dev_ev->event, c);
+		}
 	}
 }
 
