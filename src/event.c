@@ -16,6 +16,8 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
+#define CFGFILE		"/etc/spnavrc"
+
 #include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -239,6 +241,9 @@ static void handle_button_action(int act, int pressed)
 			cfg.disable_rotation = !cfg.disable_rotation;
 			if (cfg.disable_rotation)
 				cfg.disable_translation = 0;
+			if(write_cfg(CFGFILE, &cfg) == -1) {
+				fprintf(stderr, "failed to update config file\n");
+			}
 		}
 		break;
 	case BNACT_DISABLE_TRANSLATION:
@@ -246,6 +251,9 @@ static void handle_button_action(int act, int pressed)
 			cfg.disable_translation = !cfg.disable_translation;
 			if (cfg.disable_translation)
 				cfg.disable_rotation = 0;
+			if(write_cfg(CFGFILE, &cfg) == -1) {
+				fprintf(stderr, "failed to update config file\n");
+			}
 		}
 		break;
 	}
