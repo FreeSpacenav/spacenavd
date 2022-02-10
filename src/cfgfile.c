@@ -68,6 +68,8 @@ void default_cfg(struct cfg *cfg)
 		cfg->devname[i] = 0;
 		cfg->devid[i][0] = cfg->devid[i][1] = -1;
 	}
+	cfg->disable_translation = 0;
+	cfg->disable_rotation = 0;
 }
 
 #define EXPECT(cond) \
@@ -194,6 +196,14 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "sensitivity-rotation-z") == 0) {
 			EXPECT(isfloat);
 			cfg->sens_rot[2] = fval;
+
+		} else if(strcmp(key_str, "disable-rotation") == 0) {
+			EXPECT(isint);
+			cfg->disable_rotation = ival;
+
+		} else if(strcmp(key_str, "disable-translation") == 0) {
+			EXPECT(isint);
+			cfg->disable_translation = ival;
 
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			if(strchr(val_str, 'x')) {
@@ -380,6 +390,10 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	}
 	fputc('\n', fp);
 
+	fprintf(fp, "disable-rotation = %d\n", cfg->disable_rotation);
+	fprintf(fp, "disable-translation = %d\n", cfg->disable_translation);
+	fputc('\n', fp);
+
 	fprintf(fp, "# dead zone; any motion less than this number, is discarded as noise.\n");
 
 	if(cfg->dead_threshold[0] == cfg->dead_threshold[1] && cfg->dead_threshold[1] == cfg->dead_threshold[2] && cfg->dead_threshold[2] == cfg->dead_threshold[3] && cfg->dead_threshold[3] == cfg->dead_threshold[4] && cfg->dead_threshold[4] == cfg->dead_threshold[5]) {
@@ -495,6 +509,8 @@ static struct {
 	{"sensitivity-up", BNACT_SENS_INC},
 	{"sensitivity-down", BNACT_SENS_DEC},
 	{"sensitivity-reset", BNACT_SENS_RESET},
+	{"disable-rotation", BNACT_DISABLE_ROTATION},
+	{"disable-translation", BNACT_DISABLE_TRANSLATION},
 	{0, 0}
 };
 
