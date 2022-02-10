@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "spnavd.h"
 
 static int parse_bnact(const char *s);
+static const char* str_bnact(const int idx);
 
 enum {TX, TY, TZ, RX, RY, RZ};
 
@@ -356,6 +357,7 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	int i, wrote_comment;
 	FILE *fp;
 	struct flock flk;
+	char * btn_act_name;
 
 	if(!(fp = fopen(fname, "w"))) {
 		logmsg(LOG_ERR, "failed to write config file %s: %s\n", fname, strerror(errno));
@@ -460,6 +462,23 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		fputc('\n', fp);
 	}
 
+	wrote_comment = 0;
+	for(i=0; i<MAX_BUTTONS; i++) {
+		if(cfg->bnact[i]) {
+			btn_act_name = str_bnact(cfg->bnact[i]);
+			if(btn_act_name) {
+				if(!wrote_comment) {
+					fprintf(fp, "# bnactN = <action>\n");
+					wrote_comment = 1;
+				}
+				fprintf(fp, "bnact%d = %s\n", i, btn_act_name);
+			}
+		}
+	}
+	if(wrote_comment) {
+		fputc('\n', fp);
+	}
+
 	fprintf(fp, "# led status: on, off, or auto (turn on when a client is connected)\n");
 	fprintf(fp, "led = %s\n\n", (cfg->led ? (cfg->led == LED_AUTO ? "auto" : "on") : "off"));
 
@@ -523,4 +542,15 @@ static int parse_bnact(const char *s)
 		}
 	}
 	return -1;
+}
+
+static const char* str_bnact(const int idx)
+{
+	int i;
+	for(i=0; i < MAX_BNACT; i++) {
+		if(bnact_strtab[i].act == idx) {
+			return bnact_strtab[i].name;
+		}
+	}
+	return NULL;
 }
