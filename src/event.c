@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2013 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -55,6 +55,9 @@ static void send_event(spnav_event *ev, struct client *c);
 static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
 
 static struct dev_event *dev_ev_list = NULL;
+
+static int disable_translation, disable_rotation;
+
 
 static struct dev_event *add_dev_event(struct device *dev)
 {
@@ -143,8 +146,8 @@ void process_input(struct device *dev, struct dev_input *inp)
 		}
 		sign = cfg.invert[inp->idx] ? -1 : 1;
 
-		sens_rot = cfg.disable_rotation ? 0 : cfg.sens_rot[inp->idx - 3];
-		sens_trans = cfg.disable_translation ? 0 : cfg.sens_trans[inp->idx];
+		sens_rot = disable_rotation ? 0 : cfg.sens_rot[inp->idx - 3];
+		sens_trans = disable_translation ? 0 : cfg.sens_trans[inp->idx];
 
 		inp->val = (int)((float)inp->val * cfg.sensitivity * (inp->idx < 3 ? sens_trans : sens_rot));
 
@@ -224,6 +227,8 @@ void process_input(struct device *dev, struct dev_input *inp)
 
 static void handle_button_action(int act, int pressed)
 {
+	if(pressed) return;	/* perform all actions on release */
+
 	switch(act) {
 	case BNACT_SENS_INC:
 		cfg.sensitivity *= 1.1f;
@@ -235,17 +240,15 @@ static void handle_button_action(int act, int pressed)
 		cfg.sensitivity = 1.0f;
 		break;
 	case BNACT_DISABLE_ROTATION:
-		if(pressed == BTN_RELEASE) {
-			cfg.disable_rotation = !cfg.disable_rotation;
-			if (cfg.disable_rotation)
-				cfg.disable_translation = 0;
+		disable_rotation = !disable_rotation;
+		if(disable_rotation) {
+			disable_translation = 0;
 		}
 		break;
 	case BNACT_DISABLE_TRANSLATION:
-		if(pressed == BTN_RELEASE) {
-			cfg.disable_translation = !cfg.disable_translation;
-			if (cfg.disable_translation)
-				cfg.disable_rotation = 0;
+		disable_translation = !disable_translation;
+		if(disable_translation) {
+			disable_rotation = 0;
 		}
 		break;
 	}

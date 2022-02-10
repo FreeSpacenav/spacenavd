@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -45,8 +45,6 @@ enum {
 
 struct cfg {
 	float sensitivity, sens_trans[3], sens_rot[3];
-	int disable_rotation;
-	int disable_translation;
 	int dead_threshold[MAX_AXES];
 	int invert[MAX_AXES];
 	int map_axis[MAX_AXES];

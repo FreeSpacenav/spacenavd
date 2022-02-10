@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -68,8 +68,6 @@ void default_cfg(struct cfg *cfg)
 		cfg->devname[i] = 0;
 		cfg->devid[i][0] = cfg->devid[i][1] = -1;
 	}
-	cfg->disable_translation = 0;
-	cfg->disable_rotation = 0;
 }
 
 #define EXPECT(cond) \
@@ -196,14 +194,6 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "sensitivity-rotation-z") == 0) {
 			EXPECT(isfloat);
 			cfg->sens_rot[2] = fval;
-
-		} else if(strcmp(key_str, "disable-rotation") == 0) {
-			EXPECT(isint);
-			cfg->disable_rotation = ival;
-
-		} else if(strcmp(key_str, "disable-translation") == 0) {
-			EXPECT(isint);
-			cfg->disable_translation = ival;
 
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			if(strchr(val_str, 'x')) {
@@ -388,10 +378,6 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		fprintf(fp, "sensitivity-rotation-y = %.3f\n", cfg->sens_rot[1]);
 		fprintf(fp, "sensitivity-rotation-z = %.3f\n", cfg->sens_rot[2]);
 	}
-	fputc('\n', fp);
-
-	fprintf(fp, "disable-rotation = %d\n", cfg->disable_rotation);
-	fprintf(fp, "disable-translation = %d\n", cfg->disable_translation);
 	fputc('\n', fp);
 
 	fprintf(fp, "# dead zone; any motion less than this number, is discarded as noise.\n");
