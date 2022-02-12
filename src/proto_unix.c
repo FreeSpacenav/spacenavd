@@ -203,7 +203,13 @@ int handle_uevents(fd_set *rset)
 
 				case 1:
 					/* protocol v1: accumulate request bytes, and process */
-					c->reqbytes += read(s, c->reqbuf + c->reqbytes, sizeof *req - c->reqbytes);
+					while((rdbytes = read(s, c->reqbuf + c->reqbytes, sizeof *req - c->reqbytes)) <= 0 && errno == EINTR);
+					if(rdbytes <= 0) {
+						close(s);
+						remove_client(c);
+						continue;
+					}
+					c->reqbytes += rdbytes;
 					if(c->reqbytes >= sizeof *req) {
 						req = (struct reqresp*)c->reqbuf;
 						/*
