@@ -27,49 +27,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#include "proto.h"
 #include "proto_unix.h"
 #include "spnavd.h"
 
-/* maximum supported protocol version */
-#define MAX_PROTO_VER	1
-
-struct reqresp {
-	int type;
-	int data[7];
-};
-
-/* REQ_S* are set, REQ_G* are get requests.
- * Quick-reference for request-response data in the comments next to each
- * request: Q[n] defines request data item n, R[n] defines response data item n
- *
- * status responses are 0 for success, non-zero for failure
- */
-enum {
-	/* per-client settings */
-	REQ_SET_SENS,			/* set client sensitivity:	Q[0] float - R[6] status */
-	REQ_GET_SENS,			/* get client sensitivity:	R[0] float R[6] status */
-
-	/* device queries */
-	REQ_DEV_NAME = 0x1000,	/* get device name:	R[0] length R[6] status followed
-							   by <length> bytes */
-	REQ_DEV_PATH,			/* get device path: same as above */
-	REQ_DEV_NAXES,			/* get number of axes:		R[0] num axes R[6] status */
-	REQ_DEV_NBUTTONS,		/* get number of buttons: same as above */
-	/* TODO: features like LCD, LEDs ... */
-
-	/* configuration settings */
-	REQ_SCFG_SENS = 0x2000,	/* set global sensitivity:	Q[0] float - R[6] status */
-	REQ_GCFG_SENS,			/* get global sens:			R[0] float R[6] status */
-	REQ_SCFG_SENS_AXIS,		/* set per-axis sens/ty:	Q[0-5] values - R[6] status */
-	REQ_GCFG_SENS_AXIS,		/* get per-axis sens/ty:	R[0-5] values R[6] status */
-	REQ_SCFG_DEADZONE,		/* set deadzones:			Q[0-5] values - R[6] status */
-	REQ_GCFG_DEADZONE,		/* get deadzones:			R[0-5] values R[6] status */
-	REQ_SCFG_INVERT,		/* set invert axes:			Q[0-5] invert - R[6] status */
-	REQ_GCFG_INVERT,		/* get invert axes:			R[0-5] invert R[6] status */
-	/* TODO ... more */
-
-	REQ_CHANGE_PROTO	= 0x7faa5500
-};
 
 enum {
 	UEV_TYPE_MOTION,
@@ -172,8 +133,6 @@ void send_uevent(spnav_event *ev, struct client *c)
 int handle_uevents(fd_set *rset)
 {
 	struct client *citer;
-	static char reqbuf[64];
-	static int reqbytes;
 	struct reqresp *req;
 
 	if(lsock == -1) {
@@ -210,34 +169,31 @@ int handle_uevents(fd_set *rset)
 				float sens;
 
 				/* handle client requests */
-
-				while((rdbytes = read(s, &msg, sizeof msg)) <= 0 && errno == EINTR);
-				if(rdbytes <= 0) {	/* something went wrong... disconnect client */
-					close(get_client_socket(c));
-					remove_client(c);
-					continue;
-				}
-
-				/* only handle magic NaN protocol change requests, when the
-				 * client is operating in protocol 0 mode
-				 */
-				if(c->proto == 0 && (msg & 0xffffff00) == REQ_CHANGE_PROTO) {
-					c->proto = msg & 0xff;
-
-					/* if the client requests a protocol version higher than the
-					 * daemon supports, return the maximum supported version and
-					 * switch to that.
-					 */
-					if(c->proto > MAX_PROTO_VER) {
-						c->proto = MAX_PROTO_VER;
-						msg = REQ_CHANGE_PROTO | MAX_PROTO_VER;
-						write(s, &msg, sizeof msg);
-					}
-					continue;
-				}
-
 				switch(c->proto) {
 				case 0:
+					while((rdbytes = read(s, &msg, sizeof msg)) <= 0 && errno == EINTR);
+					if(rdbytes <= 0) {	/* something went wrong... disconnect client */
+						close(get_client_socket(c));
+						remove_client(c);
+						continue;
+					}
+
+					/* handle magic NaN protocol change requests */
+					if((msg & 0xffffff00) == (REQ_TAG | REQ_CHANGE_PROTO)) {
+						c->proto = msg & 0xff;
+
+						/* if the client requests a protocol version higher than the
+						 * daemon supports, return the maximum supported version and
+						 * switch to that.
+						 */
+						if(c->proto > MAX_PROTO_VER) {
+							c->proto = MAX_PROTO_VER;
+							msg = REQ_TAG | REQ_CHANGE_PROTO | MAX_PROTO_VER;
+						}
+						write(s, &msg, sizeof msg);
+						continue;
+					}
+
 					/* protocol v0: only sensitivity comes from clients */
 					sens = *(float*)&msg;
 					if(isfinite(sens)) {
@@ -247,10 +203,15 @@ int handle_uevents(fd_set *rset)
 
 				case 1:
 					/* protocol v1: accumulate request bytes, and process */
-					reqbytes += read(s, reqbuf + reqbytes, sizeof *req - reqbytes);
-					if(reqbytes >= sizeof *req) {
-						reqbytes = 0;
-						req = (struct reqresp*)reqbuf;
+					c->reqbytes += read(s, c->reqbuf + c->reqbytes, sizeof *req - c->reqbytes);
+					if(c->reqbytes >= sizeof *req) {
+						req = (struct reqresp*)c->reqbuf;
+						/*
+						logmsg(LOG_INFO, "DBG REQ (%d): %x - %x %x %x %x %x %x %x\n", c->reqbytes,
+								req->type, req->data[0], req->data[1], req->data[2],
+								req->data[3], req->data[4], req->data[5], req->data[6]);
+						*/
+						c->reqbytes = 0;
 						if(handle_request(c, req) == -1) {
 							close(s);
 							remove_client(c);
@@ -277,7 +238,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 	float fval, fvec[6];
 	struct device *dev;
 
-	switch(req->type) {
+	switch(req->type & 0xffff) {
 	case REQ_SET_SENS:
 		fval = *(float*)req->data;
 		if(isfinite(fval)) {

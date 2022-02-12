@@ -48,7 +48,7 @@ struct client *add_client(int type, void *cdata)
 		return 0;
 	}
 
-	if(!(client = malloc(sizeof *client))) {
+	if(!(client = calloc(1, sizeof *client))) {
 		return 0;
 	}
 
