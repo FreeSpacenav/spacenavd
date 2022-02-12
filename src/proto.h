@@ -40,7 +40,21 @@ enum {
 	REQ_GCFG_DEADZONE,		/* get deadzones:			R[0-5] values R[6] status */
 	REQ_SCFG_INVERT,		/* set invert axes:			Q[0-5] invert - R[6] status */
 	REQ_GCFG_INVERT,		/* get invert axes:			R[0-5] invert R[6] status */
+	REQ_SCFG_AXISMAP,		/* set axis mapping:        Q[0-5] map - R[6] status */
+	REQ_GCFG_AXISMAP,		/* get axis mapping:		R[0-5] map R[6] status */
+	REQ_SCFG_BNMAP,			/* set button mapping:		Q[0] hw bidx Q[1] map bidx - R[6] status */
+	REQ_GCFG_BNMAP,			/* get button mapping:		Q[0] hw bidx - R[0] hw bidx R[1] map bidx R[6] status */
+	REQ_SCFG_BNACTION,		/* set button action:		Q[0] bidx Q[1] action - R[6] status */
+	REQ_GCFG_BNACTION,		/* get button action:		Q[0] bidx - R[0] bidx R[1] action R[6] status */
+	REQ_SCFG_KBMAP,			/* set keyboard mapping:	Q[0] bidx Q[1] keysym - R[6] status */
+	REQ_GCFG_KBMAP,			/* get keyboard mapping:	Q[0] bidx - R[0] bidx R[1] keysym R[6] status */
+	REQ_SCFG_LED,			/* set LED state:			Q[0] state - R[6] status */
+	REQ_GCFG_LED,			/* get LED state:			R[0] state R[6] status */
+	REQ_SCFG_SERDEV,		/* set serial device path:	Q[0] length, followed by <length> bytes - R[6] status */
+	REQ_GCFG_SERDEV,		/* get serial device path:	R[0] length R[6] status, followed by <length> bytes */
 	/* TODO ... more */
+	REQ_CFG_SAVE = 0x3ffe,	/* save config file:        R[6] status */
+	REQ_CFG_RESTORE,		/* load config from file:   R[6] status */
 
 	REQ_CHANGE_PROTO	= 0x5500
 };

@@ -340,7 +340,47 @@ static int handle_request(struct client *c, struct reqresp *req)
 		sendresp(c, req, 0);
 		break;
 
-		/* TODO ... more */
+	case REQ_SCFG_DEADZONE:
+		for(i=0; i<6; i++) {
+			if(req->data[i] < 0) {
+				logmsg(LOG_WARNING, "client attempted to set invalid deadzone for axis %d: %d\n", i,
+						req->data[i]);
+				sendresp(c, req, -1);
+				return 0;
+			}
+		}
+		memcpy(cfg.dead_threshold, req->data, sizeof cfg.dead_threshold);
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GCFG_DEADZONE:
+		memcpy(req->data, cfg.dead_threshold, sizeof cfg.dead_threshold);
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_INVERT:
+		for(i=0; i<6; i++) {
+			cfg.invert[i] = req->data ? 1 : 0;
+		}
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GCFG_INVERT:
+		memcpy(req->data, cfg.invert, sizeof cfg.invert);
+		sendresp(c, req, 0);
+		break;
+
+		/* TODO continue .... */
+
+	case REQ_SCFG_LED:
+		cfg.led = req->data[0] ? 1 : 0;
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GCFG_LED:
+		req->data[0] = cfg.led;
+		sendresp(c, req, 0);
+		break;
 
 	default:
 		logmsg(LOG_WARNING, "invalid client request: %04xh\n", (unsigned int)req->type);
