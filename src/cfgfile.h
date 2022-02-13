@@ -31,7 +31,7 @@ enum {
 	LED_AUTO	= 2
 };
 
-/* button actions */
+/* button actions (XXX: must correspond to SPNAV_BNACT_* in libspnav) */
 enum {
 	BNACT_NONE,
 	BNACT_SENS_RESET,

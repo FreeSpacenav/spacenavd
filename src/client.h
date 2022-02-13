@@ -45,6 +45,8 @@ struct client {
 	float sens;	/* sensitivity */
 	struct device *dev;
 
+	char name[32];
+
 	char reqbuf[64];
 	int reqbytes;
 

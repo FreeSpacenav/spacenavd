@@ -20,7 +20,8 @@ struct reqresp {
  */
 enum {
 	/* per-client settings */
-	REQ_SET_SENS = REQ_BASE,/* set client sensitivity:	Q[0] float - R[6] status */
+	REQ_SET_NAME = REQ_BASE,/* set client name: Q[0-6] name - R[6] status */
+	REQ_SET_SENS,			/* set client sensitivity:	Q[0] float - R[6] status */
 	REQ_GET_SENS,			/* get client sensitivity:	R[0] float R[6] status */
 
 	/* device queries */
@@ -40,10 +41,10 @@ enum {
 	REQ_GCFG_DEADZONE,		/* get deadzones:			R[0-5] values R[6] status */
 	REQ_SCFG_INVERT,		/* set invert axes:			Q[0-5] invert - R[6] status */
 	REQ_GCFG_INVERT,		/* get invert axes:			R[0-5] invert R[6] status */
-	REQ_SCFG_AXISMAP,		/* set axis mapping:        Q[0-5] map - R[6] status */
-	REQ_GCFG_AXISMAP,		/* get axis mapping:		R[0-5] map R[6] status */
-	REQ_SCFG_BNMAP,			/* set button mapping:		Q[0] hw bidx Q[1] map bidx - R[6] status */
-	REQ_GCFG_BNMAP,			/* get button mapping:		Q[0] hw bidx - R[0] hw bidx R[1] map bidx R[6] status */
+	REQ_SCFG_AXISMAP,		/* set axis mapping:        Q[0] dev axis Q[1] mapping - R[6] status */
+	REQ_GCFG_AXISMAP,		/* get axis mapping:		Q[0] dev axis - R[0] dev axis R[1] mapping R[6] status */
+	REQ_SCFG_BNMAP,			/* set button mapping:		Q[0] dev bidx Q[1] map bidx - R[6] status */
+	REQ_GCFG_BNMAP,			/* get button mapping:		Q[0] dev bidx - R[0] dev bidx R[1] map bidx R[6] status */
 	REQ_SCFG_BNACTION,		/* set button action:		Q[0] bidx Q[1] action - R[6] status */
 	REQ_GCFG_BNACTION,		/* get button action:		Q[0] bidx - R[0] bidx R[1] action R[6] status */
 	REQ_SCFG_KBMAP,			/* set keyboard mapping:	Q[0] bidx Q[1] keysym - R[6] status */

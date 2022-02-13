@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 void kbemu_set_display(Display *dpy);
 KeySym kbemu_keysym(const char *str);
+const char *kbemu_keyname(KeySym sym);
 
 void send_kbevent(KeySym key, int press);
 

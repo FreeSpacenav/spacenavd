@@ -53,6 +53,11 @@ KeySym kbemu_keysym(const char *str)
 	return XStringToKeysym(str);
 }
 
+const char *kbemu_keyname(KeySym sym)
+{
+	return XKeysymToString(sym);
+}
+
 void send_kbevent(KeySym key, int press)
 {
 	XEvent xevent;

@@ -30,6 +30,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto.h"
 #include "proto_unix.h"
 #include "spnavd.h"
+#ifdef USE_X11
+#include "kbemu.h"
+#endif
 
 
 enum {
@@ -238,13 +241,24 @@ static int sendresp(struct client *c, struct reqresp *rr, int status)
 	return write(get_client_socket(c), rr, sizeof *rr);
 }
 
+#define AXIS_VALID(x)	((x) >= 0 && (x) < MAX_AXES)
+#define BN_VALID(x)		((x) >= 0 && (x) < MAX_BUTTONS)
+#define BNACT_VALID(x)	((x) >= 0 && (x) < MAX_BNACT)
+
 static int handle_request(struct client *c, struct reqresp *req)
 {
-	int i;
+	int i, idx;
 	float fval, fvec[6];
 	struct device *dev;
+	const char *str = 0;
 
 	switch(req->type & 0xffff) {
+	case REQ_SET_NAME:
+		memcpy(c->name, req->data, sizeof req->data);
+		c->name[sizeof req->data] = 0;
+		logmsg(LOG_INFO, "client name: %s\n", c->name);
+		break;
+
 	case REQ_SET_SENS:
 		fval = *(float*)req->data;
 		if(isfinite(fval)) {
@@ -370,7 +384,111 @@ static int handle_request(struct client *c, struct reqresp *req)
 		sendresp(c, req, 0);
 		break;
 
-		/* TODO continue .... */
+	case REQ_SCFG_AXISMAP:
+		if(!AXIS_VALID(req->data[0]) || req->data[1] < 0 || req->data[1] >= 6) {
+			logmsg(LOG_WARNING, "client attempted to set invalid axis mapping: %d -> %d\n",
+					req->data[0], req->data[1]);
+			sendresp(c, req, -1);
+			return 0;
+		}
+		cfg.map_axis[req->data[0]] = req->data[1];
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GCFG_AXISMAP:
+		if(!AXIS_VALID(req->data[0])) {
+			logmsg(LOG_WARNING, "client queried mapping of invalid axis: %d\n",
+					req->data[0]);
+			sendresp(c, req, -1);
+			return 0;
+		}
+		req->data[1] = cfg.map_axis[req->data[0]];
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_BNMAP:
+		if(!BN_VALID(req->data[0]) || !BN_VALID(req->data[1])) {
+			logmsg(LOG_WARNING, "client attempted to set invalid button mapping: %d -> %d\n",
+					req->data[0], req->data[1]);
+			sendresp(c, req, -1);
+			return 0;
+		}
+		cfg.map_button[req->data[0]] = req->data[1];
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GCFG_BNMAP:
+		if(!BN_VALID(req->data[0])) {
+			logmsg(LOG_WARNING, "client queried mapping of invalid button: %d\n", req->data[0]);
+			sendresp(c, req, -1);
+			return 0;
+		}
+		req->data[1] = cfg.map_button[req->data[0]];
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_BNACTION:
+		if(!BN_VALID(req->data[0]) || !BNACT_VALID(req->data[1])) {
+			logmsg(LOG_WARNING, "client attempted to set invalid button action: %d -> %d\n",
+					req->data[0], req->data[1]);
+			sendresp(c, req, -1);
+			return 0;
+		}
+		cfg.bnact[req->data[0]] = req->data[1];
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GCFG_BNACTION:
+		if(!BN_VALID(req->data[0])) {
+			logmsg(LOG_WARNING, "client queried action bound to invalid button: %d\n", req->data[0]);
+			sendresp(c, req, -1);
+			return 0;
+		}
+		req->data[1] = cfg.bnact[req->data[0]];
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_KBMAP:
+#ifdef USE_X11
+		idx = req->data[0];
+		if(!BN_VALID(idx) || (req->data[1] && !(str = kbemu_keyname(req->data[1])))) {
+			logmsg(LOG_WARNING, "client attempted to set invalid key map: %d -> %x\n",
+					idx, (unsigned int)req->data[1]);
+			sendresp(c, req, -1);
+			return 0;
+		}
+		cfg.kbmap[idx] = req->data[1];
+		free(cfg.kbmap_str[idx]);
+		cfg.kbmap_str[idx] = req->data[1] ? strdup(str) : 0;
+		sendresp(c, req, 0);
+#else
+		logmsg(LOG_WARNING, "unable to set keyboard mappings, daemon compiled without X11 support\n");
+		sendresp(c, req, -1);
+#endif
+		break;
+
+	case REQ_GCFG_KBMAP:
+#ifdef USE_X11
+		idx = req->data[0];
+		if(!BN_VALID(idx)) {
+			logmsg(LOG_WARNING, "client queried keyboard mapping for invalid button: %d\n", idx);
+			sendresp(c, req, -1);
+			return 0;
+		}
+		if(cfg.kbmap_str[idx]) {
+			if(!cfg.kbmap[idx]) {
+				cfg.kbmap[idx] = kbemu_keysym(cfg.kbmap_str[idx]);
+			}
+			req->data[1] = cfg.kbmap[idx];
+		} else {
+			req->data[1] = 0;
+		}
+		sendresp(c, req, 0);
+#else
+		logmsg(LOG_WARNING, "unable to query keyboard mappings, daemon compiled without X11 support\n");
+		sendresp(c, req, -1);
+#endif
+		break;
 
 	case REQ_SCFG_LED:
 		cfg.led = req->data[0] ? 1 : 0;
