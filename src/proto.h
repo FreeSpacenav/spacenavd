@@ -51,6 +51,8 @@ enum {
 	REQ_GCFG_KBMAP,			/* get keyboard mapping:	Q[0] bidx - R[0] bidx R[1] keysym R[6] status */
 	REQ_SCFG_LED,			/* set LED state:			Q[0] state - R[6] status */
 	REQ_GCFG_LED,			/* get LED state:			R[0] state R[6] status */
+	REQ_SCFG_GRAB,			/* set device grabbing:		Q[0] state - R[6] status */
+	REQ_GCFG_GRAB,			/* get device grabbing:		R[0] state R[6] status */
 	REQ_SCFG_SERDEV,		/* set serial device path:	Q[0] length, followed by <length> bytes - R[6] status */
 	REQ_GCFG_SERDEV,		/* get serial device path:	R[0] length R[6] status, followed by <length> bytes */
 	/* TODO ... more */

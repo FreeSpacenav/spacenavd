@@ -492,11 +492,24 @@ static int handle_request(struct client *c, struct reqresp *req)
 
 	case REQ_SCFG_LED:
 		cfg.led = req->data[0] ? 1 : 0;
+		if((dev = get_client_device(c)) && dev->set_led) {
+			dev->set_led(dev, cfg.led);
+		}
 		sendresp(c, req, 0);
 		break;
 
 	case REQ_GCFG_LED:
 		req->data[0] = cfg.led;
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_GRAB:
+		cfg.grab_device = req->data[0] ? 1 : 0;
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GCFG_GRAB:
+		req->data[0] = cfg.grab_device;
 		sendresp(c, req, 0);
 		break;
 
