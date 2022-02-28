@@ -363,24 +363,24 @@ static int handle_request(struct client *c, struct reqresp *req)
 				return 0;
 			}
 		}
-		memcpy(cfg.dead_threshold, req->data, sizeof cfg.dead_threshold);
+		memcpy(cfg.dead_threshold, req->data, 6 * sizeof(int));
 		sendresp(c, req, 0);
 		break;
 
 	case REQ_GCFG_DEADZONE:
-		memcpy(req->data, cfg.dead_threshold, sizeof cfg.dead_threshold);
+		memcpy(req->data, cfg.dead_threshold, 6 * sizeof(int));
 		sendresp(c, req, 0);
 		break;
 
 	case REQ_SCFG_INVERT:
 		for(i=0; i<6; i++) {
-			cfg.invert[i] = req->data ? 1 : 0;
+			cfg.invert[i] = req->data[i] ? 1 : 0;
 		}
 		sendresp(c, req, 0);
 		break;
 
 	case REQ_GCFG_INVERT:
-		memcpy(req->data, cfg.invert, sizeof cfg.invert);
+		memcpy(req->data, cfg.invert, 6 * sizeof(int));
 		sendresp(c, req, 0);
 		break;
 
