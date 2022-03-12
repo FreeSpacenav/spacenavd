@@ -49,7 +49,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 
 
-struct cfg cfg;
+struct cfg cfg, prev_cfg;
+extern char *cfgfile;		/* defined in spnavd.c */
+
 int verbose;
+
+void cfg_changed(void);
 
 #endif	/* SPNAVD_H_ */

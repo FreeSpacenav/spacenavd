@@ -47,8 +47,9 @@ static void handle_events(fd_set *rset);
 static void sig_handler(int s);
 static char *fix_path(char *str);
 
-static char *cfgfile = DEF_CFGFILE;
+char *cfgfile = DEF_CFGFILE;
 static char *logfile = DEF_LOGFILE;
+static int pfd[2];
 
 int main(int argc, char **argv)
 {
@@ -146,6 +147,8 @@ int main(int argc, char **argv)
 	logmsg(LOG_INFO, "Spacenav daemon " VERSION "\n");
 
 	read_cfg(cfgfile, &cfg);
+	prev_cfg = cfg;
+	pipe(pfd);
 
 	signal(SIGINT, sig_handler);
 	signal(SIGTERM, sig_handler);
@@ -213,6 +216,10 @@ int main(int argc, char **argv)
 			if(fd > max_fd) max_fd = fd;
 		}
 #endif
+
+		/* also the self-pipe read-end for safe SIGHUP handling */
+		FD_SET(pfd[0], &rset);
+		if(pfd[0] > max_fd) max_fd = fd;
 
 		do {
 			/* if there is at least one device out of the deadzone and repeat is enabled
@@ -389,6 +396,15 @@ static void handle_events(fd_set *rset)
 	struct device *dev;
 	struct dev_input inp;
 
+	/* handle signal pipe */
+	if(FD_ISSET(pfd[0], rset)) {
+		int tmp;
+		read(pfd[0], &tmp, sizeof tmp);	/* eat up the junk char */
+
+		read_cfg(cfgfile, &cfg);
+		cfg_changed();
+	}
+
 	/* handle anything coming through the UNIX socket */
 	handle_uevents(rset);
 
@@ -422,28 +438,32 @@ static void handle_events(fd_set *rset)
 	}
 }
 
+void cfg_changed(void)
+{
+	if(cfg.led != prev_cfg.led) {
+		struct device *dev = get_devices();
+		while(dev) {
+			if(is_device_valid(dev)) {
+				if(verbose) {
+					logmsg(LOG_INFO, "turn led %s, device: %s\n", cfg.led ? "on": "off", dev->name);
+				}
+				set_device_led(dev, cfg.led);
+			}
+			dev = dev->next;
+		}
+	}
+
+	prev_cfg = cfg;
+}
+
 /* signals usr1 & usr2 are sent by the spnav_x11 script to start/stop the
  * daemon's connection to the X server.
  */
 static void sig_handler(int s)
 {
-	int prev_led = cfg.led;
-
 	switch(s) {
 	case SIGHUP:
-		read_cfg(cfgfile, &cfg);
-		if(cfg.led != prev_led) {
-			struct device *dev = get_devices();
-			while(dev) {
-				if(is_device_valid(dev)) {
-					if(verbose) {
-						logmsg(LOG_INFO, "turn led %s, device: %s\n", cfg.led ? "on": "off", dev->name);
-					}
-					set_device_led(dev, cfg.led);
-				}
-				dev = dev->next;
-			}
-		}
+		write(pfd[1], &s, 1);	/* write *something* to the pipe to trigger a re-read */
 		break;
 
 	case SIGSEGV:

@@ -513,6 +513,17 @@ static int handle_request(struct client *c, struct reqresp *req)
 		sendresp(c, req, 0);
 		break;
 
+	case REQ_CFG_SAVE:
+		sendresp(c, req, write_cfg(cfgfile, &cfg));
+		break;
+
+	case REQ_CFG_RESTORE:
+		if(read_cfg(cfgfile, &cfg) == -1) {
+			default_cfg(&cfg);
+		}
+		cfg_changed();
+		break;
+
 	default:
 		logmsg(LOG_WARNING, "invalid client request: %04xh\n", (unsigned int)req->type);
 		sendresp(c, req, -1);
