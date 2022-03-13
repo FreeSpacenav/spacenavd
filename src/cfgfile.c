@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <ctype.h>
 #include <errno.h>
 #include <unistd.h>
@@ -45,7 +46,14 @@ enum {
 	NUM_CFG_OPTIONS
 };
 
+/* number of lines to add to the cfglines allocation, in order to allow for
+ * adding any number of additional options if necessary
+ */
+#define NUM_EXTRA_LINES	(NUM_CFG_OPTIONS + MAX_CUSTOM + MAX_BUTTONS * 3 + MAX_AXES + 16)
+
 static int parse_bnact(const char *s);
+static int add_cfgopt(int opt, int idx, const char *fmt, ...);
+static int add_cfgopt_devid(int vid, int pid);
 
 enum {TX, TY, TZ, RX, RY, RZ};
 
@@ -53,12 +61,11 @@ static const int def_axmap[] = {0, 2, 1, 3, 5, 4};
 static const int def_axinv[] = {0, 1, 1, 0, 1, 1};
 
 struct cfgline {
-	char *str;		/* points where in the cfgbuf this line starts at */
+	char *str;		/* actual line text */
 	int opt;		/* CFG_* item */
 	int idx;
 };
 
-static char *cfgbuf;
 static struct cfgline *cfglines;
 static int num_lines;
 
@@ -119,20 +126,21 @@ void unlock_cfgfile(int fd)
 
 int read_cfg(const char *fname, struct cfg *cfg)
 {
-	int i, j, fd;
-	char buf[512], *ptr;
+	FILE *fp;
+	int i, c, fd;
+	char buf[512];
 	struct flock flk;
 	int num_devid = 0;
-	/*int num_devnames = 0;*/
-	struct stat st;
+	struct cfgline *lptr;
 
 	default_cfg(cfg);
 
 	logmsg(LOG_INFO, "reading config file: %s\n", fname);
-	if((fd = open(fname, O_RDONLY)) == -1) {
+	if(!(fp = fopen(fname, "r"))) {
 		logmsg(LOG_WARNING, "failed to open config file %s: %s. using defaults.\n", fname, strerror(errno));
 		return -1;
 	}
+	fd = fileno(fp);
 
 	/* acquire shared read lock */
 	flk.l_type = F_RDLCK;
@@ -140,65 +148,43 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	flk.l_whence = SEEK_SET;
 	while(fcntl(fd, F_SETLKW, &flk) == -1);
 
-	/* read the file into cfgbuf */
-	fstat(fd, &st);
-	free(cfgbuf);
-	cfgbuf = 0;
-	if(!st.st_size || !(cfgbuf = malloc(st.st_size + 1))) {
-		logmsg(LOG_WARNING, "failed to allocate config file %s buffer (%ld bytes). using defaults.\n", fname, (long)st.st_size);
-		unlock_cfgfile(fd);
-		close(fd);
-		return -1;
-	}
-	if(read(fd, cfgbuf, st.st_size) < st.st_size) {
-		logmsg(LOG_WARNING, "failed to read config file %s: %s. using defaults.\n", fname, strerror(errno));
-		free(cfgbuf);
-		cfgbuf = 0;
-		unlock_cfgfile(fd);
-		close(fd);
-		return -1;
-	}
-	cfgbuf[st.st_size] = 0;
-	unlock_cfgfile(fd);
-	close(fd);
-
 	/* count newlines and populate lines array */
 	num_lines = 0;
-	ptr = cfgbuf;
-	for(i=0; i<st.st_size; i++) {
-		if(*ptr++ == '\n') num_lines++;
+	while((c = fgetc(fp)) != -1) {
+		if(c == '\n') num_lines++;
 	}
+	rewind(fp);
 	if(!num_lines) num_lines = 1;
 
-	if(!(cfglines = calloc(num_lines, sizeof *cfglines))) {
+	/* add enough lines to be able to append any number of new options */
+	if(!(cfglines = calloc(num_lines + NUM_EXTRA_LINES, sizeof *cfglines))) {
 		logmsg(LOG_WARNING, "failed to allocate config lines buffer (%d lines)\n", num_lines);
-		free(cfgbuf);
-		cfgbuf = 0;
-	}
-	num_lines = 0;
-	cfglines[num_lines++].str = cfgbuf;
-	ptr = cfgbuf;
-	for(i=0; i<st.st_size; i++) {
-		if(*ptr == '\n') {
-			*ptr = 0;
-			cfglines[num_lines++].str = ptr + 1;
-		}
-		++ptr;
+		unlock_cfgfile(fd);
+		fclose(fp);
+		return -1;
 	}
 
 	/* parse config file */
-	for(i=0; i<num_lines; i++) {
+	num_lines = 0;
+	while(fgets(buf, sizeof buf, fp)) {
 		int isint, isfloat, ival, bnidx, axisidx;
 		float fval;
 		char *endp, *key_str, *val_str, *line = buf;
 
-		strncpy(buf, cfglines[i].str, sizeof buf - 1);
-		buf[sizeof buf - 1] = 0;
+		lptr = cfglines + num_lines++;
+
+		if((endp = strchr(buf, '\r')) || (endp = strchr(buf, '\n'))) {
+			*endp = 0;
+		}
+		if(!(lptr->str = strdup(buf))) {
+			logmsg(LOG_WARNING, "failed to allocate config line buffer, skipping line %d.\n", num_lines);
+			continue;
+		}
 
 		while(*line == ' ' || *line == '\t') line++;
 
 		if(!*line || *line == '\n' || *line == '\r' || *line == '#') {
-			continue;
+			continue;	/* ignore comments and empty lines */
 		}
 
 		if(!(key_str = strtok(line, " =\n\t\r"))) {
@@ -217,94 +203,94 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		isfloat = (endp > val_str);
 
 		if(strcmp(key_str, "repeat-interval") == 0) {
-			cfglines[i].opt = CFG_REPEAT;
+			lptr->opt = CFG_REPEAT;
 			EXPECT(isint);
 			cfg->repeat_msec = ival;
 
 		} else if(strcmp(key_str, "dead-zone") == 0) {
-			cfglines[i].opt = CFG_DEADZONE;
+			lptr->opt = CFG_DEADZONE;
 			EXPECT(isint);
-			for(j=0; j<6; j++) {
-				cfg->dead_threshold[j] = ival;
+			for(i=0; i<6; i++) {
+				cfg->dead_threshold[i] = ival;
 			}
 
 		} else if(strcmp(key_str, "dead-zone-translation-x") == 0) {
-			cfglines[i].opt = CFG_DEADZONE_TX;
+			lptr->opt = CFG_DEADZONE_TX;
 			EXPECT(isint);
 			cfg->dead_threshold[0] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-y") == 0) {
-			cfglines[i].opt = CFG_DEADZONE_TY;
+			lptr->opt = CFG_DEADZONE_TY;
 			EXPECT(isint);
 			cfg->dead_threshold[1] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-z") == 0) {
-			cfglines[i].opt = CFG_DEADZONE_TZ;
+			lptr->opt = CFG_DEADZONE_TZ;
 			EXPECT(isint);
 			cfg->dead_threshold[2] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-x") == 0) {
-			cfglines[i].opt = CFG_DEADZONE_RX;
+			lptr->opt = CFG_DEADZONE_RX;
 			EXPECT(isint);
 			cfg->dead_threshold[3] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-y") == 0) {
-			cfglines[i].opt = CFG_DEADZONE_RY;
+			lptr->opt = CFG_DEADZONE_RY;
 			EXPECT(isint);
 			cfg->dead_threshold[4] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-z") == 0) {
-			cfglines[i].opt = CFG_DEADZONE_RZ;
+			lptr->opt = CFG_DEADZONE_RZ;
 			EXPECT(isint);
 			cfg->dead_threshold[5] = ival;
 
 		} else if(strcmp(key_str, "sensitivity") == 0) {
-			cfglines[i].opt = CFG_SENS;
+			lptr->opt = CFG_SENS;
 			EXPECT(isfloat);
 			cfg->sensitivity = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation") == 0) {
-			cfglines[i].opt = CFG_SENS_TRANS;
+			lptr->opt = CFG_SENS_TRANS;
 			EXPECT(isfloat);
 			cfg->sens_trans[0] = cfg->sens_trans[1] = cfg->sens_trans[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-x") == 0) {
-			cfglines[i].opt = CFG_SENS_TX;
+			lptr->opt = CFG_SENS_TX;
 			EXPECT(isfloat);
 			cfg->sens_trans[0] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-y") == 0) {
-			cfglines[i].opt = CFG_SENS_TY;
+			lptr->opt = CFG_SENS_TY;
 			EXPECT(isfloat);
 			cfg->sens_trans[1] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-z") == 0) {
-			cfglines[i].opt = CFG_SENS_TZ;
+			lptr->opt = CFG_SENS_TZ;
 			EXPECT(isfloat);
 			cfg->sens_trans[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation") == 0) {
-			cfglines[i].opt = CFG_SENS_ROT;
+			lptr->opt = CFG_SENS_ROT;
 			EXPECT(isfloat);
 			cfg->sens_rot[0] = cfg->sens_rot[1] = cfg->sens_rot[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-x") == 0) {
-			cfglines[i].opt = CFG_SENS_RX;
+			lptr->opt = CFG_SENS_RX;
 			EXPECT(isfloat);
 			cfg->sens_rot[0] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-y") == 0) {
-			cfglines[i].opt = CFG_SENS_RY;
+			lptr->opt = CFG_SENS_RY;
 			EXPECT(isfloat);
 			cfg->sens_rot[1] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-z") == 0) {
-			cfglines[i].opt = CFG_SENS_RZ;
+			lptr->opt = CFG_SENS_RZ;
 			EXPECT(isfloat);
 			cfg->sens_rot[2] = fval;
 
 		} else if(strcmp(key_str, "invert-rot") == 0) {
-			cfglines[i].opt = CFG_INVROT;
+			lptr->opt = CFG_INVROT;
 			if(strchr(val_str, 'x')) {
 				cfg->invert[RX] = !def_axinv[RX];
 			}
@@ -316,7 +302,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 
 		} else if(strcmp(key_str, "invert-trans") == 0) {
-			cfglines[i].opt = CFG_INVTRANS;
+			lptr->opt = CFG_INVTRANS;
 			if(strchr(val_str, 'x')) {
 				cfg->invert[TX] = !def_axinv[TX];
 			}
@@ -330,7 +316,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "swap-yz") == 0) {
 			int swap_yz = 0;
 
-			cfglines[i].opt = CFG_SWAPYZ;
+			lptr->opt = CFG_SWAPYZ;
 			if(isint) {
 				swap_yz = ival;
 			} else {
@@ -344,8 +330,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				}
 			}
 
-			for(j=0; j<6; j++) {
-				cfg->map_axis[j] = swap_yz ? i : def_axmap[j];
+			for(i=0; i<6; i++) {
+				cfg->map_axis[i] = swap_yz ? i : def_axmap[i];
 			}
 
 		} else if(sscanf(key_str, "axismap%d", &axisidx) == 1) {
@@ -358,8 +344,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				logmsg(LOG_WARNING, "invalid config value for %s, expected a number from 0 to 6\n", key_str);
 				continue;
 			}
-			cfglines[i].opt = CFG_AXISMAP_N;
-			cfglines[i].idx = axisidx;
+			lptr->opt = CFG_AXISMAP_N;
+			lptr->idx = axisidx;
 			cfg->map_axis[axisidx] = ival;
 
 		} else if(sscanf(key_str, "bnmap%d", &bnidx) == 1) {
@@ -371,8 +357,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			if(cfg->map_button[bnidx] != bnidx) {
 				logmsg(LOG_WARNING, "warning: multiple mappings for button %d\n", bnidx);
 			}
-			cfglines[i].opt = CFG_BNMAP_N;
-			cfglines[i].idx = bnidx;
+			lptr->opt = CFG_BNMAP_N;
+			lptr->idx = bnidx;
 			cfg->map_button[bnidx] = ival;
 
 		} else if(sscanf(key_str, "bnact%d", &bnidx) == 1) {
@@ -380,8 +366,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a number from 0 to %d\n", key_str, MAX_BUTTONS);
 				continue;
 			}
-			cfglines[i].opt = CFG_BNACT_N;
-			cfglines[i].idx = bnidx;
+			lptr->opt = CFG_BNACT_N;
+			lptr->idx = bnidx;
 			if((cfg->bnact[bnidx] = parse_bnact(val_str)) == -1) {
 				cfg->bnact[bnidx] = BNACT_NONE;
 				logmsg(LOG_WARNING, "invalid button action: \"%s\"\n", val_str);
@@ -393,8 +379,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a number from 0 to %d\n", key_str, MAX_BUTTONS);
 				continue;
 			}
-			cfglines[i].opt = CFG_KBMAP_N;
-			cfglines[i].idx = bnidx;
+			lptr->opt = CFG_KBMAP_N;
+			lptr->idx = bnidx;
 			if(cfg->kbmap_str[bnidx]) {
 				logmsg(LOG_WARNING, "warning: multiple keyboard mappings for button %d: %s -> %s\n", bnidx, cfg->kbmap_str[bnidx], val_str);
 				free(cfg->kbmap_str[bnidx]);
@@ -402,7 +388,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			cfg->kbmap_str[bnidx] = strdup(val_str);
 
 		} else if(strcmp(key_str, "led") == 0) {
-			cfglines[i].opt = CFG_LED;
+			lptr->opt = CFG_LED;
 			if(isint) {
 				cfg->led = ival;
 			} else {
@@ -419,7 +405,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 
 		} else if(strcmp(key_str, "grab") == 0) {
-			cfglines[i].opt = CFG_GRAB;
+			lptr->opt = CFG_GRAB;
 			if(isint) {
 				cfg->grab_device = ival;
 			} else {
@@ -434,12 +420,12 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 
 		} else if(strcmp(key_str, "serial") == 0) {
-			cfglines[i].opt = CFG_SERIAL;
+			lptr->opt = CFG_SERIAL;
 			strncpy(cfg->serial_dev, val_str, PATH_MAX - 1);
 
 		} else if(strcmp(key_str, "device-id") == 0) {
 			unsigned int vendor, prod;
-			cfglines[i].opt = CFG_DEVID;
+			lptr->opt = CFG_DEVID;
 			if(sscanf(val_str, "%x:%x", &vendor, &prod) == 2) {
 				cfg->devid[num_devid][0] = (int)vendor;
 				cfg->devid[num_devid][1] = (int)prod;
@@ -454,18 +440,138 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		}
 	}
 
+	unlock_cfgfile(fd);
+	fclose(fp);
 	return 0;
 }
 
 int write_cfg(const char *fname, struct cfg *cfg)
 {
-	int i, wrote_comment;
+	int i;
 	FILE *fp;
 	struct flock flk;
+	struct cfg def;
 
 	if(!(fp = fopen(fname, "w"))) {
 		logmsg(LOG_ERR, "failed to write config file %s: %s\n", fname, strerror(errno));
 		return -1;
+	}
+
+	default_cfg(&def);	/* default config for comparisons */
+
+	if(cfg->sensitivity != def.sensitivity) {
+		add_cfgopt(CFG_SENS, 0, "sensitivity = %.3f", cfg->sensitivity);
+	}
+
+	if(cfg->sens_trans[0] == cfg->sens_trans[1] && cfg->sens_trans[1] == cfg->sens_trans[2]) {
+		if(cfg->sens_trans[0] != def.sens_trans[0]) {
+			add_cfgopt(CFG_SENS_TRANS, 0, "sensitivity-translation = %.3f", cfg->sens_trans[0]);
+		}
+	} else {
+		if(cfg->sens_trans[0] != def.sens_trans[0]) {
+			add_cfgopt(CFG_SENS_TX, 0, "sensitivity-translation-x = %.3f", cfg->sens_trans[0]);
+		}
+		if(cfg->sens_trans[1] != def.sens_trans[1]) {
+			add_cfgopt(CFG_SENS_TY, 0, "sensitivity-translation-y = %.3f", cfg->sens_trans[1]);
+		}
+		if(cfg->sens_trans[2] != def.sens_trans[2]) {
+			add_cfgopt(CFG_SENS_TZ, 0, "sensitivity-translation-z = %.3f", cfg->sens_trans[2]);
+		}
+	}
+
+	if(cfg->sens_rot[0] == cfg->sens_rot[1] && cfg->sens_rot[1] == cfg->sens_rot[2]) {
+		if(cfg->sens_rot[0] != def.sens_rot[0]) {
+			add_cfgopt(CFG_SENS_ROT, 0, "sensitivity-rotation = %.3f", cfg->sens_rot[0]);
+		}
+	} else {
+		if(cfg->sens_rot[0] != def.sens_rot[0]) {
+			add_cfgopt(CFG_SENS_RX, 0, "sensitivity-rotation-x = %.3f", cfg->sens_rot[0]);
+		}
+		if(cfg->sens_rot[1] != def.sens_rot[1]) {
+			add_cfgopt(CFG_SENS_RY, 0, "sensitivity-rotation-y = %.3f", cfg->sens_rot[1]);
+		}
+		if(cfg->sens_rot[2] != def.sens_rot[2]) {
+			add_cfgopt(CFG_SENS_RZ, 0, "sensitivity-rotation-z = %.3f", cfg->sens_rot[2]);
+		}
+	}
+
+	if(cfg->dead_threshold[0] == cfg->dead_threshold[1] && cfg->dead_threshold[1] == cfg->dead_threshold[2] && cfg->dead_threshold[2] == cfg->dead_threshold[3] && cfg->dead_threshold[3] == cfg->dead_threshold[4] && cfg->dead_threshold[4] == cfg->dead_threshold[5]) {
+		if(cfg->dead_threshold[0] != def.dead_threshold[0]) {
+			add_cfgopt(CFG_DEADZONE, 0, "dead-zone = %d", cfg->dead_threshold[0]);
+		}
+	} else {
+		if(cfg->dead_threshold[0] != def.dead_threshold[0]) {
+			add_cfgopt(CFG_DEADZONE_TX, 0, "dead-zone-translation-x = %d", cfg->dead_threshold[0]);
+		}
+		if(cfg->dead_threshold[1] != def.dead_threshold[1]) {
+			add_cfgopt(CFG_DEADZONE_TY, 0, "dead-zone-translation-y = %d", cfg->dead_threshold[1]);
+		}
+		if(cfg->dead_threshold[2] != def.dead_threshold[2]) {
+			add_cfgopt(CFG_DEADZONE_TZ, 0, "dead-zone-translation-z = %d", cfg->dead_threshold[2]);
+		}
+		if(cfg->dead_threshold[3] != def.dead_threshold[3]) {
+			add_cfgopt(CFG_DEADZONE_RX, 0, "dead-zone-rotation-x = %d", cfg->dead_threshold[3]);
+		}
+		if(cfg->dead_threshold[4] != def.dead_threshold[4]) {
+			add_cfgopt(CFG_DEADZONE_RY, 0, "dead-zone-rotation-y = %d", cfg->dead_threshold[4]);
+		}
+		if(cfg->dead_threshold[5] != def.dead_threshold[5]) {
+			add_cfgopt(CFG_DEADZONE_RZ, 0, "dead-zone-rotation-z = %d", cfg->dead_threshold[5]);
+		}
+	}
+
+	if(cfg->repeat_msec != def.repeat_msec) {
+		add_cfgopt(CFG_REPEAT, 0, "repeat-interval = %d\n", cfg->repeat_msec);
+	}
+
+	if(cfg->invert[0] != def_axinv[0] || cfg->invert[1] != def_axinv[1] || cfg->invert[2] != def_axinv[2]) {
+		char flags[4] = {0}, *p = flags;
+		if(cfg->invert[0] != def_axinv[0]) *p++ = 'x';
+		if(cfg->invert[1] != def_axinv[1]) *p++ = 'y';
+		if(cfg->invert[2] != def_axinv[2]) *p = 'z';
+		add_cfgopt(CFG_INVTRANS, 0, "invert-trans = %s", flags);
+	}
+
+	if(cfg->invert[3] != def_axinv[3] || cfg->invert[4] != def_axinv[4] || cfg->invert[5] != def_axinv[5]) {
+		char flags[4] = {0}, *p = flags;
+		if(cfg->invert[3] != def_axinv[3]) *p++ = 'x';
+		if(cfg->invert[4] != def_axinv[4]) *p++ = 'y';
+		if(cfg->invert[5] != def_axinv[5]) *p = 'z';
+		add_cfgopt(CFG_INVROT, 0, "invert-rot = %s", flags);
+	}
+
+	if(cfg->map_axis[1] != def_axmap[1]) {
+		add_cfgopt(CFG_SWAPYZ, 0, "swap-yz = true");
+	}
+
+	for(i=0; i<MAX_BUTTONS; i++) {
+		if(cfg->map_button[i] != i) {
+			add_cfgopt(CFG_BNMAP_N, i, "bnmap%d = %d", i, cfg->map_button[i]);
+		}
+	}
+
+	for(i=0; i<MAX_BUTTONS; i++) {
+		if(cfg->kbmap_str[i]) {
+			add_cfgopt(CFG_KBMAP_N, i, "kbmap%d = %s", i, cfg->kbmap_str[i]);
+		}
+	}
+
+	if(cfg->led != def.led) {
+		add_cfgopt(CFG_LED, 0, "led = %s", (cfg->led ? (cfg->led == LED_AUTO ? "auto" : "on") : "off"));
+	}
+
+	if(cfg->grab_device != def.grab_device) {
+		add_cfgopt(CFG_GRAB, 0, "grab = %s", cfg->grab_device ? "true" : "false");
+	}
+
+	if(cfg->serial_dev[0]) {
+		add_cfgopt(CFG_SERIAL, 0, "serial = %s", cfg->serial_dev);
+	}
+
+	for(i=0; i<MAX_CUSTOM; i++) {
+		if(cfg->devid[i][0] != -1 && cfg->devid[i][1] != -1) {
+			add_cfgopt_devid(cfg->devid[i][0], cfg->devid[i][1]);
+		}
 	}
 
 	/* acquire exclusive write lock */
@@ -474,124 +580,12 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	flk.l_whence = SEEK_SET;
 	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
-	fprintf(fp, "# sensitivity is multiplied with every motion (1.0 normal).\n");
-	fprintf(fp, "sensitivity = %.3f\n\n", cfg->sensitivity);
-
-	fprintf(fp, "# separate sensitivity for rotation and translation.\n");
-
-	if(cfg->sens_trans[0] == cfg->sens_trans[1] && cfg->sens_trans[1] == cfg->sens_trans[2]) {
-		fprintf(fp, "sensitivity-translation = %.3f\n", cfg->sens_trans[0]);
-	} else {
-		fprintf(fp, "sensitivity-translation-x = %.3f\n", cfg->sens_trans[0]);
-		fprintf(fp, "sensitivity-translation-y = %.3f\n", cfg->sens_trans[1]);
-		fprintf(fp, "sensitivity-translation-z = %.3f\n", cfg->sens_trans[2]);
-	}
-
-	if(cfg->sens_rot[0] == cfg->sens_rot[1] && cfg->sens_rot[1] == cfg->sens_rot[2]) {
-		fprintf(fp, "sensitivity-rotation = %.3f\n", cfg->sens_rot[0]);
-	} else {
-		fprintf(fp, "sensitivity-rotation-x = %.3f\n", cfg->sens_rot[0]);
-		fprintf(fp, "sensitivity-rotation-y = %.3f\n", cfg->sens_rot[1]);
-		fprintf(fp, "sensitivity-rotation-z = %.3f\n", cfg->sens_rot[2]);
-	}
-	fputc('\n', fp);
-
-	fprintf(fp, "# dead zone; any motion less than this number, is discarded as noise.\n");
-
-	if(cfg->dead_threshold[0] == cfg->dead_threshold[1] && cfg->dead_threshold[1] == cfg->dead_threshold[2] && cfg->dead_threshold[2] == cfg->dead_threshold[3] && cfg->dead_threshold[3] == cfg->dead_threshold[4] && cfg->dead_threshold[4] == cfg->dead_threshold[5]) {
-		fprintf(fp, "dead-zone = %d\n", cfg->dead_threshold[0]);
-	} else {
-		fprintf(fp, "dead-zone-translation-x = %d\n", cfg->dead_threshold[0]);
-		fprintf(fp, "dead-zone-translation-y = %d\n", cfg->dead_threshold[1]);
-		fprintf(fp, "dead-zone-translation-z = %d\n", cfg->dead_threshold[2]);
-		fprintf(fp, "dead-zone-rotation-x = %d\n", cfg->dead_threshold[3]);
-		fprintf(fp, "dead-zone-rotation-y = %d\n", cfg->dead_threshold[4]);
-		fprintf(fp, "dead-zone-rotation-z = %d\n", cfg->dead_threshold[5]);
-	}
-	fputc('\n', fp);
-
-	fprintf(fp, "# repeat interval; non-deadzone events are repeated every so many milliseconds (-1 to disable)\n");
-	fprintf(fp, "repeat-interval = %d\n", cfg->repeat_msec);
-
-	if(cfg->invert[0] != def_axinv[0] || cfg->invert[1] != def_axinv[1] || cfg->invert[2] != def_axinv[2]) {
-		fprintf(fp, "# invert translations on some axes.\n");
-		fprintf(fp, "invert-trans = ");
-		if(cfg->invert[0] != def_axinv[0]) fputc('x', fp);
-		if(cfg->invert[1] != def_axinv[1]) fputc('y', fp);
-		if(cfg->invert[2] != def_axinv[2]) fputc('z', fp);
-		fputs("\n\n", fp);
-	}
-
-	if(cfg->invert[3] != def_axinv[3] || cfg->invert[4] != def_axinv[4] || cfg->invert[5] != def_axinv[5]) {
-		fprintf(fp, "# invert rotations around some axes.\n");
-		fprintf(fp, "invert-rot = ");
-		if(cfg->invert[3] != def_axinv[3]) fputc('x', fp);
-		if(cfg->invert[4] != def_axinv[4]) fputc('y', fp);
-		if(cfg->invert[5] != def_axinv[5]) fputc('z', fp);
-		fputs("\n\n", fp);
-	}
-
-	fprintf(fp, "# swap translation along Y and Z axes\n");
-	fprintf(fp, "swap-yz = %s\n\n", cfg->map_axis[1] == def_axmap[1] ? "false" : "true");
-
-	wrote_comment = 0;
-	for(i=0; i<MAX_BUTTONS; i++) {
-		if(cfg->map_button[i] != i) {
-			if(!wrote_comment) {
-				fprintf(fp, "# button mappings\n");
-				wrote_comment = 1;
-			}
-			fprintf(fp, "bnmap%d = %d\n", i, cfg->map_button[i]);
+	for(i=0; i<num_lines; i++) {
+		if(cfglines[i].str && *cfglines[i].str) {
+			fputs(cfglines[i].str, fp);
 		}
-	}
-	if(wrote_comment) {
 		fputc('\n', fp);
 	}
-
-	wrote_comment = 0;
-	for(i=0; i<MAX_BUTTONS; i++) {
-		if(cfg->kbmap_str[i]) {
-			if(!wrote_comment) {
-				fprintf(fp, "# button to key mappings\n");
-				wrote_comment = 1;
-			}
-			fprintf(fp, "kbmap%d = %s\n", i, cfg->kbmap_str[i]);
-		}
-	}
-	if(wrote_comment) {
-		fputc('\n', fp);
-	}
-
-	fprintf(fp, "# led status: on, off, or auto (turn on when a client is connected)\n");
-	fprintf(fp, "led = %s\n\n", (cfg->led ? (cfg->led == LED_AUTO ? "auto" : "on") : "off"));
-
-	if(!cfg->grab_device) {
-		fprintf(fp, "# Don't grab USB device\n");
-		fprintf(fp, "#   Grabbing the device ensures that other programs won't be able to use it without\n");
-		fprintf(fp, "#   talking to spacenavd. For instance some versions of Xorg will use the device to move\n");
-		fprintf(fp, "#   the mouse pointer if we don't grab it.\n");
-		fprintf(fp, "#   Set this to false if you want to use programs that try to talk to the device directly\n");
-		fprintf(fp, "#   such as google earth, then follow FAQ 11 http://spacenav.sourceforge.net/faq.html#faq11\n");
-		fprintf(fp, "#   to force the X server to ignore the device\n");
-		fprintf(fp, "grab = false\n\n");
-	}
-
-	fprintf(fp, "# serial device\n");
-	fprintf(fp, "#   Set this only if you have a serial device, and make sure you specify the\n");
-	fprintf(fp, "#   correct device file (On linux usually: /dev/ttyS0, /dev/ttyS1, /dev/ttyUSB0 ... etc).\n");
-	if(cfg->serial_dev[0]) {
-		fprintf(fp, "serial = %s\n\n", cfg->serial_dev);
-	} else {
-		fprintf(fp, "#serial = /dev/ttyS0\n\n");
-	}
-
-	fprintf(fp, "List of additional USB devices to use (multiple devices can be listed)");
-	for(i=0; i<MAX_CUSTOM; i++) {
-		if(cfg->devid[i][0] != -1 && cfg->devid[i][1] != -1) {
-			fprintf(fp, "device-id = %x:%x\n", cfg->devid[i][0], cfg->devid[i][1]);
-		}
-	}
-	fprintf(fp, "\n");
 
 	/* unlock */
 	flk.l_type = F_UNLCK;
@@ -625,4 +619,73 @@ static int parse_bnact(const char *s)
 		}
 	}
 	return -1;
+}
+
+static struct cfgline *find_cfgopt(int opt, int idx)
+{
+	int i;
+	for(i=0; i<num_lines; i++) {
+		if(cfglines[i].str && cfglines[i].opt == opt && cfglines[i].idx == idx) {
+			return cfglines + i;
+		}
+	}
+	return 0;
+}
+
+static int add_cfgopt(int opt, int idx, const char *fmt, ...)
+{
+	struct cfgline *lptr;
+	char buf[512], *str;
+	va_list ap;
+
+	va_start(ap, fmt);
+	vsnprintf(buf, sizeof buf, fmt, ap);
+	va_end(ap);
+
+	if(!(str = strdup(buf))) return -1;
+
+	if(!(lptr = find_cfgopt(opt, idx))) {
+		num_lines++;	/* leave an empty line */
+		lptr = cfglines + num_lines++;
+	}
+	free(lptr->str);
+	lptr->str = str;
+	lptr->opt = opt;
+	lptr->idx = idx;
+	return 0;
+}
+
+static int add_cfgopt_devid(int vid, int pid)
+{
+	int i;
+	unsigned int dev[2];
+	struct cfgline *lptr = 0;
+	char *str, *val;
+
+	if(!(str = malloc(64))) return -1;
+	sprintf(str, "device-id = %04x:%04x", vid, pid);
+
+	for(i=0; i<num_lines; i++) {
+		if(!cfglines[i].str || cfglines[i].opt != CFG_DEVID) {
+			continue;
+		}
+		if(!(val = strchr(cfglines[i].str, '='))) {
+			continue;
+		}
+		if(sscanf(val + 1, "%x:%x", dev, dev + 1) == 2 && dev[0] == vid && dev[1] == pid) {
+			lptr = cfglines + i;
+			break;
+		}
+	}
+
+	if(!lptr) {
+		num_lines++;	/* leave an empty line */
+		lptr = cfglines + num_lines++;
+	}
+
+	free(lptr->str);
+	lptr->str = str;
+	lptr->opt = CFG_DEVID;
+	lptr->idx = 0;
+	return 0;
 }
