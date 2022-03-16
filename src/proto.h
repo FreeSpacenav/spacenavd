@@ -28,8 +28,10 @@ enum {
 	REQ_DEV_NAME = 0x2000,	/* get device name:	R[0] length R[6] status followed
 							   by <length> bytes */
 	REQ_DEV_PATH,			/* get device path: same as above */
-	REQ_DEV_NAXES,			/* get number of axes:		R[0] num axes R[6] status */
+	REQ_DEV_NAXES,			/* get number of axes:	R[0] num axes R[6] status */
 	REQ_DEV_NBUTTONS,		/* get number of buttons: same as above */
+	REQ_DEV_USBID,			/* get USB id:			R[0] vend R[1] prod R[6] status */
+	REQ_DEV_TYPE,			/* get device type:		R[0] type enum R[6] status */
 	/* TODO: features like LCD, LEDs ... */
 
 	/* configuration settings */
@@ -60,6 +62,36 @@ enum {
 	REQ_CFG_RESTORE,		/* load config from file:   R[6] status */
 
 	REQ_CHANGE_PROTO	= 0x5500
+};
+
+/* XXX keep in sync with SPNAV_DEV_* in spnav.h (libspnav) */
+enum {
+	DEV_UNKNOWN,
+	/* serial devices */
+	DEV_SB2003 = 0x100,	/* Spaceball 1003/2003/2003C */
+	DEV_SB3003,			/* Spaceball 3003/3003C */
+	DEV_SB4000,			/* Spaceball 4000FLX/5000FLX */
+	DEV_SM,				/* Magellan SpaceMouse */
+	DEV_SM5000,			/* Spaceball 5000 (spacemouse protocol) */
+	DEV_SMCADMAN,		/* 3Dconnexion CadMan (spacemouse protocol) */
+	/* USB devices */
+	DEV_PLUSXT = 0x200,	/* SpaceMouse Plus XT */
+	DEV_CADMAN,			/* 3Dconnexion CadMan (USB version) */
+	DEV_SMCLASSIC,		/* SpaceMouse Classic */
+	DEV_SB5000,			/* Spaceball 5000 (USB version) */
+	DEV_STRAVEL,		/* Space Traveller */
+	DEV_SPILOT,			/* Space Pilot */
+	DEV_SNAV,			/* Space Navigator */
+	DEV_SEXP,			/* Space Explorer */
+	DEV_SNAVNB,			/* Space Navigator for Notebooks */
+	DEV_SPILOTPRO,		/* Space Pilot pro */
+	DEV_SMPRO,			/* SpaceMouse Pro */
+	DEV_NULOOQ,			/* Nulooq */
+	DEV_SMW,			/* SpaceMouse Wireless */
+	DEV_SMPROW,			/* SpaceMouse Pro Wireless */
+	DEV_SMENT,			/* SpaceMouse Enterprise */
+	DEV_SMCOMP,			/* SpaceMouse Compact */
+	DEV_SMMOD			/* SpaceMouse Module */
 };
 
 #endif	/* PROTO_H_ */

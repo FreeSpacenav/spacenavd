@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dev.h"
 #include "event.h"
 #include "logger.h"
+#include "proto.h"
 
 #if  defined(__i386__) || defined(__ia64__) || defined(WIN32) || \
     (defined(__alpha__) || defined(__alpha)) || \
@@ -505,6 +506,7 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 			sb->nbuttons = 12;	/* might have guessed 8 before */
 			sb->keymask = 0xfff;
 			strcpy(sb->dev->name, "Spaceball 4000FLX");
+			sb->dev->type = DEV_SB4000;
 		}
 		/* update orientation flag (actually don't bother) */
 		/*
@@ -564,10 +566,12 @@ static int guess_num_buttons(struct device *dev, const char *verstr)
 		/* try to guess based on firmware number */
 		if(sscanf(s + 17, "%d.%d", &major, &minor) == 2 && major == 2) {
 			if(minor == 35 || minor == 62 || minor == 63) {
+				dev->type = DEV_SB3003;
 				strcpy(dev->name, "Spaceball 3003/3003C");
 				return 2;	/* spaceball 3003/3003C */
 			}
 			if(minor == 43 || minor == 45) {
+				dev->type = DEV_SB4000;
 				strcpy(dev->name, "Spaceball 4000FLX/5000FLX-A");
 				return 12;	/* spaceball 4000flx/5000flx-a */
 			}
@@ -578,6 +582,7 @@ static int guess_num_buttons(struct device *dev, const char *verstr)
 				 * sure this happens as soon as possible, before clients have a
 				 * chance to connect.
 				 */
+				dev->type = DEV_SB2003;
 				strcpy(dev->name, "Spaceball 1003/2003/2003C");
 				return 8;	/* spaceball 1003/2003/2003c */
 			}
@@ -585,16 +590,19 @@ static int guess_num_buttons(struct device *dev, const char *verstr)
 	}
 
 	if(strstr(verstr, "MAGELLAN")) {
+		dev->type = DEV_SM;
 		strcpy(dev->name, "Magellan SpaceMouse");
 		return 9; /* magellan spacemouse */
 	}
 
 	if(strstr(verstr, "SPACEBALL")) {
+		dev->type = DEV_SM5000;
 		strcpy(dev->name, "Spaceball 5000");
 		return 12; /* spaceball 5000 */
 	}
 
 	if(strstr(verstr, "CadMan")) {
+		dev->type = DEV_SMCADMAN;
 		strcpy(dev->name, "CadMan");
 		return 4;
 	}

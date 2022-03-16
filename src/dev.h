@@ -30,6 +30,8 @@ struct device {
 	void *data;
 	char name[MAX_DEV_NAME];
 	char path[PATH_MAX];
+	int type;
+	unsigned int usbid[2];	/* vendor:product for USB devices */
 
 	int num_axes, num_buttons;
 	int *minval, *maxval;	/* input value range (default: -500, 500) */

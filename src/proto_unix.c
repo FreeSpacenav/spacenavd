@@ -314,6 +314,25 @@ static int handle_request(struct client *c, struct reqresp *req)
 		}
 		break;
 
+	case REQ_DEV_USBID:
+		if((dev = get_client_device(c)) && dev->usbid[0] && dev->usbid[1]) {
+			req->data[0] = dev->usbid[0];
+			req->data[1] = dev->usbid[1];
+			sendresp(c, req, 0);
+		} else {
+			sendresp(c, req, -1);
+		}
+		break;
+
+	case REQ_DEV_TYPE:
+		if((dev = get_client_device(c))) {
+			req->data[0] = dev->type;
+			sendresp(c, req, 0);
+		} else {
+			sendresp(c, req, -1);
+		}
+		break;
+
 	case REQ_SCFG_SENS:
 		fval = *(float*)req->data;
 		if(isfinite(fval)) {

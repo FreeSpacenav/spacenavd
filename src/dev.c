@@ -25,6 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "dev_serial.h"
 #include "event.h" /* remove pending events upon device removal */
 #include "spnavd.h"
+#include "proto.h"
 
 #ifdef USE_X11
 #include "proto_x11.h"
@@ -33,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 static struct device *add_device(void);
 static struct device *dev_path_in_use(char const * dev_path);
 static int match_usbdev(const struct usb_dev_info *devinfo);
+static int usbdevtype(unsigned int vid, unsigned int pid);
 
 static struct device *dev_list = NULL;
 
@@ -72,6 +74,9 @@ int init_devices(void)
 
 			dev = add_device();
 			strcpy(dev->path, usbdev->devfiles[i]);
+			dev->type = usbdevtype(usbdev->vendorid, usbdev->productid);
+			dev->usbid[0] = usbdev->vendorid;
+			dev->usbid[1] = usbdev->productid;
 
 			if(open_dev_usb(dev) == -1) {
 				remove_device(dev);
@@ -204,28 +209,28 @@ struct device *get_devices(void)
 
 #define VENDOR_3DCONNEXION	0x256f
 
-static int devid_list[][2] = {
-	{0x046d, 0xc603},	/* spacemouse plus XT */
-	{0x046d, 0xc605},	/* cadman */
-	{0x046d, 0xc606},	/* spacemouse classic */
-	{0x046d, 0xc621},	/* spaceball 5000 */
-	{0x046d, 0xc623},	/* space traveller */
-	{0x046d, 0xc625},	/* space pilot */
-	{0x046d, 0xc626},	/* space navigator */
-	{0x046d, 0xc627},	/* space explorer */
-	{0x046d, 0xc628},	/* space navigator for notebooks*/
-	{0x046d, 0xc629},	/* space pilot pro*/
-	{0x046d, 0xc62b},	/* space mouse pro*/
-	{0x046d, 0xc640},	/* nulooq */
-	{0x256f, 0xc62e},	/* spacemouse wireless (USB cable) */
-	{0x256f, 0xc62f},	/* spacemouse wireless  receiver */
-	{0x256f, 0xc631},	/* spacemouse pro wireless */
-	{0x256f, 0xc632},	/* spacemouse pro wireless receiver */
-	{0x256f, 0xc633},	/* spacemouse enterprise */
-	{0x256f, 0xc635},	/* spacemouse compact */
-	{0x256f, 0xc636},	/* spacemouse module */
+static int devid_list[][3] = {
+	{0x046d, 0xc603, DEV_PLUSXT},		/* spacemouse plus XT */
+	{0x046d, 0xc605, DEV_CADMAN},		/* cadman */
+	{0x046d, 0xc606, DEV_SMCLASSIC},	/* spacemouse classic */
+	{0x046d, 0xc621, DEV_SB5000},		/* spaceball 5000 */
+	{0x046d, 0xc623, DEV_STRAVEL},		/* space traveller */
+	{0x046d, 0xc625, DEV_SPILOT},		/* space pilot */
+	{0x046d, 0xc626, DEV_SNAV},			/* space navigator */
+	{0x046d, 0xc627, DEV_SEXP},			/* space explorer */
+	{0x046d, 0xc628, DEV_SNAVNB},		/* space navigator for notebooks*/
+	{0x046d, 0xc629, DEV_SPILOTPRO},	/* space pilot pro*/
+	{0x046d, 0xc62b, DEV_SMPRO},		/* space mouse pro*/
+	{0x046d, 0xc640, DEV_NULOOQ},		/* nulooq */
+	{0x256f, 0xc62e, DEV_SMW},			/* spacemouse wireless (USB cable) */
+	{0x256f, 0xc62f, DEV_SMW},			/* spacemouse wireless  receiver */
+	{0x256f, 0xc631, DEV_SMPROW},		/* spacemouse pro wireless */
+	{0x256f, 0xc632, DEV_SMPROW},		/* spacemouse pro wireless receiver */
+	{0x256f, 0xc633, DEV_SMENT},		/* spacemouse enterprise */
+	{0x256f, 0xc635, DEV_SMCOMP},		/* spacemouse compact */
+	{0x256f, 0xc636, DEV_SMMOD},		/* spacemouse module */
 
-	{-1, -1}
+	{-1, -1, DEV_UNKNOWN}
 };
 
 /* 3Dconnexion devices which we don't want to match, because they are
@@ -293,4 +298,15 @@ static int match_usbdev(const struct usb_dev_info *devinfo)
 	}
 
 	return 0;	/* no match */
+}
+
+static int usbdevtype(unsigned int vid, unsigned int pid)
+{
+	int i;
+	for(i=0; devid_list[i][0] != -1; i++) {
+		if(devid_list[i][0] == vid && devid_list[i][1] == pid) {
+			return devid_list[i][2];
+		}
+	}
+	return DEV_UNKNOWN;
 }
