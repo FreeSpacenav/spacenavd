@@ -79,6 +79,8 @@ struct sball {
 	struct dev_input evqueue[EVQUEUE_SZ];
 	int evq_rd, evq_wr;
 
+	struct device *dev;
+
 	int (*parse)(struct sball*, int, char*, int);
 };
 
@@ -96,7 +98,7 @@ static int proc_input(struct sball *sb);
 static int mag_parsepkt(struct sball *sb, int id, char *data, int len);
 static int sball_parsepkt(struct sball *sb, int id, char *data, int len);
 
-static int guess_num_buttons(const char *verstr);
+static int guess_num_buttons(struct device *dev, const char *verstr);
 
 static void make_printable(char *buf, int len);
 static int read_timeout(int fd, char *buf, int bufsz, long tm_usec);
@@ -120,6 +122,7 @@ int open_dev_serial(struct device *dev)
 		logmsg(LOG_ERR, "open_dev_serial: failed to allocate sball object\n");
 		goto err;
 	}
+	sb->dev = dev;
 	dev->data = sb;
 	dev->fd = sb->fd = fd;
 	dev->close = close_dev_serial;
@@ -136,8 +139,9 @@ int open_dev_serial(struct device *dev)
 		/* we got a response, so it's a spaceball */
 		make_printable(buf, sz);
 		logmsg(LOG_INFO, "Spaceball detected: %s\n", buf);
+		strcpy(dev->name, "Spaceball");
 
-		sb->nbuttons = guess_num_buttons(buf);
+		sb->nbuttons = guess_num_buttons(dev, buf);
 		sb->keymask = 0xffff >> (16 - sb->nbuttons);
 		logmsg(LOG_INFO, "%d buttons\n", sb->nbuttons);
 
@@ -160,8 +164,9 @@ int open_dev_serial(struct device *dev)
 	if((sz = read_timeout(fd, buf, sizeof buf - 1, 250000)) > 0 && buf[0] == 'v') {
 		make_printable(buf, sz);
 		logmsg(LOG_INFO, "Magellan SpaceMouse detected:\n%s\n", buf);
+		strcpy(dev->name, "Magellan SpaceMouse");
 
-		sb->nbuttons = guess_num_buttons(buf);
+		sb->nbuttons = guess_num_buttons(dev, buf);
 		sb->keymask = 0xffff >> (16 - sb->nbuttons);
 		logmsg(LOG_INFO, "%d buttons\n", sb->nbuttons);
 
@@ -499,6 +504,7 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 			sb->flags |= SB4000;
 			sb->nbuttons = 12;	/* might have guessed 8 before */
 			sb->keymask = 0xfff;
+			strcpy(sb->dev->name, "Spaceball 4000FLX");
 		}
 		/* update orientation flag (actually don't bother) */
 		/*
@@ -549,7 +555,7 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 	return 0;
 }
 
-static int guess_num_buttons(const char *verstr)
+static int guess_num_buttons(struct device *dev, const char *verstr)
 {
 	int major, minor;
 	const char *s;
@@ -558,9 +564,11 @@ static int guess_num_buttons(const char *verstr)
 		/* try to guess based on firmware number */
 		if(sscanf(s + 17, "%d.%d", &major, &minor) == 2 && major == 2) {
 			if(minor == 35 || minor == 62 || minor == 63) {
+				strcpy(dev->name, "Spaceball 3003/3003C");
 				return 2;	/* spaceball 3003/3003C */
 			}
 			if(minor == 43 || minor == 45) {
+				strcpy(dev->name, "Spaceball 4000FLX/5000FLX-A");
 				return 12;	/* spaceball 4000flx/5000flx-a */
 			}
 			if(minor == 2 || minor == 13 || minor == 15 || minor == 42) {
@@ -570,20 +578,24 @@ static int guess_num_buttons(const char *verstr)
 				 * sure this happens as soon as possible, before clients have a
 				 * chance to connect.
 				 */
+				strcpy(dev->name, "Spaceball 1003/2003/2003C");
 				return 8;	/* spaceball 1003/2003/2003c */
 			}
 		}
 	}
 
 	if(strstr(verstr, "MAGELLAN")) {
+		strcpy(dev->name, "Magellan SpaceMouse");
 		return 9; /* magellan spacemouse */
 	}
 
 	if(strstr(verstr, "SPACEBALL")) {
+		strcpy(dev->name, "Spaceball 5000");
 		return 12; /* spaceball 5000 */
 	}
 
 	if(strstr(verstr, "CadMan")) {
+		strcpy(dev->name, "CadMan");
 		return 4;
 	}
 
