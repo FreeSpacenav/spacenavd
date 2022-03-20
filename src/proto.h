@@ -60,6 +60,7 @@ enum {
 	/* TODO ... more */
 	REQ_CFG_SAVE = 0x3ffe,	/* save config file:        R[6] status */
 	REQ_CFG_RESTORE,		/* load config from file:   R[6] status */
+	REQ_CFG_RESET,			/* reset to default config: R[6] status */
 
 	REQ_CHANGE_PROTO	= 0x5500
 };
