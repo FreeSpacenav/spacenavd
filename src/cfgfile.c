@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 /* all parsable config options... some of them might map to the same cfg field */
 enum {
 	CFG_REPEAT,
-	CFG_DEADZONE,
+	CFG_DEADZONE, CFG_DEADZONE_N,
 	CFG_DEADZONE_TX, CFG_DEADZONE_TY, CFG_DEADZONE_TZ,
 	CFG_DEADZONE_RX, CFG_DEADZONE_RY, CFG_DEADZONE_RZ,
 	CFG_SENS,
@@ -210,36 +210,51 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "dead-zone") == 0) {
 			lptr->opt = CFG_DEADZONE;
 			EXPECT(isint);
-			for(i=0; i<6; i++) {
+			for(i=0; i<MAX_AXES; i++) {
 				cfg->dead_threshold[i] = ival;
 			}
 
+		} else if(sscanf(key_str, "dead-zone%d", &axisidx) == 1) {
+			if(axisidx < 0 || axisidx >= MAX_AXES) {
+				logmsg(LOG_WARNING, "invalid option %s, valid input axis numbers 0 - %d\n", key_str, MAX_AXES - 1);
+				continue;
+			}
+			lptr->opt = CFG_DEADZONE_N;
+			lptr->idx = axisidx;
+			cfg->dead_threshold[axisidx] = ival;
+
 		} else if(strcmp(key_str, "dead-zone-translation-x") == 0) {
+			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_TX;
 			EXPECT(isint);
 			cfg->dead_threshold[0] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-y") == 0) {
+			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_TY;
 			EXPECT(isint);
 			cfg->dead_threshold[1] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-z") == 0) {
+			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_TZ;
 			EXPECT(isint);
 			cfg->dead_threshold[2] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-x") == 0) {
+			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_RX;
 			EXPECT(isint);
 			cfg->dead_threshold[3] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-y") == 0) {
+			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_RY;
 			EXPECT(isint);
 			cfg->dead_threshold[4] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-z") == 0) {
+			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_RZ;
 			EXPECT(isint);
 			cfg->dead_threshold[5] = ival;
@@ -447,7 +462,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 int write_cfg(const char *fname, struct cfg *cfg)
 {
-	int i;
+	int i, same;
 	FILE *fp;
 	struct flock flk;
 	struct cfg def;
@@ -495,28 +510,22 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		}
 	}
 
-	if(cfg->dead_threshold[0] == cfg->dead_threshold[1] && cfg->dead_threshold[1] == cfg->dead_threshold[2] && cfg->dead_threshold[2] == cfg->dead_threshold[3] && cfg->dead_threshold[3] == cfg->dead_threshold[4] && cfg->dead_threshold[4] == cfg->dead_threshold[5]) {
+	same = 1;
+	for(i=1; i<MAX_AXES; i++) {
+		if(cfg->dead_threshold[i] != cfg->dead_threshold[i - 1]) {
+			same = 0;
+			break;
+		}
+	}
+	if(same) {
 		if(cfg->dead_threshold[0] != def.dead_threshold[0]) {
 			add_cfgopt(CFG_DEADZONE, 0, "dead-zone = %d", cfg->dead_threshold[0]);
 		}
 	} else {
-		if(cfg->dead_threshold[0] != def.dead_threshold[0]) {
-			add_cfgopt(CFG_DEADZONE_TX, 0, "dead-zone-translation-x = %d", cfg->dead_threshold[0]);
-		}
-		if(cfg->dead_threshold[1] != def.dead_threshold[1]) {
-			add_cfgopt(CFG_DEADZONE_TY, 0, "dead-zone-translation-y = %d", cfg->dead_threshold[1]);
-		}
-		if(cfg->dead_threshold[2] != def.dead_threshold[2]) {
-			add_cfgopt(CFG_DEADZONE_TZ, 0, "dead-zone-translation-z = %d", cfg->dead_threshold[2]);
-		}
-		if(cfg->dead_threshold[3] != def.dead_threshold[3]) {
-			add_cfgopt(CFG_DEADZONE_RX, 0, "dead-zone-rotation-x = %d", cfg->dead_threshold[3]);
-		}
-		if(cfg->dead_threshold[4] != def.dead_threshold[4]) {
-			add_cfgopt(CFG_DEADZONE_RY, 0, "dead-zone-rotation-y = %d", cfg->dead_threshold[4]);
-		}
-		if(cfg->dead_threshold[5] != def.dead_threshold[5]) {
-			add_cfgopt(CFG_DEADZONE_RZ, 0, "dead-zone-rotation-z = %d", cfg->dead_threshold[5]);
+		for(i=0; i<MAX_AXES; i++) {
+			if(cfg->dead_threshold[i] != def.dead_threshold[i]) {
+				add_cfgopt(CFG_DEADZONE_N, i, "dead-zone%d = %d", i, cfg->dead_threshold[i]);
+			}
 		}
 	}
 

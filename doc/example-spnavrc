@@ -32,6 +32,8 @@
 #dead-zone = 2
 
 # Separate dead-zone for each rotation and translation axis.
+# This is still supported, but unclear in face of device axes mapping, and
+# therefore you are encouraged to use dead-zoneN instead.
 #
 #dead-zone-translation-x = 2
 #dead-zone-translation-y = 2
@@ -40,6 +42,12 @@
 #dead-zone-rotation-y = 2
 #dead-zone-rotation-z = 2
 
+# Separate dead-zone for each device axis.
+#
+#dead-zone0 = 2
+#dead-zone1 = 2
+# ...
+#dead-zoneN = 2
 
 # Selectively invert translation and rotation axes. Valid values are
 # combinations of the letters x, y, and z.

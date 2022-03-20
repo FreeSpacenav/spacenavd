@@ -427,6 +427,9 @@ static void handle_events(fd_set *rset)
 				/* ... and process it, possibly dispatching a spacenav event to clients */
 				process_input(dev, &inp);
 			}
+			/* flush any pending events if we run out of input */
+			inp.type = INP_FLUSH;
+			process_input(dev, &inp);
 		}
 		dev = next;
 	}

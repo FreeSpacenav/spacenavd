@@ -139,12 +139,11 @@ void process_input(struct device *dev, struct dev_input *inp)
 
 	switch(inp->type) {
 	case INP_MOTION:
-		if((inp->idx = cfg.map_axis[inp->idx]) < 0) {
-			break;
-		}
-
 		if(abs(inp->val) < cfg.dead_threshold[inp->idx] ) {
 			inp->val = 0;
+		}
+		if((inp->idx = cfg.map_axis[inp->idx]) < 0) {
+			break;
 		}
 		sign = cfg.invert[inp->idx] ? -1 : 1;
 

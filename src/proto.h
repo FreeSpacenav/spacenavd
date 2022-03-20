@@ -39,8 +39,8 @@ enum {
 	REQ_GCFG_SENS,			/* get global sens:			R[0] float R[6] status */
 	REQ_SCFG_SENS_AXIS,		/* set per-axis sens/ty:	Q[0-5] values - R[6] status */
 	REQ_GCFG_SENS_AXIS,		/* get per-axis sens/ty:	R[0-5] values R[6] status */
-	REQ_SCFG_DEADZONE,		/* set deadzones:			Q[0-5] values - R[6] status */
-	REQ_GCFG_DEADZONE,		/* get deadzones:			R[0-5] values R[6] status */
+	REQ_SCFG_DEADZONE,		/* set deadzones:			Q[0] dev axis Q[1] deadzone - R[6] status */
+	REQ_GCFG_DEADZONE,		/* get deadzones:			R[0] dev axis - R[0] dev axis R[1] deadzone R[6] status */
 	REQ_SCFG_INVERT,		/* set invert axes:			Q[0-5] invert - R[6] status */
 	REQ_GCFG_INVERT,		/* get invert axes:			R[0-5] invert R[6] status */
 	REQ_SCFG_AXISMAP,		/* set axis mapping:        Q[0] dev axis Q[1] mapping - R[6] status */

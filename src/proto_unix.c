@@ -374,20 +374,22 @@ static int handle_request(struct client *c, struct reqresp *req)
 		break;
 
 	case REQ_SCFG_DEADZONE:
-		for(i=0; i<6; i++) {
-			if(req->data[i] < 0) {
-				logmsg(LOG_WARNING, "client attempted to set invalid deadzone for axis %d: %d\n", i,
-						req->data[i]);
-				sendresp(c, req, -1);
-				return 0;
-			}
+		if(!AXIS_VALID(req->data[0])) {
+			logmsg(LOG_WARNING, "client attempted to set invalid axis deadzone: %d\n", req->data[0]);
+			sendresp(c, req, -1);
+			return 0;
 		}
-		memcpy(cfg.dead_threshold, req->data, 6 * sizeof(int));
+		cfg.dead_threshold[req->data[0]] = req->data[1];
 		sendresp(c, req, 0);
 		break;
 
 	case REQ_GCFG_DEADZONE:
-		memcpy(req->data, cfg.dead_threshold, 6 * sizeof(int));
+		if(!AXIS_VALID(req->data[0])) {
+			logmsg(LOG_WARNING, "client requested invalid axis deadzone: %d\n", req->data[0]);
+			sendresp(c, req, -1);
+			return 0;
+		}
+		req->data[1] = cfg.dead_threshold[req->data[0]];
 		sendresp(c, req, 0);
 		break;
 
