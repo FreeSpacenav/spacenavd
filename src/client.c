@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2010 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -62,6 +62,8 @@ struct client *add_client(int type, void *cdata)
 	}
 	/* default to protocol version 0 until the client changes it */
 	client->proto = 0;
+	/* evmask for proto-v0 clients is just input events */
+	client->evmask = EVMASK_MOTION | EVMASK_BUTTON;
 
 	client->sens = 1.0f;
 	client->dev = 0; /* default/first device */

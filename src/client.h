@@ -31,6 +31,14 @@ enum {
 	CLIENT_UNIX		/* through the new UNIX domain socket */
 };
 
+/* event selection (must match SPNAV_EVMASK* in libspnav/spnav.h) */
+enum {
+	EVMASK_MOTION	= 1,
+	EVMASK_BUTTON	= 2,
+	EVMASK_DEV		= 4,
+	EVMASK_CFG		= 8
+};
+
 struct device;
 
 struct client {
@@ -45,7 +53,8 @@ struct client {
 	float sens;	/* sensitivity */
 	struct device *dev;
 
-	char name[32];
+	char name[32];			/* client name (not unique) */
+	unsigned int evmask;	/* event selection mask */
 
 	char reqbuf[64];
 	int reqbytes;

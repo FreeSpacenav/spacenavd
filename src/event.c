@@ -304,6 +304,18 @@ static void dispatch_event(struct dev_event *dev_ev)
 	}
 }
 
+void broadcast_event(spnav_event *ev)
+{
+	struct client *c;
+
+	c = first_client();
+	while(c) {
+		/* event masks will be checked at the protocol level (send_uevent) */
+		send_event(ev, c);
+		c = c->next;
+	}
+}
+
 static void send_event(spnav_event *ev, struct client *c)
 {
 	switch(get_client_type(c)) {

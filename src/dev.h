@@ -26,6 +26,7 @@ struct dev_input;
 #define MAX_DEV_NAME	256
 
 struct device {
+	int id;
 	int fd;
 	void *data;
 	char name[MAX_DEV_NAME];

@@ -35,12 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 
-enum {
-	UEV_TYPE_MOTION,
-	UEV_TYPE_PRESS,
-	UEV_TYPE_RELEASE
-};
-
 static int lsock = -1;
 
 
@@ -111,7 +105,9 @@ void send_uevent(spnav_event *ev, struct client *c)
 
 	switch(ev->type) {
 	case EVENT_MOTION:
-		data[0] = UEV_TYPE_MOTION;
+		if(!(c->evmask & EVMASK_MOTION)) break;
+
+		data[0] = UEV_MOTION;
 
 		motion_mul = get_client_sensitivity(c);
 		for(i=0; i<6; i++) {
@@ -122,8 +118,29 @@ void send_uevent(spnav_event *ev, struct client *c)
 		break;
 
 	case EVENT_BUTTON:
-		data[0] = ev->button.press ? UEV_TYPE_PRESS : UEV_TYPE_RELEASE;
+		if(!(c->evmask & EVMASK_BUTTON)) break;
+
+		data[0] = ev->button.press ? UEV_PRESS : UEV_RELEASE;
 		data[1] = ev->button.bnum;
+		break;
+
+	case EVENT_DEV:
+		if(!(c->evmask & EVMASK_DEV)) break;
+
+		data[0] = UEV_DEV;
+		data[1] = ev->dev.op;
+		data[2] = ev->dev.id;
+		data[3] = ev->dev.devtype;
+		data[4] = ev->dev.usbid[0];
+		data[5] = ev->dev.usbid[1];
+		break;
+
+	case EVENT_CFG:
+		if(!(c->evmask & EVMASK_CFG)) break;
+
+		data[0] = UEV_CFG;
+		data[1] = ev->cfg.cfg;
+		memcpy(data + 2, ev->cfg.data, sizeof ev->cfg.data);
 		break;
 
 	default:
@@ -194,6 +211,11 @@ int handle_uevents(fd_set *rset)
 							msg = REQ_TAG | REQ_CHANGE_PROTO | MAX_PROTO_VER;
 						}
 						write(s, &msg, sizeof msg);
+
+						if(c->proto > 0) {
+							/* set default event mask for proto-v1 clients */
+							c->evmask = EVMASK_MOTION | EVMASK_BUTTON | EVMASK_DEV;
+						}
 						continue;
 					}
 
@@ -273,6 +295,16 @@ static int handle_request(struct client *c, struct reqresp *req)
 	case REQ_GET_SENS:
 		fval = get_client_sensitivity(c);
 		req->data[0] = *(int*)&fval;
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_SET_EVMASK:
+		c->evmask = req->data[0];
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GET_EVMASK:
+		req->data[0] = c->evmask;
 		sendresp(c, req, 0);
 		break;
 

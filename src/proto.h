@@ -4,6 +4,16 @@
 /* maximum supported protocol version */
 #define MAX_PROTO_VER	1
 
+enum {
+	UEV_MOTION,
+	UEV_PRESS,
+	UEV_RELEASE,
+	UEV_DEV,
+	UEV_CFG,
+
+	MAX_UEV
+};
+
 struct reqresp {
 	int type;
 	int data[7];
@@ -23,6 +33,8 @@ enum {
 	REQ_SET_NAME = REQ_BASE,/* set client name: Q[0-6] name - R[6] status */
 	REQ_SET_SENS,			/* set client sensitivity:	Q[0] float - R[6] status */
 	REQ_GET_SENS,			/* get client sensitivity:	R[0] float R[6] status */
+	REQ_SET_EVMASK,			/* set event mask: Q[0] mask - R[6] status */
+	REQ_GET_EVMASK,			/* get event mask: R[0] mask R[6] status */
 
 	/* device queries */
 	REQ_DEV_NAME = 0x2000,	/* get device name:	R[0] length R[6] status followed
