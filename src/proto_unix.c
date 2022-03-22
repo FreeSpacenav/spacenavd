@@ -27,7 +27,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
+#define DEF_PROTO_REQ_NAMES
 #include "proto.h"
+#undef DEF_PROTO_REQ_NAMES
 #include "proto_unix.h"
 #include "spnavd.h"
 #ifdef USE_X11
@@ -39,7 +41,7 @@ static int lsock = -1;
 
 
 static int handle_request(struct client *c, struct reqresp *req);
-
+static const char *reqstr(int req);
 
 int init_unix(void)
 {
@@ -191,7 +193,7 @@ int handle_uevents(fd_set *rset)
 				/* handle client requests */
 				switch(c->proto) {
 				case 0:
-					while((rdbytes = read(s, &msg, sizeof msg)) <= 0 && errno == EINTR);
+					while((rdbytes = read(s, &msg, sizeof msg)) < 0 && errno == EINTR);
 					if(rdbytes <= 0) {	/* something went wrong... disconnect client */
 						close(get_client_socket(c));
 						remove_client(c);
@@ -228,7 +230,7 @@ int handle_uevents(fd_set *rset)
 
 				case 1:
 					/* protocol v1: accumulate request bytes, and process */
-					while((rdbytes = read(s, c->reqbuf + c->reqbytes, sizeof *req - c->reqbytes)) <= 0 && errno == EINTR);
+					while((rdbytes = read(s, c->reqbuf + c->reqbytes, sizeof *req - c->reqbytes)) < 0 && errno == EINTR);
 					if(rdbytes <= 0) {
 						close(s);
 						remove_client(c);
@@ -273,6 +275,11 @@ static int handle_request(struct client *c, struct reqresp *req)
 	float fval, fvec[6];
 	struct device *dev;
 	const char *str = 0;
+
+	/*
+	logmsg(LOG_DEBUG, "request %s - %x %x %x %x %x %x\n", reqstr(req->type), req->data[0],
+			req->data[1], req->data[2], req->data[3], req->data[4], req->data[5], req->data[6]);
+	*/
 
 	switch(req->type & 0xffff) {
 	case REQ_SET_NAME:
@@ -438,7 +445,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 		break;
 
 	case REQ_SCFG_AXISMAP:
-		if(!AXIS_VALID(req->data[0]) || req->data[1] < 0 || req->data[1] >= 6) {
+		if(!AXIS_VALID(req->data[0]) || req->data[1] < -1 || req->data[1] >= 6) {
 			logmsg(LOG_WARNING, "client attempted to set invalid axis mapping: %d -> %d\n",
 					req->data[0], req->data[1]);
 			sendresp(c, req, -1);
@@ -598,9 +605,39 @@ static int handle_request(struct client *c, struct reqresp *req)
 		break;
 
 	default:
-		logmsg(LOG_WARNING, "invalid client request: %04xh\n", (unsigned int)req->type);
+		logmsg(LOG_WARNING, "invalid client request: %s\n", reqstr(req->type));
 		sendresp(c, req, -1);
 	}
 
 	return 0;
+}
+
+static const char *reqstr(int req)
+{
+	static char buf[8];
+
+	req &= 0xffff;
+
+	if(req >= 0x1000 && req < 0x1000 + sizeof reqnames_1000 / sizeof *reqnames_1000) {
+		return reqnames_1000[req - 0x1000];
+	}
+	if(req >= 0x2000 && req < 0x2000 + sizeof reqnames_2000 / sizeof *reqnames_2000) {
+		return reqnames_2000[req - 0x2000];
+	}
+	if(req >= 0x3000 && req < 0x3000 + sizeof reqnames_3000 / sizeof *reqnames_3000) {
+		return reqnames_3000[req - 0x3000];
+	}
+	switch(req) {
+	case REQ_CFG_SAVE:
+		return "CFG_SAVE";
+	case REQ_CFG_RESTORE:
+		return "CFG_RESTORE";
+	case REQ_CFG_RESET:
+		return "CFG_RESET";
+	default:
+		break;
+	}
+
+	sprintf(buf, "0x%04x", req);
+	return buf;
 }

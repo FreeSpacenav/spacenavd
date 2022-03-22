@@ -109,4 +109,49 @@ enum {
 	DEV_SMMOD			/* SpaceMouse Module */
 };
 
+
+#ifdef DEF_PROTO_REQ_NAMES
+static const char *reqnames_1000[] = {
+	"SET_NAME",
+	"SET_SENS",
+	"GET_SENS",
+	"SET_EVMASK",
+	"GET_EVMASK",
+};
+static const char *reqnames_2000[] = {
+	"DEV_NAME",
+	"DEV_PATH",
+	"DEV_NAXES",
+	"DEV_NBUTTONS",
+	"DEV_USBID",
+	"DEV_TYPE",
+};
+static const char *reqnames_3000[] = {
+	"SCFG_SENS",
+	"GCFG_SENS",
+	"SCFG_SENS_AXIS",
+	"GCFG_SENS_AXIS",
+	"SCFG_DEADZONE",
+	"GCFG_DEADZONE",
+	"SCFG_INVERT",
+	"GCFG_INVERT",
+	"SCFG_AXISMAP",
+	"GCFG_AXISMAP",
+	"SCFG_BNMAP",
+	"GCFG_BNMAP",
+	"SCFG_BNACTION",
+	"GCFG_BNACTION",
+	"SCFG_KBMAP",
+	"GCFG_KBMAP",
+	"SCFG_SWAPYZ",
+	"GCFG_SWAPYZ",
+	"SCFG_LED",
+	"GCFG_LED",
+	"SCFG_GRAB",
+	"GCFG_GRAB",
+	"SCFG_SERDEV",
+	"GCFG_SERDEV",
+};
+#endif	/* DEF_PROTO_REQ_NAMES */
+
 #endif	/* PROTO_H_ */
