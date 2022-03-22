@@ -448,9 +448,13 @@ void cfg_changed(void)
 		while(dev) {
 			if(is_device_valid(dev)) {
 				if(verbose) {
-					logmsg(LOG_INFO, "turn led %s, device: %s\n", cfg.led ? "on": "off", dev->name);
+					logmsg(LOG_INFO, "led %s, device: %s\n", cfg.led ? (cfg.led == LED_AUTO ? "auto" : "on"): "off", dev->name);
 				}
-				set_device_led(dev, cfg.led);
+				if(cfg.led == LED_ON || (cfg.led == LED_AUTO && first_client())) {
+					set_device_led(dev, 1);
+				} else {
+					set_device_led(dev, 0);
+				}
 			}
 			dev = dev->next;
 		}

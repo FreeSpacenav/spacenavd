@@ -125,6 +125,21 @@ static struct dev_event *device_event_in_use(struct device *dev)
 	return NULL;
 }
 
+static inline int map_axis(int devaxis)
+{
+	const static int swaptab[] = {0, 2, 1, 3, 5, 4};
+
+	int axis = cfg.map_axis[devaxis];
+	if(axis < 0 || axis >= 6) {
+		return -1;
+	}
+
+	if(!cfg.swapyz) {
+		return swaptab[axis];
+	}
+	return axis;
+}
+
 /* process_input processes an device input event, and dispatches
  * spacenav events to the clients by calling dispatch_event.
  * relative inputs (INP_MOTION) are accumulated, and dispatched when
@@ -133,7 +148,7 @@ static struct dev_event *device_event_in_use(struct device *dev)
  */
 void process_input(struct device *dev, struct dev_input *inp)
 {
-	int sign;
+	int sign, axis;
 	struct dev_event *dev_ev;
 	float sens_rot, sens_trans;
 
@@ -142,15 +157,15 @@ void process_input(struct device *dev, struct dev_input *inp)
 		if(abs(inp->val) < cfg.dead_threshold[inp->idx] ) {
 			inp->val = 0;
 		}
-		if((inp->idx = cfg.map_axis[inp->idx]) < 0) {
+		if((axis = map_axis(inp->idx)) == -1) {
 			break;
 		}
-		sign = cfg.invert[inp->idx] ? -1 : 1;
+		sign = cfg.invert[axis] ? -1 : 1;
 
-		sens_rot = disable_rotation ? 0 : cfg.sens_rot[inp->idx - 3];
-		sens_trans = disable_translation ? 0 : cfg.sens_trans[inp->idx];
+		sens_rot = disable_rotation ? 0 : cfg.sens_rot[axis - 3];
+		sens_trans = disable_translation ? 0 : cfg.sens_trans[axis];
 
-		inp->val = (int)((float)inp->val * cfg.sensitivity * (inp->idx < 3 ? sens_trans : sens_rot));
+		inp->val = (int)((float)inp->val * cfg.sensitivity * (axis < 3 ? sens_trans : sens_rot));
 
 		dev_ev = device_event_in_use(dev);
 		if(verbose && dev_ev == NULL)
@@ -161,7 +176,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 		}
 		dev_ev->event.type = EVENT_MOTION;
 		dev_ev->event.motion.data = (int*)&dev_ev->event.motion.x;
-		dev_ev->event.motion.data[inp->idx] = sign * inp->val;
+		dev_ev->event.motion.data[axis] = sign * inp->val;
 		dev_ev->pending = 1;
 		break;
 

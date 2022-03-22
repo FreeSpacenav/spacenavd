@@ -543,11 +543,22 @@ static int handle_request(struct client *c, struct reqresp *req)
 #endif
 		break;
 
+	case REQ_SCFG_SWAPYZ:
+		cfg.swapyz = req->data[0] ? 1 : 0;
+		sendresp(c, req, 0);
+
+	case REQ_GCFG_SWAPYZ:
+		req->data[0] = cfg.swapyz;
+		sendresp(c, req, 0);
+		break;
+
 	case REQ_SCFG_LED:
-		cfg.led = req->data[0] ? 1 : 0;
-		if((dev = get_client_device(c)) && dev->set_led) {
-			dev->set_led(dev, cfg.led);
+		if(req->data[0] < 0 || req->data[0] >= 3) {
+			sendresp(c, req, -1);
+			break;
 		}
+		cfg.led = req->data[0];
+		cfg_changed();
 		sendresp(c, req, 0);
 		break;
 

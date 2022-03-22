@@ -52,6 +52,7 @@ struct cfg {
 	int bnact[MAX_BUTTONS];
 	int kbmap[MAX_BUTTONS];
 	char *kbmap_str[MAX_BUTTONS];
+	int swapyz;
 	int led, grab_device;
 	char serial_dev[PATH_MAX];
 	int repeat_msec;

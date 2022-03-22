@@ -57,7 +57,7 @@ static int add_cfgopt_devid(int vid, int pid);
 
 enum {TX, TY, TZ, RX, RY, RZ};
 
-static const int def_axmap[] = {0, 2, 1, 3, 5, 4};
+static const int def_axmap[] = {0, 1, 2, 3, 4, 5};
 static const int def_axinv[] = {0, 1, 1, 0, 1, 1};
 
 struct cfgline {
@@ -85,6 +85,7 @@ void default_cfg(struct cfg *cfg)
 		cfg->dead_threshold[i] = 2;
 	}
 
+	cfg->swapyz = 1;
 	cfg->led = LED_ON;
 	cfg->grab_device = 1;
 
@@ -329,24 +330,18 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 
 		} else if(strcmp(key_str, "swap-yz") == 0) {
-			int swap_yz = 0;
-
 			lptr->opt = CFG_SWAPYZ;
 			if(isint) {
-				swap_yz = ival;
+				cfg->swapyz = ival;
 			} else {
 				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
-					swap_yz = 1;
+					cfg->swapyz = 1;
 				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
-					swap_yz = 0;
+					cfg->swapyz = 0;
 				} else {
 					logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
 					continue;
 				}
-			}
-
-			for(i=0; i<6; i++) {
-				cfg->map_axis[i] = swap_yz ? i : def_axmap[i];
 			}
 
 		} else if(sscanf(key_str, "axismap%d", &axisidx) == 1) {
@@ -563,6 +558,10 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		if(cfg->kbmap_str[i]) {
 			add_cfgopt(CFG_KBMAP_N, i, "kbmap%d = %s", i, cfg->kbmap_str[i]);
 		}
+	}
+
+	if(cfg->swapyz != def.swapyz) {
+		add_cfgopt(CFG_SWAPYZ, 0, "swap-yz = %s", cfg->swapyz ? "true" : "false");
 	}
 
 	if(cfg->led != def.led) {

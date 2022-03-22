@@ -63,6 +63,8 @@ enum {
 	REQ_GCFG_BNACTION,		/* get button action:		Q[0] bidx - R[0] bidx R[1] action R[6] status */
 	REQ_SCFG_KBMAP,			/* set keyboard mapping:	Q[0] bidx Q[1] keysym - R[6] status */
 	REQ_GCFG_KBMAP,			/* get keyboard mapping:	Q[0] bidx - R[0] bidx R[1] keysym R[6] status */
+	REQ_SCFG_SWAPYZ,		/* set Y-Z axis swap:		Q[0] swap - R[6] status */
+	REQ_GCFG_SWAPYZ,		/* get Y-Z axis swap:		R[0] swap R[6] status */
 	REQ_SCFG_LED,			/* set LED state:			Q[0] state - R[6] status */
 	REQ_GCFG_LED,			/* get LED state:			R[0] state R[6] status */
 	REQ_SCFG_GRAB,			/* set device grabbing:		Q[0] state - R[6] status */
