@@ -460,6 +460,18 @@ void cfg_changed(void)
 		}
 	}
 
+	if(strcmp(cfg.serial_dev, prev_cfg.serial_dev) != 0) {
+		struct device *dev, *iter = get_devices();
+		while(iter) {
+			dev = iter;
+			iter = iter->next;
+			if(strcmp(dev->path, prev_cfg.serial_dev) == 0) {
+				remove_device(dev);
+			}
+		}
+		init_devices_serial();
+	}
+
 	prev_cfg = cfg;
 }
 

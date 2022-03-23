@@ -239,11 +239,6 @@ int handle_uevents(fd_set *rset)
 					c->reqbytes += rdbytes;
 					if(c->reqbytes >= sizeof *req) {
 						req = (struct reqresp*)c->reqbuf;
-						/*
-						logmsg(LOG_INFO, "DBG REQ (%d): %x - %x %x %x %x %x %x %x\n", c->reqbytes,
-								req->type, req->data[0], req->data[1], req->data[2],
-								req->data[3], req->data[4], req->data[5], req->data[6]);
-						*/
 						c->reqbytes = 0;
 						if(handle_request(c, req) == -1) {
 							close(s);
@@ -271,15 +266,16 @@ static int sendresp(struct client *c, struct reqresp *rr, int status)
 
 static int handle_request(struct client *c, struct reqresp *req)
 {
+	static char *serdev_end;
+	static int serdev_total_len;
+
 	int i, idx;
 	float fval, fvec[6];
 	struct device *dev;
 	const char *str = 0;
 
-	/*
 	logmsg(LOG_DEBUG, "request %s - %x %x %x %x %x %x\n", reqstr(req->type), req->data[0],
 			req->data[1], req->data[2], req->data[3], req->data[4], req->data[5], req->data[6]);
-	*/
 
 	switch(req->type & 0xffff) {
 	case REQ_SET_NAME:
@@ -582,6 +578,35 @@ static int handle_request(struct client *c, struct reqresp *req)
 	case REQ_GCFG_GRAB:
 		req->data[0] = cfg.grab_device;
 		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_SERDEV:
+		if(!serdev_end) {
+			/* first part */
+			serdev_end = cfg.serial_dev;
+			serdev_total_len = req->data[0];
+		}
+		for(i=0; i<6; i++) {
+			if(serdev_end < serdev_end + PATH_MAX - 1) {
+				*serdev_end++ = req->data[i + 1];
+			}
+			req->data[0]--;
+		}
+		if(req->data[0] <= 0) {
+			*serdev_end = 0;
+			if(strlen(cfg.serial_dev) != serdev_total_len) {
+				logmsg(LOG_WARNING, "config SCFG_SERDEV, expected %d bytes, got %d\n", serdev_total_len, strlen(cfg.serial_dev));
+			}
+			serdev_end = 0;
+			serdev_total_len = 0;
+			cfg_changed();
+		}
+		break;
+
+	case REQ_GCFG_SERDEV:
+		req->data[0] = strlen(cfg.serial_dev);
+		sendresp(c, req, 0);
+		write(get_client_socket(c), cfg.serial_dev, req->data[0]);
 		break;
 
 	case REQ_CFG_SAVE:

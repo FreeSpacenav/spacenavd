@@ -42,9 +42,13 @@ static unsigned short last_id;
 
 int init_devices(void)
 {
+	init_devices_serial();
+	return init_devices_usb();
+}
+
+int init_devices_serial(void)
+{
 	struct device *dev;
-	int i, device_added = 0;
-	struct usb_dev_info *usblist, *usbdev;
 	spnav_event ev = {0};
 
 	/* try to open a serial device if specified in the config file */
@@ -68,6 +72,17 @@ int init_devices(void)
 			broadcast_event(&ev);
 		}
 	}
+
+	return 0;
+}
+
+
+int init_devices_usb(void)
+{
+	struct device *dev;
+	int i, device_added = 0;
+	struct usb_dev_info *usblist, *usbdev;
+	spnav_event ev = {0};
 
 	/* detect any supported USB devices */
 	usblist = find_usb_devices(match_usbdev);
@@ -111,7 +126,7 @@ int init_devices(void)
 	free_usb_devices_list(usblist);
 
 	if(!usblist) {
-		logmsg(LOG_ERR, "failed to find any supported devices\n");
+		logmsg(LOG_ERR, "failed to find any supported USB devices\n");
 		return -1;
 	}
 

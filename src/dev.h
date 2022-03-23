@@ -46,6 +46,8 @@ struct device {
 };
 
 int init_devices(void);
+int init_devices_serial(void);
+int init_devices_usb(void);
 
 void remove_device(struct device *dev);
 

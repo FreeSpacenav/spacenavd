@@ -134,7 +134,7 @@ static inline int map_axis(int devaxis)
 		return -1;
 	}
 
-	if(!cfg.swapyz) {
+	if(cfg.swapyz) {
 		return swaptab[axis];
 	}
 	return axis;

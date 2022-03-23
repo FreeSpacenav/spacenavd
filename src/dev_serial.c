@@ -66,7 +66,6 @@ enum {
 struct sball {
 	int fd;
 	unsigned int flags;
-	int nbuttons;
 
 	char buf[INP_BUF_SZ];
 	int len;
@@ -126,6 +125,7 @@ int open_dev_serial(struct device *dev)
 	sb->dev = dev;
 	dev->data = sb;
 	dev->fd = sb->fd = fd;
+	dev->num_axes = 6;
 	dev->close = close_dev_serial;
 	dev->read = read_dev_serial;
 
@@ -142,9 +142,9 @@ int open_dev_serial(struct device *dev)
 		logmsg(LOG_INFO, "Spaceball detected: %s\n", buf);
 		strcpy(dev->name, "Spaceball");
 
-		sb->nbuttons = guess_num_buttons(dev, buf);
-		sb->keymask = 0xffff >> (16 - sb->nbuttons);
-		logmsg(LOG_INFO, "%d buttons\n", sb->nbuttons);
+		dev->num_buttons = guess_num_buttons(dev, buf);
+		sb->keymask = 0xffff >> (16 - dev->num_buttons);
+		logmsg(LOG_INFO, "%d buttons\n", dev->num_buttons);
 
 		/* set binary mode and enable automatic data packet sending. also request
 		 * a key event to find out as soon as possible if this is a 4000flx with
@@ -167,9 +167,9 @@ int open_dev_serial(struct device *dev)
 		logmsg(LOG_INFO, "Magellan SpaceMouse detected:\n%s\n", buf);
 		strcpy(dev->name, "Magellan SpaceMouse");
 
-		sb->nbuttons = guess_num_buttons(dev, buf);
-		sb->keymask = 0xffff >> (16 - sb->nbuttons);
-		logmsg(LOG_INFO, "%d buttons\n", sb->nbuttons);
+		dev->num_buttons = guess_num_buttons(dev, buf);
+		sb->keymask = 0xffff >> (16 - dev->num_buttons);
+		logmsg(LOG_INFO, "%d buttons\n", dev->num_buttons);
 
 		/* set 3D mode, not-dominant-axis, pass through motion and button packets */
 		write(fd, "m3\r", 3);
@@ -503,7 +503,7 @@ static int sball_parsepkt(struct sball *sb, int id, char *data, int len)
 		if(!(sb->flags & SB4000)) {
 			logmsg(LOG_INFO, "Switching to spaceball 4000flx/5000flx-a mode (12 buttons)            \n");
 			sb->flags |= SB4000;
-			sb->nbuttons = 12;	/* might have guessed 8 before */
+			sb->dev->num_buttons = 12;	/* might have guessed 8 before */
 			sb->keymask = 0xfff;
 			strcpy(sb->dev->name, "Spaceball 4000FLX");
 			sb->dev->type = DEV_SB4000;
