@@ -85,7 +85,7 @@ void remove_client(struct client *client)
 
 	if(iter == client) {
 		client_list = iter->next;
-		free(iter);
+		free_client(iter);
 		iter = client_list;
 		if(!iter) {
 			if(cfg.led == LED_AUTO) {
@@ -99,10 +99,19 @@ void remove_client(struct client *client)
 		if(iter->next == client) {
 			struct client *tmp = iter->next;
 			iter->next = tmp->next;
-			free(tmp);
+			free_client(tmp);
 		} else {
 			iter = iter->next;
 		}
+	}
+}
+
+void free_client(struct client *client)
+{
+	if(client) {
+		free(client->name);
+		free(client->strbuf.buf);
+		free(client);
 	}
 }
 

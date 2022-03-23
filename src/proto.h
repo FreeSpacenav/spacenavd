@@ -21,25 +21,34 @@ struct reqresp {
 	int32_t data[7];
 };
 
+struct reqresp_strbuf {
+	char *buf, *endp;
+	int size;
+	int expect;
+};
+
 #define REQ_TAG			0x7faa0000
 #define REQ_BASE		0x1000
 
-/* REQ_S* are set, REQ_G* are get requests.
+/* REQ_S* are set requests, REQ_G* are get requests.
  * Quick-reference for request-response data in the comments next to each
  * request: Q[n] defines request data item n, R[n] defines response data item n
  *
  * status responses are 0 for success, non-zero for failure
+ *
+ * "remaining length" fields in string transfers have 16 valid bits. Bit 16 is
+ * used as a flag: 0 for the first packet, 1 for continuation packets.
  */
 enum {
 	/* per-client settings */
-	REQ_SET_NAME = REQ_BASE,/* set client name: Q[0-5] next 6 bytes Q[6] remaining length - R[6] status */
+	REQ_SET_NAME = REQ_BASE,/* set client name: Q[0-5] next 24 bytes Q[6] remaining length - R[6] status */
 	REQ_SET_SENS,			/* set client sensitivity:	Q[0] float - R[6] status */
 	REQ_GET_SENS,			/* get client sensitivity:	R[0] float R[6] status */
 	REQ_SET_EVMASK,			/* set event mask: Q[0] mask - R[6] status */
 	REQ_GET_EVMASK,			/* get event mask: R[0] mask R[6] status */
 
 	/* device queries */
-	REQ_DEV_NAME = 0x2000,	/* get device name:	R[0-5] next 6 bytes R[6] remaining length or -1 for failure */
+	REQ_DEV_NAME = 0x2000,	/* get device name:	R[0-5] next 24 bytes R[6] remaining length or -1 for failure */
 	REQ_DEV_PATH,			/* get device path: same as above */
 	REQ_DEV_NAXES,			/* get number of axes:	R[0] num axes R[6] status */
 	REQ_DEV_NBUTTONS,		/* get number of buttons: same as above */
@@ -70,8 +79,8 @@ enum {
 	REQ_GCFG_LED,			/* get LED state:			R[0] state R[6] status */
 	REQ_SCFG_GRAB,			/* set device grabbing:		Q[0] state - R[6] status */
 	REQ_GCFG_GRAB,			/* get device grabbing:		R[0] state R[6] status */
-	REQ_SCFG_SERDEV,		/* set serial device path:	Q[0-5] next 6 bytes Q[6] remaining length - R[6] status */
-	REQ_GCFG_SERDEV,		/* get serial device path:	R[0-5] next 6 bytes R[6] remaining length or -1 for failure */
+	REQ_SCFG_SERDEV,		/* set serial device path:	Q[0-5] next 24 bytes Q[6] remaining length - R[6] status */
+	REQ_GCFG_SERDEV,		/* get serial device path:	R[0-5] next 24 bytes R[6] remaining length or -1 for failure */
 	/* TODO ... more */
 	REQ_CFG_SAVE = 0x3ffe,	/* save config file:        R[6] status */
 	REQ_CFG_RESTORE,		/* load config from file:   R[6] status */
@@ -111,23 +120,31 @@ enum {
 };
 
 
+#define REQSTR_CHUNK_SIZE	24
+#define REQSTR_CONT_BIT		0x10000
+#define REQSTR_FIRST(rr)	(((rr)->data[6] & REQSTR_CONT_BIT) == 0)
+#define REQSTR_REMLEN(rr)	((rr)->data[6] & 0xffff)
+
+int proto_send_str(int fd, int req, const char *str);
+int proto_recv_str(struct reqresp_strbuf *sbuf, struct reqresp *rr);
+
 #ifdef DEF_PROTO_REQ_NAMES
-static const char *reqnames_1000[] = {
+const char *reqnames_1000[] = {
 	"SET_NAME",
 	"SET_SENS",
 	"GET_SENS",
 	"SET_EVMASK",
-	"GET_EVMASK",
+	"GET_EVMASK"
 };
-static const char *reqnames_2000[] = {
+const char *reqnames_2000[] = {
 	"DEV_NAME",
 	"DEV_PATH",
 	"DEV_NAXES",
 	"DEV_NBUTTONS",
 	"DEV_USBID",
-	"DEV_TYPE",
+	"DEV_TYPE"
 };
-static const char *reqnames_3000[] = {
+const char *reqnames_3000[] = {
 	"SCFG_SENS",
 	"GCFG_SENS",
 	"SCFG_SENS_AXIS",
@@ -151,8 +168,19 @@ static const char *reqnames_3000[] = {
 	"SCFG_GRAB",
 	"GCFG_GRAB",
 	"SCFG_SERDEV",
-	"GCFG_SERDEV",
+	"GCFG_SERDEV"
 };
+
+const int reqnames_1000_size = sizeof reqnames_1000 / sizeof *reqnames_1000;
+const int reqnames_2000_size = sizeof reqnames_2000 / sizeof *reqnames_2000;
+const int reqnames_3000_size = sizeof reqnames_3000 / sizeof *reqnames_3000;
+#else
+extern const char *reqnames_1000[];
+extern const char *reqnames_2000[];
+extern const char *reqnames_3000[];
+extern const int reqnames_1000_size;
+extern const int reqnames_2000_size;
+extern const int reqnames_3000_size;
 #endif	/* DEF_PROTO_REQ_NAMES */
 
 #endif	/* PROTO_H_ */

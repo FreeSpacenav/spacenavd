@@ -25,6 +25,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <X11/Xlib.h>
 #endif
 
+#include "proto.h"
+
 /* client types */
 enum {
 	CLIENT_X11,		/* through the magellan X11 protocol */
@@ -53,17 +55,21 @@ struct client {
 	float sens;	/* sensitivity */
 	struct device *dev;
 
-	char name[32];			/* client name (not unique) */
+	char *name;				/* client name (not unique) */
 	unsigned int evmask;	/* event selection mask */
 
 	char reqbuf[64];
 	int reqbytes;
+
+	/* protocol buffer for handling reception of strings in multiple packets */
+	struct reqresp_strbuf strbuf;
 
 	struct client *next;
 };
 
 struct client *add_client(int type, void *cdata);
 void remove_client(struct client *client);
+void free_client(struct client *client);
 
 int get_client_type(struct client *client);
 int get_client_socket(struct client *client);

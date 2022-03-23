@@ -27,9 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/un.h>
-#define DEF_PROTO_REQ_NAMES
 #include "proto.h"
-#undef DEF_PROTO_REQ_NAMES
 #include "proto_unix.h"
 #include "spnavd.h"
 #ifdef USE_X11
@@ -268,10 +266,7 @@ static int sendresp(struct client *c, struct reqresp *rr, int status)
 
 static int handle_request(struct client *c, struct reqresp *req)
 {
-	static char *serdev_end;
-	static int serdev_total_len;
-
-	int i, idx;
+	int i, idx, res;
 	float fval, fvec[6];
 	struct device *dev;
 	const char *str = 0;
@@ -281,9 +276,15 @@ static int handle_request(struct client *c, struct reqresp *req)
 
 	switch(req->type & 0xffff) {
 	case REQ_SET_NAME:
-		memcpy(c->name, req->data, sizeof req->data);
-		c->name[sizeof req->data] = 0;
-		logmsg(LOG_INFO, "client name: %s\n", c->name);
+		if((res = proto_recv_str(&c->strbuf, req)) == -1) {
+			logmsg(LOG_ERR, "SET_NAME: failed to receive string\n");
+			break;
+		}
+		if(res) {
+			c->name = c->strbuf.buf;
+			c->strbuf.buf = 0;
+			logmsg(LOG_INFO, "client name: %s\n", c->name);
+		}
 		break;
 
 	case REQ_SET_SENS:
@@ -315,9 +316,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 
 	case REQ_DEV_NAME:
 		if((dev = get_client_device(c))) {
-			req->data[0] = strlen(dev->name);
-			sendresp(c, req, 0);
-			write(get_client_socket(c), dev->name, req->data[0]);
+			proto_send_str(get_client_socket(c), req->type, dev->name);
 		} else {
 			sendresp(c, req, -1);
 		}
@@ -325,9 +324,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 
 	case REQ_DEV_PATH:
 		if((dev = get_client_device(c))) {
-			req->data[0] = strlen(dev->name);
-			sendresp(c, req, 0);
-			write(get_client_socket(c), dev->path, req->data[0]);
+			proto_send_str(get_client_socket(c), req->type, dev->path);
 		} else {
 			sendresp(c, req, -1);
 		}
@@ -583,32 +580,19 @@ static int handle_request(struct client *c, struct reqresp *req)
 		break;
 
 	case REQ_SCFG_SERDEV:
-		if(!serdev_end) {
-			/* first part */
-			serdev_end = cfg.serial_dev;
-			serdev_total_len = req->data[0];
+		if((res = proto_recv_str(&c->strbuf, req)) == -1) {
+			logmsg(LOG_ERR, "SCFG_SERDEV: failed to receive string\n");
+			break;
 		}
-		for(i=0; i<6; i++) {
-			if(serdev_end < serdev_end + PATH_MAX - 1) {
-				*serdev_end++ = req->data[i + 1];
-			}
-			req->data[0]--;
-		}
-		if(req->data[0] <= 0) {
-			*serdev_end = 0;
-			if(strlen(cfg.serial_dev) != serdev_total_len) {
-				logmsg(LOG_WARNING, "config SCFG_SERDEV, expected %d bytes, got %d\n", serdev_total_len, strlen(cfg.serial_dev));
-			}
-			serdev_end = 0;
-			serdev_total_len = 0;
+		if(res) {
+			strncpy(cfg.serial_dev, c->strbuf.buf, sizeof cfg.serial_dev - 1);
+			cfg.serial_dev[sizeof cfg.serial_dev - 1] = 0;
 			cfg_changed();
 		}
 		break;
 
 	case REQ_GCFG_SERDEV:
-		req->data[0] = strlen(cfg.serial_dev);
-		sendresp(c, req, 0);
-		write(get_client_socket(c), cfg.serial_dev, req->data[0]);
+		proto_send_str(c->sock, req->type, cfg.serial_dev);
 		break;
 
 	case REQ_CFG_SAVE:
@@ -645,13 +629,13 @@ static const char *reqstr(int req)
 
 	req &= 0xffff;
 
-	if(req >= 0x1000 && req < 0x1000 + sizeof reqnames_1000 / sizeof *reqnames_1000) {
+	if(req >= 0x1000 && req < 0x1000 + reqnames_1000_size) {
 		return reqnames_1000[req - 0x1000];
 	}
-	if(req >= 0x2000 && req < 0x2000 + sizeof reqnames_2000 / sizeof *reqnames_2000) {
+	if(req >= 0x2000 && req < 0x2000 + reqnames_2000_size) {
 		return reqnames_2000[req - 0x2000];
 	}
-	if(req >= 0x3000 && req < 0x3000 + sizeof reqnames_3000 / sizeof *reqnames_3000) {
+	if(req >= 0x3000 && req < 0x3000 + reqnames_3000_size) {
 		return reqnames_3000[req - 0x3000];
 	}
 	switch(req) {
