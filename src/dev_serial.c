@@ -115,7 +115,7 @@ int open_dev_serial(struct device *dev)
 
 	if((fd = open(dev->path, O_RDWR | O_NOCTTY | O_NONBLOCK)) == -1) {
 		logmsg(LOG_ERR, "open_dev_serial: failed to open device: %s: %s\n", dev->path, strerror(errno));
-		return 0;
+		return -1;
 	}
 
 	if(!(sb = calloc(1, sizeof *sb))) {

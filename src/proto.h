@@ -1,6 +1,8 @@
 #ifndef PROTO_H_
 #define PROTO_H_
 
+#include <stdint.h>
+
 /* maximum supported protocol version */
 #define MAX_PROTO_VER	1
 
@@ -15,8 +17,8 @@ enum {
 };
 
 struct reqresp {
-	int type;
-	int data[7];
+	int32_t type;
+	int32_t data[7];
 };
 
 #define REQ_TAG			0x7faa0000
@@ -30,15 +32,14 @@ struct reqresp {
  */
 enum {
 	/* per-client settings */
-	REQ_SET_NAME = REQ_BASE,/* set client name: Q[0-6] name - R[6] status */
+	REQ_SET_NAME = REQ_BASE,/* set client name: Q[0-5] next 6 bytes Q[6] remaining length - R[6] status */
 	REQ_SET_SENS,			/* set client sensitivity:	Q[0] float - R[6] status */
 	REQ_GET_SENS,			/* get client sensitivity:	R[0] float R[6] status */
 	REQ_SET_EVMASK,			/* set event mask: Q[0] mask - R[6] status */
 	REQ_GET_EVMASK,			/* get event mask: R[0] mask R[6] status */
 
 	/* device queries */
-	REQ_DEV_NAME = 0x2000,	/* get device name:	R[0] length R[6] status followed
-							   by <length> bytes */
+	REQ_DEV_NAME = 0x2000,	/* get device name:	R[0-5] next 6 bytes R[6] remaining length or -1 for failure */
 	REQ_DEV_PATH,			/* get device path: same as above */
 	REQ_DEV_NAXES,			/* get number of axes:	R[0] num axes R[6] status */
 	REQ_DEV_NBUTTONS,		/* get number of buttons: same as above */
@@ -69,8 +70,8 @@ enum {
 	REQ_GCFG_LED,			/* get LED state:			R[0] state R[6] status */
 	REQ_SCFG_GRAB,			/* set device grabbing:		Q[0] state - R[6] status */
 	REQ_GCFG_GRAB,			/* get device grabbing:		R[0] state R[6] status */
-	REQ_SCFG_SERDEV,		/* set serial device path:	Q[0] remaining length Q[1-6] next 6 bytes - R[6] status */
-	REQ_GCFG_SERDEV,		/* get serial device path:	R[0] length R[6] status, followed by <length> bytes */
+	REQ_SCFG_SERDEV,		/* set serial device path:	Q[0-5] next 6 bytes Q[6] remaining length - R[6] status */
+	REQ_GCFG_SERDEV,		/* get serial device path:	R[0-5] next 6 bytes R[6] remaining length or -1 for failure */
 	/* TODO ... more */
 	REQ_CFG_SAVE = 0x3ffe,	/* save config file:        R[6] status */
 	REQ_CFG_RESTORE,		/* load config from file:   R[6] status */

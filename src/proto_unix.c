@@ -100,7 +100,8 @@ int get_unix_socket(void)
 
 void send_uevent(spnav_event *ev, struct client *c)
 {
-	int i, data[8] = {0};
+	int i;
+	int32_t data[8] = {0};
 	float motion_mul;
 
 	if(lsock == -1) return;
@@ -114,7 +115,7 @@ void send_uevent(spnav_event *ev, struct client *c)
 		motion_mul = get_client_sensitivity(c);
 		for(i=0; i<6; i++) {
 			float val = (float)ev->motion.data[i] * motion_mul;
-			data[i + 1] = (int)val;
+			data[i + 1] = (int32_t)val;
 		}
 		data[7] = ev->motion.period;
 		break;
@@ -187,7 +188,8 @@ int handle_uevents(fd_set *rset)
 			int s = get_client_socket(c);
 
 			if(FD_ISSET(s, rset)) {
-				int rdbytes, msg;
+				int rdbytes;
+				int32_t msg;
 				float sens;
 
 				/* handle client requests */

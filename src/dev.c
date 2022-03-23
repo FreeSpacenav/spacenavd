@@ -40,13 +40,13 @@ static int usbdevtype(unsigned int vid, unsigned int pid);
 static struct device *dev_list = NULL;
 static unsigned short last_id;
 
-int init_devices(void)
+void init_devices(void)
 {
 	init_devices_serial();
-	return init_devices_usb();
+	init_devices_usb();
 }
 
-int init_devices_serial(void)
+void init_devices_serial(void)
 {
 	struct device *dev;
 	spnav_event ev = {0};
@@ -59,9 +59,7 @@ int init_devices_serial(void)
 			if(open_dev_serial(dev) == -1) {
 				remove_device(dev);
 			} else {
-				strcpy(dev->name, "serial device");
 				logmsg(LOG_INFO, "using device: %s\n", cfg.serial_dev);
-				device_added++;
 			}
 
 			/* new serial device added, send device change event */
@@ -72,15 +70,13 @@ int init_devices_serial(void)
 			broadcast_event(&ev);
 		}
 	}
-
-	return 0;
 }
 
 
 int init_devices_usb(void)
 {
+	int i;
 	struct device *dev;
-	int i, device_added = 0;
 	struct usb_dev_info *usblist, *usbdev;
 	spnav_event ev = {0};
 
@@ -107,7 +103,6 @@ int init_devices_usb(void)
 				remove_device(dev);
 			} else {
 				logmsg(LOG_INFO, "using device: %s (%s)\n", dev->name, dev->path);
-				device_added++;
 
 				/* new USB device added, send device change event */
 				ev.dev.type = EVENT_DEV;
@@ -161,7 +156,7 @@ void remove_device(struct device *dev)
 	struct device *iter;
 	spnav_event ev;
 
-	logmsg(LOG_INFO, "removing device: %s (id: %d)\n", dev->name, dev->id);
+	logmsg(LOG_INFO, "removing device: %s (id: %d path: %s)\n", dev->name, dev->id, dev->path);
 
 	dummy.next = dev_list;
 	iter = &dummy;

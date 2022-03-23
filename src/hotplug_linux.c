@@ -97,7 +97,7 @@ int handle_hotplug(void)
 		logmsg(LOG_DEBUG, "\nhandle_hotplug called\n");
 	}
 
-	if(init_devices() == -1) {
+	if(init_devices_usb() == -1) {
 		return -1;
 	}
 	return 0;
