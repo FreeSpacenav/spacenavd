@@ -5,7 +5,7 @@
 #include "proto.h"
 
 
-int proto_send_str(int fd, int req, const char *str)
+int spnav_send_str(int fd, int req, const char *str)
 {
 	int len;
 	struct reqresp rr = {0};
@@ -28,7 +28,7 @@ int proto_send_str(int fd, int req, const char *str)
 	return 0;
 }
 
-int proto_recv_str(struct reqresp_strbuf *sbuf, struct reqresp *rr)
+int spnav_recv_str(struct reqresp_strbuf *sbuf, struct reqresp *rr)
 {
 	int len;
 

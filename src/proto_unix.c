@@ -276,7 +276,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 
 	switch(req->type & 0xffff) {
 	case REQ_SET_NAME:
-		if((res = proto_recv_str(&c->strbuf, req)) == -1) {
+		if((res = spnav_recv_str(&c->strbuf, req)) == -1) {
 			logmsg(LOG_ERR, "SET_NAME: failed to receive string\n");
 			break;
 		}
@@ -316,7 +316,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 
 	case REQ_DEV_NAME:
 		if((dev = get_client_device(c))) {
-			proto_send_str(get_client_socket(c), req->type, dev->name);
+			spnav_send_str(get_client_socket(c), req->type, dev->name);
 		} else {
 			sendresp(c, req, -1);
 		}
@@ -324,7 +324,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 
 	case REQ_DEV_PATH:
 		if((dev = get_client_device(c))) {
-			proto_send_str(get_client_socket(c), req->type, dev->path);
+			spnav_send_str(get_client_socket(c), req->type, dev->path);
 		} else {
 			sendresp(c, req, -1);
 		}
@@ -580,7 +580,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 		break;
 
 	case REQ_SCFG_SERDEV:
-		if((res = proto_recv_str(&c->strbuf, req)) == -1) {
+		if((res = spnav_recv_str(&c->strbuf, req)) == -1) {
 			logmsg(LOG_ERR, "SCFG_SERDEV: failed to receive string\n");
 			break;
 		}
@@ -592,7 +592,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 		break;
 
 	case REQ_GCFG_SERDEV:
-		proto_send_str(c->sock, req->type, cfg.serial_dev);
+		spnav_send_str(c->sock, req->type, cfg.serial_dev);
 		break;
 
 	case REQ_CFG_SAVE:
@@ -629,14 +629,14 @@ static const char *reqstr(int req)
 
 	req &= 0xffff;
 
-	if(req >= 0x1000 && req < 0x1000 + reqnames_1000_size) {
-		return reqnames_1000[req - 0x1000];
+	if(req >= 0x1000 && req < 0x1000 + spnav_reqnames_1000_size) {
+		return spnav_reqnames_1000[req - 0x1000];
 	}
-	if(req >= 0x2000 && req < 0x2000 + reqnames_2000_size) {
-		return reqnames_2000[req - 0x2000];
+	if(req >= 0x2000 && req < 0x2000 + spnav_reqnames_2000_size) {
+		return spnav_reqnames_2000[req - 0x2000];
 	}
-	if(req >= 0x3000 && req < 0x3000 + reqnames_3000_size) {
-		return reqnames_3000[req - 0x3000];
+	if(req >= 0x3000 && req < 0x3000 + spnav_reqnames_3000_size) {
+		return spnav_reqnames_3000[req - 0x3000];
 	}
 	switch(req) {
 	case REQ_CFG_SAVE:

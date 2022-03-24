@@ -125,18 +125,18 @@ enum {
 #define REQSTR_FIRST(rr)	(((rr)->data[6] & REQSTR_CONT_BIT) == 0)
 #define REQSTR_REMLEN(rr)	((rr)->data[6] & 0xffff)
 
-int proto_send_str(int fd, int req, const char *str);
-int proto_recv_str(struct reqresp_strbuf *sbuf, struct reqresp *rr);
+int spnav_send_str(int fd, int req, const char *str);
+int spnav_recv_str(struct reqresp_strbuf *sbuf, struct reqresp *rr);
 
 #ifdef DEF_PROTO_REQ_NAMES
-const char *reqnames_1000[] = {
+const char *spnav_reqnames_1000[] = {
 	"SET_NAME",
 	"SET_SENS",
 	"GET_SENS",
 	"SET_EVMASK",
 	"GET_EVMASK"
 };
-const char *reqnames_2000[] = {
+const char *spnav_reqnames_2000[] = {
 	"DEV_NAME",
 	"DEV_PATH",
 	"DEV_NAXES",
@@ -144,7 +144,7 @@ const char *reqnames_2000[] = {
 	"DEV_USBID",
 	"DEV_TYPE"
 };
-const char *reqnames_3000[] = {
+const char *spnav_reqnames_3000[] = {
 	"SCFG_SENS",
 	"GCFG_SENS",
 	"SCFG_SENS_AXIS",
@@ -171,16 +171,16 @@ const char *reqnames_3000[] = {
 	"GCFG_SERDEV"
 };
 
-const int reqnames_1000_size = sizeof reqnames_1000 / sizeof *reqnames_1000;
-const int reqnames_2000_size = sizeof reqnames_2000 / sizeof *reqnames_2000;
-const int reqnames_3000_size = sizeof reqnames_3000 / sizeof *reqnames_3000;
+const int spnav_reqnames_1000_size = sizeof spnav_reqnames_1000 / sizeof *spnav_reqnames_1000;
+const int spnav_reqnames_2000_size = sizeof spnav_reqnames_2000 / sizeof *spnav_reqnames_2000;
+const int spnav_reqnames_3000_size = sizeof spnav_reqnames_3000 / sizeof *spnav_reqnames_3000;
 #else
-extern const char *reqnames_1000[];
-extern const char *reqnames_2000[];
-extern const char *reqnames_3000[];
-extern const int reqnames_1000_size;
-extern const int reqnames_2000_size;
-extern const int reqnames_3000_size;
+extern const char *spnav_reqnames_1000[];
+extern const char *spnav_reqnames_2000[];
+extern const char *spnav_reqnames_3000[];
+extern const int spnav_reqnames_1000_size;
+extern const int spnav_reqnames_2000_size;
+extern const int spnav_reqnames_3000_size;
 #endif	/* DEF_PROTO_REQ_NAMES */
 
 #endif	/* PROTO_H_ */
