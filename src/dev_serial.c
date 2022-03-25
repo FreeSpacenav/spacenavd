@@ -362,6 +362,11 @@ static int mag_parsepkt(struct sball *sb, int id, char *data, int len)
 					(((int)data[2] & 0xf) << 4) | (data[3] & 0xf)) - 0x8000;
 			data += 4;
 
+			/* flip the Z axis sign to match the spaceball */
+			if(i == 2 || i == 5) {
+				sb->mot[i] = -sb->mot[i];
+			}
+
 			if(sb->mot[i] != prev) {
 				enqueue_motion(sb, i, sb->mot[i]);
 				motion_pending++;

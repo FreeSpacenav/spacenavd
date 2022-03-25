@@ -57,9 +57,6 @@ static int add_cfgopt_devid(int vid, int pid);
 
 enum {TX, TY, TZ, RX, RY, RZ};
 
-static const int def_axmap[] = {0, 1, 2, 3, 4, 5};
-static const int def_axinv[] = {0, 1, 1, 0, 1, 1};
-
 struct cfgline {
 	char *str;		/* actual line text */
 	int opt;		/* CFG_* item */
@@ -85,13 +82,11 @@ void default_cfg(struct cfg *cfg)
 		cfg->dead_threshold[i] = 2;
 	}
 
-	cfg->swapyz = 1;
 	cfg->led = LED_ON;
 	cfg->grab_device = 1;
 
 	for(i=0; i<6; i++) {
-		cfg->invert[i] = def_axinv[i];
-		cfg->map_axis[i] = def_axmap[i];
+		cfg->map_axis[i] = i;
 	}
 
 	for(i=0; i<MAX_BUTTONS; i++) {
@@ -308,25 +303,25 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			lptr->opt = CFG_INVROT;
 			if(strchr(val_str, 'x')) {
-				cfg->invert[RX] = !def_axinv[RX];
+				cfg->invert[RX] = 1;
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[RY] = !def_axinv[RY];
+				cfg->invert[RY] = 1;
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[RZ] = !def_axinv[RZ];
+				cfg->invert[RZ] = 1;
 			}
 
 		} else if(strcmp(key_str, "invert-trans") == 0) {
 			lptr->opt = CFG_INVTRANS;
 			if(strchr(val_str, 'x')) {
-				cfg->invert[TX] = !def_axinv[TX];
+				cfg->invert[TX] = 1;
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[TY] = !def_axinv[TY];
+				cfg->invert[TY] = 1;
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[TZ] = !def_axinv[TZ];
+				cfg->invert[TZ] = 1;
 			}
 
 		} else if(strcmp(key_str, "swap-yz") == 0) {
@@ -528,23 +523,23 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		add_cfgopt(CFG_REPEAT, 0, "repeat-interval = %d\n", cfg->repeat_msec);
 	}
 
-	if(cfg->invert[0] != def_axinv[0] || cfg->invert[1] != def_axinv[1] || cfg->invert[2] != def_axinv[2]) {
+	if(cfg->invert[0] || cfg->invert[1] || cfg->invert[2]) {
 		char flags[4] = {0}, *p = flags;
-		if(cfg->invert[0] != def_axinv[0]) *p++ = 'x';
-		if(cfg->invert[1] != def_axinv[1]) *p++ = 'y';
-		if(cfg->invert[2] != def_axinv[2]) *p = 'z';
+		if(cfg->invert[0]) *p++ = 'x';
+		if(cfg->invert[1]) *p++ = 'y';
+		if(cfg->invert[2]) *p = 'z';
 		add_cfgopt(CFG_INVTRANS, 0, "invert-trans = %s", flags);
 	}
 
-	if(cfg->invert[3] != def_axinv[3] || cfg->invert[4] != def_axinv[4] || cfg->invert[5] != def_axinv[5]) {
+	if(cfg->invert[3] || cfg->invert[4] || cfg->invert[5]) {
 		char flags[4] = {0}, *p = flags;
-		if(cfg->invert[3] != def_axinv[3]) *p++ = 'x';
-		if(cfg->invert[4] != def_axinv[4]) *p++ = 'y';
-		if(cfg->invert[5] != def_axinv[5]) *p = 'z';
+		if(cfg->invert[3]) *p++ = 'x';
+		if(cfg->invert[4]) *p++ = 'y';
+		if(cfg->invert[5]) *p = 'z';
 		add_cfgopt(CFG_INVROT, 0, "invert-rot = %s", flags);
 	}
 
-	if(cfg->map_axis[1] != def_axmap[1]) {
+	if(cfg->swapyz) {
 		add_cfgopt(CFG_SWAPYZ, 0, "swap-yz = true");
 	}
 
@@ -558,10 +553,6 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		if(cfg->kbmap_str[i]) {
 			add_cfgopt(CFG_KBMAP_N, i, "kbmap%d = %s", i, cfg->kbmap_str[i]);
 		}
-	}
-
-	if(cfg->swapyz != def.swapyz) {
-		add_cfgopt(CFG_SWAPYZ, 0, "swap-yz = %s", cfg->swapyz ? "true" : "false");
 	}
 
 	if(cfg->led != def.led) {

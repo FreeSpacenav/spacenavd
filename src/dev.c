@@ -32,10 +32,70 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto_x11.h"
 #endif
 
+
+#define VENDOR_3DCONNEXION	0x256f
+
+/* The device flags are introduced to normalize input across all known
+ * supported 6dof devices. Newer USB devices seem to use axis 1 as fwd/back and
+ * axis 2 as up/down, while older serial devices (and possibly also the early
+ * USB ones?) do the opposite. This discrepancy would mean the user has to
+ * change the configuration back and forth when changing devices. With these
+ * flags we attempt to make all known devices use the same input axes at the
+ * lowest level, and let the user remap based on preference, and have their
+ * choice persist across all known devices.
+ */
+enum {
+	DF_SWAPYZ = 1,
+	DF_INVYZ = 2
+};
+
+static struct {
+	int usbid[2];
+	int type;
+	unsigned int flags;
+} devid_list[] = {
+	{{0x046d, 0xc603}, DEV_PLUSXT,		0},						/* spacemouse plus XT */
+	{{0x046d, 0xc605}, DEV_CADMAN,		0},						/* cadman */
+	{{0x046d, 0xc606}, DEV_SMCLASSIC,	0},						/* spacemouse classic */
+	{{0x046d, 0xc621}, DEV_SB5000,		0},						/* spaceball 5000 */
+	{{0x046d, 0xc623}, DEV_STRAVEL,		DF_SWAPYZ | DF_INVYZ},	/* space traveller */
+	{{0x046d, 0xc625}, DEV_SPILOT,		DF_SWAPYZ | DF_INVYZ},	/* space pilot */
+	{{0x046d, 0xc626}, DEV_SNAV,		DF_SWAPYZ | DF_INVYZ},	/* space navigator */
+	{{0x046d, 0xc627}, DEV_SEXP,		DF_SWAPYZ | DF_INVYZ},	/* space explorer */
+	{{0x046d, 0xc628}, DEV_SNAVNB,		DF_SWAPYZ | DF_INVYZ},	/* space navigator for notebooks*/
+	{{0x046d, 0xc629}, DEV_SPILOTPRO,	DF_SWAPYZ | DF_INVYZ},	/* space pilot pro*/
+	{{0x046d, 0xc62b}, DEV_SMPRO,		DF_SWAPYZ | DF_INVYZ},	/* space mouse pro*/
+	{{0x046d, 0xc640}, DEV_NULOOQ,		0},						/* nulooq */
+	{{0x256f, 0xc62e}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ},	/* spacemouse wireless (USB cable) */
+	{{0x256f, 0xc62f}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ},	/* spacemouse wireless  receiver */
+	{{0x256f, 0xc631}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse pro wireless */
+	{{0x256f, 0xc632}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse pro wireless receiver */
+	{{0x256f, 0xc633}, DEV_SMENT,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse enterprise */
+	{{0x256f, 0xc635}, DEV_SMCOMP,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse compact */
+	{{0x256f, 0xc636}, DEV_SMMOD,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse module */
+
+	{{-1, -1}, DEV_UNKNOWN, 0}
+};
+
+/* 3Dconnexion devices which we don't want to match, because they are
+ * not 6dof space-mice. reported by: Herbert Graeber in github pull request #4
+ */
+static int devid_blacklist[][2] = {
+	{0x256f, 0xc650},	/* cadmouse */
+	{0x256f, 0xc651},	/* cadmouse wireless */
+	{0x256f, 0xc62c},	/* lipari(?) */
+	{0x256f, 0xc641},	/* scout(?) */
+
+	{-1, -1}
+};
+
+
+
 static struct device *add_device(void);
 static struct device *dev_path_in_use(char const * dev_path);
 static int match_usbdev(const struct usb_dev_info *devinfo);
 static int usbdevtype(unsigned int vid, unsigned int pid);
+static unsigned int usbdevflags(unsigned int vid, unsigned int pid);
 
 static struct device *dev_list = NULL;
 static unsigned short last_id;
@@ -79,6 +139,7 @@ int init_devices_usb(void)
 	struct device *dev;
 	struct usb_dev_info *usblist, *usbdev;
 	spnav_event ev = {0};
+	char buf[256];
 
 	/* detect any supported USB devices */
 	usblist = find_usb_devices(match_usbdev);
@@ -96,13 +157,29 @@ int init_devices_usb(void)
 			dev = add_device();
 			strcpy(dev->path, usbdev->devfiles[i]);
 			dev->type = usbdevtype(usbdev->vendorid, usbdev->productid);
+			dev->flags = usbdevflags(usbdev->vendorid, usbdev->productid);
 			dev->usbid[0] = usbdev->vendorid;
 			dev->usbid[1] = usbdev->productid;
 
 			if(open_dev_usb(dev) == -1) {
 				remove_device(dev);
 			} else {
+				/* add the 6dof remapping flags to every future 3dconnexion device */
+				if(dev->usbid[0] == VENDOR_3DCONNEXION) {
+					dev->flags |= DF_SWAPYZ | DF_INVYZ;
+				}
+				/* sanity-check the device flags */
+				if((dev->flags & (DF_SWAPYZ | DF_INVYZ)) && dev->num_axes != 6) {
+					logmsg(LOG_WARNING, "BUG: Tried to add 6dof device flags to a device with %d axes. Please report this as a bug\n", dev->num_axes);
+					dev->flags &= ~(DF_SWAPYZ | DF_INVYZ);
+				}
 				logmsg(LOG_INFO, "using device: %s (%s)\n", dev->name, dev->path);
+				if(dev->flags) {
+					strcpy(buf, "  device flags:");
+					if(dev->flags & DF_SWAPYZ) strcat(buf, " swap y-z");
+					if(dev->flags & DF_INVYZ) strcat(buf, " invert y-z");
+					logmsg(LOG_INFO, "%s\n", buf);
+				}
 
 				/* new USB device added, send device change event */
 				ev.dev.type = EVENT_DEV;
@@ -224,7 +301,21 @@ int read_device(struct device *dev, struct dev_input *inp)
 	if(dev->read == NULL) {
 		return -1;
 	}
-	return dev->read(dev, inp);
+
+	if(dev->read(dev, inp) == -1) {
+		return -1;
+	}
+
+	if(inp->type == INP_MOTION) {
+		if(dev->flags & DF_SWAPYZ) {
+			static const int swap[] = {0, 2, 1, 3, 5, 4};
+			inp->idx = swap[inp->idx];
+		}
+		if((dev->flags & DF_INVYZ) && inp->idx != 0 && inp->idx != 3) {
+			inp->val = -inp->val;
+		}
+	}
+	return 0;
 }
 
 void set_device_led(struct device *dev, int state)
@@ -247,45 +338,6 @@ struct device *get_devices(void)
 {
 	return dev_list;
 }
-
-#define VENDOR_3DCONNEXION	0x256f
-
-static int devid_list[][3] = {
-	{0x046d, 0xc603, DEV_PLUSXT},		/* spacemouse plus XT */
-	{0x046d, 0xc605, DEV_CADMAN},		/* cadman */
-	{0x046d, 0xc606, DEV_SMCLASSIC},	/* spacemouse classic */
-	{0x046d, 0xc621, DEV_SB5000},		/* spaceball 5000 */
-	{0x046d, 0xc623, DEV_STRAVEL},		/* space traveller */
-	{0x046d, 0xc625, DEV_SPILOT},		/* space pilot */
-	{0x046d, 0xc626, DEV_SNAV},			/* space navigator */
-	{0x046d, 0xc627, DEV_SEXP},			/* space explorer */
-	{0x046d, 0xc628, DEV_SNAVNB},		/* space navigator for notebooks*/
-	{0x046d, 0xc629, DEV_SPILOTPRO},	/* space pilot pro*/
-	{0x046d, 0xc62b, DEV_SMPRO},		/* space mouse pro*/
-	{0x046d, 0xc640, DEV_NULOOQ},		/* nulooq */
-	{0x256f, 0xc62e, DEV_SMW},			/* spacemouse wireless (USB cable) */
-	{0x256f, 0xc62f, DEV_SMW},			/* spacemouse wireless  receiver */
-	{0x256f, 0xc631, DEV_SMPROW},		/* spacemouse pro wireless */
-	{0x256f, 0xc632, DEV_SMPROW},		/* spacemouse pro wireless receiver */
-	{0x256f, 0xc633, DEV_SMENT},		/* spacemouse enterprise */
-	{0x256f, 0xc635, DEV_SMCOMP},		/* spacemouse compact */
-	{0x256f, 0xc636, DEV_SMMOD},		/* spacemouse module */
-
-	{-1, -1, DEV_UNKNOWN}
-};
-
-/* 3Dconnexion devices which we don't want to match, because they are
- * not 6dof space-mice. reported by: Herbert Graeber in github pull request #4
- */
-static int devid_blacklist[][2] = {
-	{0x256f, 0xc650},	/* cadmouse */
-	{0x256f, 0xc651},	/* cadmouse wireless */
-	{0x256f, 0xc62c},	/* lipari(?) */
-	{0x256f, 0xc641},	/* scout(?) */
-
-	{-1, -1}
-};
-
 
 static int match_usbdev(const struct usb_dev_info *devinfo)
 {
@@ -326,8 +378,8 @@ static int match_usbdev(const struct usb_dev_info *devinfo)
 		}
 
 		/* match any device in the devid_list */
-		for(i=0; devid_list[i][0] > 0; i++) {
-			if(vid == devid_list[i][0] && pid == devid_list[i][1]) {
+		for(i=0; devid_list[i].usbid[0] > 0; i++) {
+			if(vid == devid_list[i].usbid[0] && pid == devid_list[i].usbid[1]) {
 				return 1;
 			}
 		}
@@ -344,10 +396,21 @@ static int match_usbdev(const struct usb_dev_info *devinfo)
 static int usbdevtype(unsigned int vid, unsigned int pid)
 {
 	int i;
-	for(i=0; devid_list[i][0] != -1; i++) {
-		if(devid_list[i][0] == vid && devid_list[i][1] == pid) {
-			return devid_list[i][2];
+	for(i=0; devid_list[i].usbid[0] != -1; i++) {
+		if(devid_list[i].usbid[0] == vid && devid_list[i].usbid[1] == pid) {
+			return devid_list[i].type;
 		}
 	}
 	return DEV_UNKNOWN;
+}
+
+static unsigned int usbdevflags(unsigned int vid, unsigned int pid)
+{
+	int i;
+	for(i=0; devid_list[i].usbid[0] != -1; i++) {
+		if(devid_list[i].usbid[0] == vid && devid_list[i].usbid[1] == pid) {
+			return devid_list[i].flags;
+		}
+	}
+	return 0;
 }
