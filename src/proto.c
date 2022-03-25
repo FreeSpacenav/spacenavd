@@ -18,13 +18,14 @@ int spnav_send_str(int fd, int req, const char *str)
 	rr.type = req;
 	rr.data[6] = len;
 
-	while(len > 0) {
+	do {
 		memcpy(rr.data, str, len > REQSTR_CHUNK_SIZE ? REQSTR_CHUNK_SIZE : len);
 		write(fd, &rr, sizeof rr);
 		str += REQSTR_CHUNK_SIZE;
 		len -= REQSTR_CHUNK_SIZE;
 		rr.data[6] = len | REQSTR_CONT_BIT;
-	}
+	} while(len > 0);
+
 	return 0;
 }
 
