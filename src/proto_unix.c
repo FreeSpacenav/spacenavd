@@ -523,7 +523,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 	case REQ_SCFG_KBMAP:
 #ifdef USE_X11
 		idx = req->data[0];
-		if(!BN_VALID(idx) || (req->data[1] && !(str = kbemu_keyname(req->data[1])))) {
+		if(!BN_VALID(idx) || (req->data[1] > 0 && !(str = kbemu_keyname(req->data[1])))) {
 			logmsg(LOG_WARNING, "client attempted to set invalid key map: %d -> %x\n",
 					idx, (unsigned int)req->data[1]);
 			sendresp(c, req, -1);
@@ -531,7 +531,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 		}
 		cfg.kbmap[idx] = req->data[1];
 		free(cfg.kbmap_str[idx]);
-		cfg.kbmap_str[idx] = req->data[1] ? strdup(str) : 0;
+		cfg.kbmap_str[idx] = req->data[1] > 0 ? strdup(str) : 0;
 		sendresp(c, req, 0);
 #else
 		logmsg(LOG_WARNING, "unable to set keyboard mappings, daemon compiled without X11 support\n");
