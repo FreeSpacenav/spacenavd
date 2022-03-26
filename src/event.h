@@ -29,7 +29,10 @@ enum {
 
 	/* protocol v1 events */
 	EVENT_DEV,		/* device change */
-	EVENT_CFG		/* configuration change */
+	EVENT_CFG,		/* configuration change */
+
+	EVENT_RAWAXIS,
+	EVENT_RAWBUTTON
 };
 
 enum { DEV_ADD, DEV_RM };
@@ -62,12 +65,19 @@ struct event_cfg {
 	int data[6];
 };
 
+struct event_axis {
+	int type;
+	int idx;
+	int value;
+};
+
 typedef union spnav_event {
 	int type;
 	struct event_motion motion;
 	struct event_button button;
 	struct event_dev dev;
 	struct event_cfg cfg;
+	struct event_axis axis;
 } spnav_event;
 
 enum {
@@ -95,5 +105,7 @@ void repeat_last_event(struct device *dev);
 
 /* broadcasts an event to all clients */
 void broadcast_event(spnav_event *ev);
+
+void broadcast_cfg_event(int cfg, int val);
 
 #endif	/* EVENT_H_ */

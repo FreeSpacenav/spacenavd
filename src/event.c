@@ -151,9 +151,15 @@ void process_input(struct device *dev, struct dev_input *inp)
 	int sign, axis;
 	struct dev_event *dev_ev;
 	float sens_rot, sens_trans;
+	spnav_event ev;
 
 	switch(inp->type) {
 	case INP_MOTION:
+		ev.type = EVENT_RAWAXIS;
+		ev.axis.idx = inp->idx;
+		ev.axis.value = inp->val;
+		broadcast_event(&ev);
+
 		if(abs(inp->val) < cfg.dead_threshold[inp->idx] ) {
 			inp->val = 0;
 		}
@@ -181,6 +187,11 @@ void process_input(struct device *dev, struct dev_input *inp)
 		break;
 
 	case INP_BUTTON:
+		ev.type = EVENT_RAWBUTTON;
+		ev.button.press = inp->val;
+		ev.button.bnum = inp->idx;
+		broadcast_event(&ev);
+
 		/* check to see if the button has been bound to an action */
 		if(cfg.bnact[inp->idx] > 0) {
 			handle_button_action(cfg.bnact[inp->idx], inp->val);
@@ -248,12 +259,15 @@ static void handle_button_action(int act, int pressed)
 	switch(act) {
 	case BNACT_SENS_INC:
 		cfg.sensitivity *= 1.1f;
+		broadcast_cfg_event(REQ_GCFG_SENS, *(int*)&cfg.sensitivity);
 		break;
 	case BNACT_SENS_DEC:
 		cfg.sensitivity *= 0.9f;
+		broadcast_cfg_event(REQ_GCFG_SENS, *(int*)&cfg.sensitivity);
 		break;
 	case BNACT_SENS_RESET:
 		cfg.sensitivity = 1.0f;
+		broadcast_cfg_event(REQ_GCFG_SENS, *(int*)&cfg.sensitivity);
 		break;
 	case BNACT_DISABLE_ROTATION:
 		disable_rotation = !disable_rotation;
@@ -329,6 +343,16 @@ void broadcast_event(spnav_event *ev)
 		send_event(ev, c);
 		c = c->next;
 	}
+}
+
+void broadcast_cfg_event(int cfg, int val)
+{
+	spnav_event ev = {0};
+
+	ev.type = EVENT_CFG;
+	ev.cfg.cfg = cfg;
+	ev.cfg.data[0] = val;
+	broadcast_event(&ev);
 }
 
 static void send_event(spnav_event *ev, struct client *c)

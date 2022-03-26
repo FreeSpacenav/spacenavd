@@ -106,7 +106,7 @@ void send_uevent(spnav_event *ev, struct client *c)
 
 	switch(ev->type) {
 	case EVENT_MOTION:
-		if(!(c->evmask & EVMASK_MOTION)) break;
+		if(!(c->evmask & EVMASK_MOTION)) return;
 
 		data[0] = UEV_MOTION;
 
@@ -118,15 +118,32 @@ void send_uevent(spnav_event *ev, struct client *c)
 		data[7] = ev->motion.period;
 		break;
 
+	case EVENT_RAWAXIS:
+		if(!(c->evmask & EVMASK_RAWAXIS)) return;
+
+		data[0] = UEV_RAWAXIS;
+		data[1] = ev->axis.idx;
+		data[2] = ev->axis.value;
+		break;
+
 	case EVENT_BUTTON:
-		if(!(c->evmask & EVMASK_BUTTON)) break;
+		if(!(c->evmask & EVMASK_BUTTON)) return;
 
 		data[0] = ev->button.press ? UEV_PRESS : UEV_RELEASE;
 		data[1] = ev->button.bnum;
+		data[2] = ev->button.press;
+		break;
+
+	case EVENT_RAWBUTTON:
+		if(!(c->evmask & EVMASK_RAWBUTTON)) return;
+
+		data[0] = UEV_RAWBUTTON;
+		data[1] = ev->button.bnum;
+		data[2] = ev->button.press;
 		break;
 
 	case EVENT_DEV:
-		if(!(c->evmask & EVMASK_DEV)) break;
+		if(!(c->evmask & EVMASK_DEV)) return;
 
 		data[0] = UEV_DEV;
 		data[1] = ev->dev.op;
@@ -137,7 +154,7 @@ void send_uevent(spnav_event *ev, struct client *c)
 		break;
 
 	case EVENT_CFG:
-		if(!(c->evmask & EVMASK_CFG)) break;
+		if(!(c->evmask & EVMASK_CFG)) return;
 
 		data[0] = UEV_CFG;
 		data[1] = ev->cfg.cfg;
@@ -145,7 +162,7 @@ void send_uevent(spnav_event *ev, struct client *c)
 		break;
 
 	default:
-		break;
+		return;
 	}
 
 	while(write(get_client_socket(c), data, sizeof data) == -1 && errno == EINTR);

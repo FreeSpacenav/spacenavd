@@ -35,10 +35,12 @@ enum {
 
 /* event selection (must match SPNAV_EVMASK* in libspnav/spnav.h) */
 enum {
-	EVMASK_MOTION	= 1,
-	EVMASK_BUTTON	= 2,
-	EVMASK_DEV		= 4,
-	EVMASK_CFG		= 8
+	EVMASK_MOTION		= 0x01,
+	EVMASK_BUTTON		= 0x02,
+	EVMASK_DEV			= 0x04,
+	EVMASK_CFG			= 0x08,
+	EVMASK_RAWAXIS		= 0x10,
+	EVMASK_RAWBUTTON	= 0x20
 };
 
 struct device;
