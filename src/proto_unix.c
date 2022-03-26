@@ -600,19 +600,19 @@ static int handle_request(struct client *c, struct reqresp *req)
 		break;
 
 	case REQ_CFG_RESTORE:
-		sendresp(c, req, 0);	/* always succeed immediately */
 		if(read_cfg(cfgfile, &cfg) == -1) {
 			logmsg(LOG_INFO, "config restore requested but failed to read %s, restoring defaults instead\n",
 					cfgfile);
 			default_cfg(&cfg);
 		}
 		cfg_changed();
+		sendresp(c, req, 0);
 		break;
 
 	case REQ_CFG_RESET:
-		sendresp(c, req, 0);	/* always succeed immediately */
 		default_cfg(&cfg);
 		cfg_changed();
+		sendresp(c, req, 0);
 		break;
 
 	default:
