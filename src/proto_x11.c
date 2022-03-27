@@ -224,7 +224,7 @@ int get_x11_socket(void)
 void send_xevent(spnav_event *ev, struct client *c)
 {
 	int i;
-	XEvent xevent;
+	XEvent xevent = {0};
 
 	if(!dpy) return;
 
@@ -396,18 +396,19 @@ static int xerr(Display *dpy, XErrorEvent *err)
 {
 	char buf[512];
 
-	if(verbose) {
-		logmsg(LOG_ERR, "xerr(%p, %p)\n", (void*)dpy, (void*)err);
-	}
-
 	if(err->error_code == BadWindow) {
+		if(verbose) {
+			logmsg(LOG_INFO, "Caught BadWindow, dropping client with window: %x\n",
+					(unsigned int)err->resourceid);
+		}
 		/* we may get a BadWindow error when trying to send events to
 		 * clients that have disconnected in the meanwhile.
 		 */
 		remove_client_window((Window)err->resourceid);
 	} else {
 		XGetErrorText(dpy, err->error_code, buf, sizeof buf);
-		logmsg(LOG_ERR, "Caught unexpected X error: %s\n", buf);
+		logmsg(LOG_ERR, "Caught unexpected X error: %s [op: %d,%d, res: %u]\n", buf,
+				(int)err->request_code, (int)err->minor_code, (unsigned int)err->resourceid);
 	}
 	return 0;
 }

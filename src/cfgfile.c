@@ -153,6 +153,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	if(!num_lines) num_lines = 1;
 
 	/* add enough lines to be able to append any number of new options */
+	free(cfglines);
 	if(!(cfglines = calloc(num_lines + NUM_EXTRA_LINES, sizeof *cfglines))) {
 		logmsg(LOG_WARNING, "failed to allocate config lines buffer (%d lines)\n", num_lines);
 		unlock_cfgfile(fd);

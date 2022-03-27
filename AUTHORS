@@ -1,12 +1,20 @@
 Main author and maintainer:
 	John Tsiombikas <nuclear@member.fsf.org>
 
-Serial device support (libsball):
-	John E. Stone <j.stone@acm.org>	
-
 Contributors:
-	Doug LaRue, Krister Svanlun, Hans Meine, Jaroslaw Bulat, Pavel Frolov,
-	Robert Haschke, David Lister
+	Doug LaRue
+	Krister Svanlun
+	Hans Meine
+	Jaroslaw Bulat
+	Pavel Frolov,
+	Robert Haschke
+	David Lister
+	Stephen Hurd
+	Gaël Écorchard
+	Alberto Fanjul
+
+Serial device support in early versions (before the v0.8 rewrite):
+	John E. Stone <j.stone@acm.org>	
 
 NOTE: This file has been left untended for quite a while. There are bound to be
 contributions from people not listed here. If you ever contributed code to this

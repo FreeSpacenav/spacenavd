@@ -118,9 +118,9 @@ void init_devices_serial(void)
 			strcpy(dev->path, cfg.serial_dev);
 			if(open_dev_serial(dev) == -1) {
 				remove_device(dev);
-			} else {
-				logmsg(LOG_INFO, "using device: %s\n", cfg.serial_dev);
+				return;
 			}
+			logmsg(LOG_INFO, "using device: %s\n", cfg.serial_dev);
 
 			/* new serial device added, send device change event */
 			ev.dev.type = EVENT_DEV;
