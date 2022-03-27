@@ -224,7 +224,7 @@ int get_x11_socket(void)
 void send_xevent(spnav_event *ev, struct client *c)
 {
 	int i;
-	XEvent xevent = {0};
+	XEvent xevent;
 
 	if(!dpy) return;
 
@@ -257,7 +257,7 @@ void send_xevent(spnav_event *ev, struct client *c)
 		break;
 
 	default:
-		break;
+		return;
 	}
 
 	XSendEvent(dpy, get_client_window(c), False, 0, &xevent);
