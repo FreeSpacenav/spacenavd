@@ -46,6 +46,8 @@ enum {
 	NUM_CFG_OPTIONS
 };
 
+enum { RMCFG_ALL, RMCFG_OWN };
+
 /* number of lines to add to the cfglines allocation, in order to allow for
  * adding any number of additional options if necessary
  */
@@ -54,6 +56,7 @@ enum {
 static int parse_bnact(const char *s);
 static int add_cfgopt(int opt, int idx, const char *fmt, ...);
 static int add_cfgopt_devid(int vid, int pid);
+static int rm_cfgopt(const char *name, int mode);
 
 enum {TX, TY, TZ, RX, RY, RZ};
 
@@ -61,6 +64,7 @@ struct cfgline {
 	char *str;		/* actual line text */
 	int opt;		/* CFG_* item */
 	int idx;
+	int own;		/* added and owned by spacenavd, not in the original user config */
 };
 
 static struct cfgline *cfglines;
@@ -457,6 +461,7 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	FILE *fp;
 	struct flock flk;
 	struct cfg def;
+	char buf[128];
 
 	if(!(fp = fopen(fname, "w"))) {
 		logmsg(LOG_ERR, "failed to write config file %s: %s\n", fname, strerror(errno));
@@ -470,34 +475,62 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	}
 
 	if(cfg->sens_trans[0] == cfg->sens_trans[1] && cfg->sens_trans[1] == cfg->sens_trans[2]) {
+		rm_cfgopt("sensitivity-translation-x", RMCFG_ALL);
+		rm_cfgopt("sensitivity-translation-y", RMCFG_ALL);
+		rm_cfgopt("sensitivity-translation-z", RMCFG_ALL);
 		if(cfg->sens_trans[0] != def.sens_trans[0]) {
 			add_cfgopt(CFG_SENS_TRANS, 0, "sensitivity-translation = %.3f", cfg->sens_trans[0]);
+		} else {
+			rm_cfgopt("sensitivity-translation", RMCFG_OWN);
 		}
 	} else {
 		if(cfg->sens_trans[0] != def.sens_trans[0]) {
 			add_cfgopt(CFG_SENS_TX, 0, "sensitivity-translation-x = %.3f", cfg->sens_trans[0]);
+			rm_cfgopt("sensitivity-translation", RMCFG_ALL);
+		} else {
+			rm_cfgopt("sensitivity-translation-x", RMCFG_OWN);
 		}
 		if(cfg->sens_trans[1] != def.sens_trans[1]) {
 			add_cfgopt(CFG_SENS_TY, 0, "sensitivity-translation-y = %.3f", cfg->sens_trans[1]);
+			rm_cfgopt("sensitivity-translation", RMCFG_ALL);
+		} else {
+			rm_cfgopt("sensitivity-translation-y", RMCFG_OWN);
 		}
 		if(cfg->sens_trans[2] != def.sens_trans[2]) {
 			add_cfgopt(CFG_SENS_TZ, 0, "sensitivity-translation-z = %.3f", cfg->sens_trans[2]);
+			rm_cfgopt("sensitivity-translation", RMCFG_ALL);
+		} else {
+			rm_cfgopt("sensitivity-translation-z", RMCFG_OWN);
 		}
 	}
 
 	if(cfg->sens_rot[0] == cfg->sens_rot[1] && cfg->sens_rot[1] == cfg->sens_rot[2]) {
+		rm_cfgopt("sensitivity-rotation-x", RMCFG_ALL);
+		rm_cfgopt("sensitivity-rotation-y", RMCFG_ALL);
+		rm_cfgopt("sensitivity-rotation-z", RMCFG_ALL);
 		if(cfg->sens_rot[0] != def.sens_rot[0]) {
 			add_cfgopt(CFG_SENS_ROT, 0, "sensitivity-rotation = %.3f", cfg->sens_rot[0]);
+		} else {
+			rm_cfgopt("sensitivity-rotation", RMCFG_OWN);
 		}
 	} else {
 		if(cfg->sens_rot[0] != def.sens_rot[0]) {
 			add_cfgopt(CFG_SENS_RX, 0, "sensitivity-rotation-x = %.3f", cfg->sens_rot[0]);
+			rm_cfgopt("sensitivity-rotation", RMCFG_ALL);
+		} else {
+			rm_cfgopt("sensitivity-rotation-x", RMCFG_OWN);
 		}
 		if(cfg->sens_rot[1] != def.sens_rot[1]) {
 			add_cfgopt(CFG_SENS_RY, 0, "sensitivity-rotation-y = %.3f", cfg->sens_rot[1]);
+			rm_cfgopt("sensitivity-rotation", RMCFG_ALL);
+		} else {
+			rm_cfgopt("sensitivity-rotation-y", RMCFG_OWN);
 		}
 		if(cfg->sens_rot[2] != def.sens_rot[2]) {
 			add_cfgopt(CFG_SENS_RZ, 0, "sensitivity-rotation-z = %.3f", cfg->sens_rot[2]);
+			rm_cfgopt("sensitivity-rotation", RMCFG_ALL);
+		} else {
+			rm_cfgopt("sensitivity-rotation-z", RMCFG_OWN);
 		}
 	}
 
@@ -511,17 +544,29 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	if(same) {
 		if(cfg->dead_threshold[0] != def.dead_threshold[0]) {
 			add_cfgopt(CFG_DEADZONE, 0, "dead-zone = %d", cfg->dead_threshold[0]);
+			for(i=0; i<MAX_AXES; i++) {
+				sprintf(buf, "dead-zone%d", i);
+				rm_cfgopt(buf, RMCFG_ALL);
+			}
+		} else {
+			rm_cfgopt("dead-zone", RMCFG_OWN);
 		}
 	} else {
 		for(i=0; i<MAX_AXES; i++) {
 			if(cfg->dead_threshold[i] != def.dead_threshold[i]) {
 				add_cfgopt(CFG_DEADZONE_N, i, "dead-zone%d = %d", i, cfg->dead_threshold[i]);
+				rm_cfgopt("dead-zone", RMCFG_ALL);
+			} else {
+				sprintf(buf, "dead-zone%d", i);
+				rm_cfgopt(buf, RMCFG_OWN);
 			}
 		}
 	}
 
 	if(cfg->repeat_msec != def.repeat_msec) {
 		add_cfgopt(CFG_REPEAT, 0, "repeat-interval = %d\n", cfg->repeat_msec);
+	} else {
+		rm_cfgopt("repeat-interval", RMCFG_ALL);
 	}
 
 	if(cfg->invert[0] || cfg->invert[1] || cfg->invert[2]) {
@@ -530,6 +575,8 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		if(cfg->invert[1]) *p++ = 'y';
 		if(cfg->invert[2]) *p = 'z';
 		add_cfgopt(CFG_INVTRANS, 0, "invert-trans = %s", flags);
+	} else {
+		rm_cfgopt("invert-trans", RMCFG_ALL);
 	}
 
 	if(cfg->invert[3] || cfg->invert[4] || cfg->invert[5]) {
@@ -538,34 +585,50 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		if(cfg->invert[4]) *p++ = 'y';
 		if(cfg->invert[5]) *p = 'z';
 		add_cfgopt(CFG_INVROT, 0, "invert-rot = %s", flags);
+	} else {
+		rm_cfgopt("invert-rot", RMCFG_ALL);
 	}
 
 	if(cfg->swapyz) {
 		add_cfgopt(CFG_SWAPYZ, 0, "swap-yz = true");
+	} else {
+		rm_cfgopt("swap-yz", RMCFG_ALL);
 	}
 
 	for(i=0; i<MAX_BUTTONS; i++) {
 		if(cfg->map_button[i] != i) {
 			add_cfgopt(CFG_BNMAP_N, i, "bnmap%d = %d", i, cfg->map_button[i]);
+		} else {
+			sprintf(buf, "bnmap%d", i);
+			rm_cfgopt(buf, RMCFG_ALL);
 		}
 	}
 
 	for(i=0; i<MAX_BUTTONS; i++) {
 		if(cfg->kbmap_str[i]) {
 			add_cfgopt(CFG_KBMAP_N, i, "kbmap%d = %s", i, cfg->kbmap_str[i]);
+		} else {
+			sprintf(buf, "kbmap%d", i);
+			rm_cfgopt(buf, RMCFG_ALL);
 		}
 	}
 
 	if(cfg->led != def.led) {
 		add_cfgopt(CFG_LED, 0, "led = %s", (cfg->led ? (cfg->led == LED_AUTO ? "auto" : "on") : "off"));
+	} else {
+		rm_cfgopt("led", RMCFG_OWN);
 	}
 
 	if(cfg->grab_device != def.grab_device) {
 		add_cfgopt(CFG_GRAB, 0, "grab = %s", cfg->grab_device ? "true" : "false");
+	} else {
+		rm_cfgopt("grab", RMCFG_OWN);
 	}
 
 	if(cfg->serial_dev[0]) {
 		add_cfgopt(CFG_SERIAL, 0, "serial = %s", cfg->serial_dev);
+	} else {
+		rm_cfgopt("serial", RMCFG_ALL);
 	}
 
 	for(i=0; i<MAX_CUSTOM; i++) {
@@ -581,7 +644,9 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
 	for(i=0; i<num_lines; i++) {
-		if(cfglines[i].str && *cfglines[i].str) {
+		if(!cfglines[i].str) continue;
+
+		if(*cfglines[i].str) {
 			fputs(cfglines[i].str, fp);
 		}
 		fputc('\n', fp);
@@ -645,8 +710,8 @@ static int add_cfgopt(int opt, int idx, const char *fmt, ...)
 	if(!(str = strdup(buf))) return -1;
 
 	if(!(lptr = find_cfgopt(opt, idx))) {
-		num_lines++;	/* leave an empty line */
 		lptr = cfglines + num_lines++;
+		lptr->own = 1;
 	}
 	free(lptr->str);
 	lptr->str = str;
@@ -688,4 +753,33 @@ static int add_cfgopt_devid(int vid, int pid)
 	lptr->opt = CFG_DEVID;
 	lptr->idx = 0;
 	return 0;
+}
+
+static int rm_cfgopt(const char *name, int mode)
+{
+	int i;
+	char *ptr, *endp;
+	char buf[256];
+
+	for(i=0; i<num_lines; i++) {
+		if(!cfglines[i].str || !*cfglines[i].str) continue;
+
+		strncpy(buf, cfglines[i].str, sizeof buf - 1);
+		buf[sizeof buf - 1] = 0;
+
+		ptr = buf;
+		while(*ptr && isspace(*ptr)) ptr++;
+		if(!(endp = strchr(ptr, '='))) {
+			continue;
+		}
+		while(endp > ptr && isspace(*--endp)) *endp = 0;
+		if(strcmp(ptr, name) == 0) {
+			if(mode != RMCFG_OWN || cfglines[i].own) {
+				free(cfglines[i].str);
+				cfglines[i].str = 0;
+			}
+			return 0;
+		}
+	}
+	return -1;
 }
