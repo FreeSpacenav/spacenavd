@@ -117,6 +117,11 @@ int open_dev_serial(struct device *dev)
 		logmsg(LOG_ERR, "open_dev_serial: failed to open device: %s: %s\n", dev->path, strerror(errno));
 		return -1;
 	}
+	if(!isatty(fd)) {
+		logmsg(LOG_ERR, "open_dev_serial: refusing to use %s: not a TTY\n", dev->path);
+		close(fd);
+		return -1;
+	}
 
 	if(!(sb = calloc(1, sizeof *sb))) {
 		logmsg(LOG_ERR, "open_dev_serial: failed to allocate sball object\n");

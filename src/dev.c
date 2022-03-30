@@ -19,7 +19,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <unistd.h>
+#include <sys/stat.h>
 #include "dev.h"
 #include "dev_usb.h"
 #include "dev_serial.h"
@@ -108,12 +110,24 @@ void init_devices(void)
 
 void init_devices_serial(void)
 {
+	struct stat st;
 	struct device *dev;
 	spnav_event ev = {0};
 
 	/* try to open a serial device if specified in the config file */
 	if(cfg.serial_dev[0]) {
 		if(!dev_path_in_use(cfg.serial_dev)) {
+			if(stat(cfg.serial_dev, &st) == -1) {
+				logmsg(LOG_ERR, "Failed to stat serial device %s: %s\n",
+						cfg.serial_dev, strerror(errno));
+				return;
+			}
+			if(!S_ISCHR(st.st_mode)) {
+				logmsg(LOG_ERR, "Ignoring configured serial device: %s: %s\n",
+						cfg.serial_dev, "not a character device");
+				return;
+			}
+
 			dev = add_device();
 			strcpy(dev->path, cfg.serial_dev);
 			if(open_dev_serial(dev) == -1) {
