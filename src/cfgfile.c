@@ -54,6 +54,7 @@ enum { RMCFG_ALL, RMCFG_OWN };
 #define NUM_EXTRA_LINES	(NUM_CFG_OPTIONS + MAX_CUSTOM + MAX_BUTTONS * 3 + MAX_AXES + 16)
 
 static int parse_bnact(const char *s);
+static const char *bnact_name(int bnact);
 static int add_cfgopt(int opt, int idx, const char *fmt, ...);
 static int add_cfgopt_devid(int vid, int pid);
 static int rm_cfgopt(const char *name, int mode);
@@ -605,6 +606,15 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	}
 
 	for(i=0; i<MAX_BUTTONS; i++) {
+		if(cfg->bnact[i] != BNACT_NONE) {
+			add_cfgopt(CFG_BNACT_N, i, "bnact%d = %s", i, bnact_name(cfg->bnact[i]));
+		} else {
+			sprintf(buf, "bnact%d", i);
+			rm_cfgopt(buf, RMCFG_ALL);
+		}
+	}
+
+	for(i=0; i<MAX_BUTTONS; i++) {
 		if(cfg->kbmap_str[i]) {
 			add_cfgopt(CFG_KBMAP_N, i, "kbmap%d = %s", i, cfg->kbmap_str[i]);
 		} else {
@@ -684,6 +694,17 @@ static int parse_bnact(const char *s)
 		}
 	}
 	return -1;
+}
+
+static const char *bnact_name(int bnact)
+{
+	int i;
+	for(i=0; bnact_strtab[i].name; i++) {
+		if(bnact_strtab[i].act == bnact) {
+			return bnact_strtab[i].name;
+		}
+	}
+	return "none";
 }
 
 static struct cfgline *find_cfgopt(int opt, int idx)
