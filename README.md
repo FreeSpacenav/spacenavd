@@ -14,7 +14,7 @@ For more info on the spacenav project, visit: http://spacenav.sourceforge.net
 
 License
 -------
-Copyright (C) 2007-2020 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software. Feel free to copy, modify and/or redistribute it
 under the terms of the GNU General Public Licens version 3, or at your option,
@@ -28,6 +28,7 @@ In order to compile the spacenavd daemon, you'll need the following:
  - GNU make
  - Xlib (libX11, optional)
  - XInput2 (libXi, optional)
+ - Xtest (libXtst, optional)
 
 You can compile the daemon without Xlib, but it won't be compatible with
 applications that where written for the original proprietary 3Dconnexion driver
@@ -66,18 +67,23 @@ that file doesn't exist, then it will use default values for everything. An
 example configuration file is included in the doc subdirectory, which you may
 copy to `/etc` and tweak.
 
-You may use the graphical spnavcfg program to interactively set any of these
-options, which will create the spnavrc file for you, and automatically notify
-the daemon to re-read it.
+You may use the graphical spnavcfg program to interactively set and tweak any
+of the configuration options.
 
 Troubleshooting
 ---------------
 If you're having trouble running spacenavd, read the up to date FAQ on the
 spacenav website: http://spacenav.sourceforge.net/faq.html
 
+If you're not sure if spacenavd is set up correctly and works with your device,
+a good first step is to try and run the "simple" example program which comes
+with libspnav. It builds into two variants: `simple_af_unix` and `simple_x11`,
+which is helpful for testing both supported communication protocols. If either
+or both fail to work, there's something wrong with your setup.
+
 If you're still having trouble, send a description of your problem to the
 spacenav-users mailing list: spacenav-users@lists.sourceforge.net along with a
 copy of your /var/log/spnavd.log and any other relevant information.
 
-If you have encountered a bug, please file a bug report in our bug tracking
-system: https://sourceforge.net/p/spacenav/bugs/
+If you have encountered a bug, please file a bug report in our bug tracker:
+https://github.com/FreeSpacenav/spacenavd/issues
