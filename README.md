@@ -12,6 +12,13 @@ with spacenavd.
 
 For more info on the spacenav project, visit: http://spacenav.sourceforge.net
 
+> We are currently in the process of documenting how button numbers relate to
+> physical buttons, across all 6dof devices:
+> https://github.com/FreeSpacenav/spacenavd/wiki/Device-button-names
+>
+> If you have a device which is missing from that wiki page, please help us
+> expand the database by adding it, or send us the information through email.
+
 License
 -------
 Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
