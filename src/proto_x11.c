@@ -57,7 +57,8 @@ static int xioerr(Display *dpy);
 
 static Display *dpy;
 static Window win;
-static Atom xa_event_motion, xa_event_bpress, xa_event_brelease, xa_event_cmd;
+static Atom xa_event_motion, xa_event_bpress, xa_event_brelease;
+static Atom xa_event_devdisc, xa_event_cmd;
 
 /* XXX This stands in for the client sensitivity. Due to the
  * bad design of the original magellan protocol, we can't know
@@ -137,6 +138,7 @@ int init_x11(void)
 	xa_event_motion = XInternAtom(dpy, "MotionEvent", False);
 	xa_event_bpress = XInternAtom(dpy, "ButtonPressEvent", False);
 	xa_event_brelease = XInternAtom(dpy, "ButtonReleaseEvent", False);
+	xa_event_devdisc = XInternAtom(dpy, "DeviceDisconnectEvent", False);
 	xa_event_cmd = XInternAtom(dpy, "CommandEvent", False);
 
 	/* Create a dummy window, so that clients are able to send us events
