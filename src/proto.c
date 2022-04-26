@@ -10,16 +10,18 @@ int spnav_send_str(int fd, int req, const char *str)
 	int len;
 	struct reqresp rr = {0};
 
-	if(fd == -1 || !str) {
+	if(fd == -1) {
 		return -1;
 	}
 
-	len = strlen(str);
+	len = str ? strlen(str) : 0;
 	rr.type = req;
 	rr.data[6] = len;
 
 	do {
-		memcpy(rr.data, str, len > REQSTR_CHUNK_SIZE ? REQSTR_CHUNK_SIZE : len);
+		if(str) {
+			memcpy(rr.data, str, len > REQSTR_CHUNK_SIZE ? REQSTR_CHUNK_SIZE : len);
+		}
 		write(fd, &rr, sizeof rr);
 		str += REQSTR_CHUNK_SIZE;
 		len -= REQSTR_CHUNK_SIZE;
