@@ -10,7 +10,7 @@ warn = -pedantic -Wall
 CC ?= gcc
 CFLAGS = $(warn) $(dbg) $(opt) -fno-strict-aliasing -fcommon \
 		 -I$(srcdir)/src -I/usr/local/include -MMD $(add_cflags)
-LDFLAGS = -L/usr/local/lib $(xlib) $(add_ldflags)
+LDFLAGS = -L/usr/local/lib $(xlib) $(add_ldflags) -lm
 
 $(bin): $(obj)
 	$(CC) -o $@ $(obj) $(LDFLAGS)
