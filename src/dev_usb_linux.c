@@ -444,7 +444,7 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 				/* add it to the list */
 				struct usb_dev_info *node = malloc(sizeof *node);
 				if(node) {
-					if(verbose > 1 || (verbose && dev_path_in_use(devinfo.devfiles[0]))) {
+					if(verbose > 1 || (verbose && !dev_path_in_use(devinfo.devfiles[0]))) {
 						logmsg(LOG_INFO, "found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
 								devinfo.name ? devinfo.name : "unknown", devinfo.devfiles[0]);
 					}
