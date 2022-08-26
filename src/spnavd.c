@@ -58,7 +58,11 @@ int main(int argc, char **argv)
 
 	for(i=1; i<argc; i++) {
 		if(argv[i][0] == '-') {
-			if(argv[i][2] == 0) {
+			if(argv[i][1] == 'v') {
+				char *p = argv[i] + 1;
+				while(*p++) verbose++;
+
+			} else if(argv[i][2] == 0) {
 				switch(argv[i][1]) {
 				case 'd':
 					become_daemon = !become_daemon;
@@ -90,10 +94,6 @@ int main(int argc, char **argv)
 						 */
 						force_logfile = 1;
 					}
-					break;
-
-				case 'v':
-					verbose = 1;
 					break;
 
 				case 'V':
@@ -266,7 +266,7 @@ static void print_usage(const char *argv0)
 	printf(" -d: do not daemonize\n");
 	printf(" -c <file>: config file path (default: " DEF_CFGFILE ")\n");
 	printf(" -l <file>|syslog: log file path or log to syslog (default: " DEF_LOGFILE ")\n");
-	printf(" -v: verbose output\n");
+	printf(" -v: verbose output (use multiple times for greater effect)\n");
 	printf(" -V,-version: print version number and exit\n");
 	printf(" -h,-help: print usage information and exit\n");
 }

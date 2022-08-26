@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2019 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -62,7 +62,6 @@ static void close_evdev(struct device *dev);
 static int read_evdev(struct device *dev, struct dev_input *inp);
 static void set_led_evdev(struct device *dev, int state);
 
-
 int open_dev_usb(struct device *dev)
 {
 	int i, axes_rel = 0, axes_abs = 0;
@@ -119,18 +118,26 @@ int open_dev_usb(struct device *dev)
 	}
 
 	/* get number of buttons */
-	dev->num_buttons = 0;
-	if(ioctl(dev->fd, EVIOCGBIT(EV_KEY, sizeof evtype_mask), evtype_mask) != -1) {
-		for(i=0; i<KEY_CNT; i++) {
-			int idx = i / 8;
-			int bit = i % 8;
-
-			if(evtype_mask[idx] & (1 << bit)) {
-				dev->num_buttons++;
-			}
-		}
+	if(dev->bnhack) {
+		/* for those problematic devices, rely on the hardcoded button value in
+		 * their button remapping hack
+		 */
+		dev->num_buttons = dev->bnhack(-1);
 	} else {
-		logmsg(LOG_DEBUG, "EVIOCGBIT(EV_KEY) ioctl failed: %s\n", strerror(errno));
+		dev->num_buttons = 0;
+		if(ioctl(dev->fd, EVIOCGBIT(EV_KEY, sizeof evtype_mask), evtype_mask) != -1) {
+			for(i=0; i<KEY_CNT; i++) {
+				int idx = i / 8;
+				int bit = i % 8;
+
+				if(evtype_mask[idx] & (1 << bit)) {
+					logmsg(LOG_DEBUG, "bit %d (part %d bit %d)\n", idx * 8 + i, idx, bit);
+					dev->num_buttons++;
+				}
+			}
+		} else {
+			logmsg(LOG_DEBUG, "EVIOCGBIT(EV_KEY) ioctl failed: %s\n", strerror(errno));
+		}
 	}
 	if(!dev->num_buttons) {
 		logmsg(LOG_WARNING, "failed to retrieve number of buttons, will default to 2\n");
@@ -266,8 +273,16 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 
 		case EV_KEY:
 			inp->type = INP_BUTTON;
-			inp->idx = iev.code - BTN_0;
+			if(dev->bnhack) {
+				/* for problematic devices, remap button numbers to a contiguous range */
+				if((inp->idx = dev->bnhack(iev.code)) == -1) {
+					return -1;
+				}
+			} else {
+				inp->idx = iev.code - BTN_0;
+			}
 			inp->val = iev.value;
+			/*logmsg(LOG_DEBUG, "EV_KEY c:%d (%d) v:%d\n", iev.code, inp->idx, iev.value);*/
 			break;
 
 		case EV_SYN:
@@ -275,8 +290,14 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 			/*printf("[%s] EV_SYN\n", dev->name);*/
 			break;
 
+		case EV_MSC:
+			/* don't know what to do with these MSC events, the spacemouse enterprise
+			 * sends them on every button press. Silently ignore them for now.
+			 */
+			return -1;
+
 		default:
-			if(verbose) {
+			if(verbose > 1) {
 				logmsg(LOG_DEBUG, "unhandled event: %d\n", iev.type);
 			}
 			return -1;
@@ -314,7 +335,7 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 	DIR *dir;
 	struct dirent *dent;
 
-	if(verbose) {
+	if(verbose > 1) {
 		logmsg(LOG_INFO, "Device detection, parsing " PROC_DEV "\n");
 	}
 
@@ -423,7 +444,7 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 				/* add it to the list */
 				struct usb_dev_info *node = malloc(sizeof *node);
 				if(node) {
-					if(verbose) {
+					if(verbose > 1 || (verbose && dev_path_in_use(devinfo.devfiles[0]))) {
 						logmsg(LOG_INFO, "found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
 								devinfo.name ? devinfo.name : "unknown", devinfo.devfiles[0]);
 					}
@@ -458,7 +479,7 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 	/* otherwise try the alternative detection in case it finds something... */
 
 alt_detect:
-	if(verbose) {
+	if(verbose > 1) {
 		logmsg(LOG_INFO, "trying alternative detection, querying /dev/input/ devices...\n");
 	}
 
@@ -485,7 +506,7 @@ alt_detect:
 		sprintf(devinfo.devfiles[0], "/dev/input/%s", dent->d_name);
 		devinfo.num_devfiles = 1;
 
-		if(verbose) {
+		if(verbose > 1) {
 			logmsg(LOG_INFO, "  trying \"%s\" ... \n", devinfo.devfiles[0]);
 		}
 
@@ -517,7 +538,7 @@ alt_detect:
 		if(!match || match(&devinfo)) {
 			struct usb_dev_info *node = malloc(sizeof *node);
 			if(node) {
-				if(verbose) {
+				if(verbose > 1 || (verbose && !dev_path_in_use(devinfo.devfiles[0]))) {
 					logmsg(LOG_INFO, "found usb device [%x:%x]: \"%s\" (%s) \n", devinfo.vendorid, devinfo.productid,
 							devinfo.name ? devinfo.name : "unknown", devinfo.devfiles[0]);
 				}

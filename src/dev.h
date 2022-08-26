@@ -43,6 +43,8 @@ struct device {
 	int (*read)(struct device*, struct dev_input*);
 	void (*set_led)(struct device*, int);
 
+	int (*bnhack)(int bn);
+
 	struct device *next;
 };
 
@@ -60,5 +62,7 @@ void set_device_led(struct device *dev, int state);
 void set_devices_led(int state);
 
 struct device *get_devices(void);
+
+struct device *dev_path_in_use(const char *dev_path);
 
 #endif	/* SPNAV_DEV_H_ */

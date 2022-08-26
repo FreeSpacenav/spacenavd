@@ -51,30 +51,40 @@ enum {
 	DF_INVYZ = 2
 };
 
-static struct {
+/* The bnmap function pointer in the device table was introduced to deal with
+ * certain USB devices which report a huge amount of buttons, and strange
+ * disjointed button numbers. The function is expected to return the number of
+ * actual buttons when a negative number is passed as argument, and the button
+ * mapping otherwise.
+ */
+int bnhack_smpro(int bn);
+int bnhack_sment(int bn);
+
+static struct usbdb_entry {
 	int usbid[2];
 	int type;
 	unsigned int flags;
-} devid_list[] = {
-	{{0x046d, 0xc603}, DEV_PLUSXT,		0},						/* spacemouse plus XT */
-	{{0x046d, 0xc605}, DEV_CADMAN,		0},						/* cadman */
-	{{0x046d, 0xc606}, DEV_SMCLASSIC,	0},						/* spacemouse classic */
-	{{0x046d, 0xc621}, DEV_SB5000,		0},						/* spaceball 5000 */
-	{{0x046d, 0xc623}, DEV_STRAVEL,		DF_SWAPYZ | DF_INVYZ},	/* space traveller */
-	{{0x046d, 0xc625}, DEV_SPILOT,		DF_SWAPYZ | DF_INVYZ},	/* space pilot */
-	{{0x046d, 0xc626}, DEV_SNAV,		DF_SWAPYZ | DF_INVYZ},	/* space navigator */
-	{{0x046d, 0xc627}, DEV_SEXP,		DF_SWAPYZ | DF_INVYZ},	/* space explorer */
-	{{0x046d, 0xc628}, DEV_SNAVNB,		DF_SWAPYZ | DF_INVYZ},	/* space navigator for notebooks*/
-	{{0x046d, 0xc629}, DEV_SPILOTPRO,	DF_SWAPYZ | DF_INVYZ},	/* space pilot pro*/
-	{{0x046d, 0xc62b}, DEV_SMPRO,		DF_SWAPYZ | DF_INVYZ},	/* space mouse pro*/
-	{{0x046d, 0xc640}, DEV_NULOOQ,		0},						/* nulooq */
-	{{0x256f, 0xc62e}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ},	/* spacemouse wireless (USB cable) */
-	{{0x256f, 0xc62f}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ},	/* spacemouse wireless  receiver */
-	{{0x256f, 0xc631}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse pro wireless */
-	{{0x256f, 0xc632}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse pro wireless receiver */
-	{{0x256f, 0xc633}, DEV_SMENT,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse enterprise */
-	{{0x256f, 0xc635}, DEV_SMCOMP,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse compact */
-	{{0x256f, 0xc636}, DEV_SMMOD,		DF_SWAPYZ | DF_INVYZ},	/* spacemouse module */
+	int (*bnmap)(int);		/* remap buttons on problematic devices */
+} usbdb[] = {
+	{{0x046d, 0xc603}, DEV_PLUSXT,		0,						0},				/* spacemouse plus XT */
+	{{0x046d, 0xc605}, DEV_CADMAN,		0,						0},				/* cadman */
+	{{0x046d, 0xc606}, DEV_SMCLASSIC,	0,						0},				/* spacemouse classic */
+	{{0x046d, 0xc621}, DEV_SB5000,		0,						0},				/* spaceball 5000 */
+	{{0x046d, 0xc623}, DEV_STRAVEL,		DF_SWAPYZ | DF_INVYZ,	0},				/* space traveller */
+	{{0x046d, 0xc625}, DEV_SPILOT,		DF_SWAPYZ | DF_INVYZ,	0},				/* space pilot */
+	{{0x046d, 0xc626}, DEV_SNAV,		DF_SWAPYZ | DF_INVYZ,	0},				/* space navigator */
+	{{0x046d, 0xc627}, DEV_SEXP,		DF_SWAPYZ | DF_INVYZ,	0},				/* space explorer */
+	{{0x046d, 0xc628}, DEV_SNAVNB,		DF_SWAPYZ | DF_INVYZ,	0},				/* space navigator for notebooks*/
+	{{0x046d, 0xc629}, DEV_SPILOTPRO,	DF_SWAPYZ | DF_INVYZ,	0},				/* space pilot pro*/
+	{{0x046d, 0xc62b}, DEV_SMPRO,		DF_SWAPYZ | DF_INVYZ,	0},				/* space mouse pro*/
+	{{0x046d, 0xc640}, DEV_NULOOQ,		0,						0},				/* nulooq */
+	{{0x256f, 0xc62e}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless (USB cable) */
+	{{0x256f, 0xc62f}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless  receiver */
+	{{0x256f, 0xc631}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ,	bnhack_smpro},	/* spacemouse pro wireless */
+	{{0x256f, 0xc632}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ,	bnhack_smpro},	/* spacemouse pro wireless receiver */
+	{{0x256f, 0xc633}, DEV_SMENT,		DF_SWAPYZ | DF_INVYZ,	bnhack_sment},	/* spacemouse enterprise */
+	{{0x256f, 0xc635}, DEV_SMCOMP,		DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse compact */
+	{{0x256f, 0xc636}, DEV_SMMOD,		DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse module */
 
 	{{-1, -1}, DEV_UNKNOWN, 0}
 };
@@ -94,10 +104,8 @@ static int devid_blacklist[][2] = {
 
 
 static struct device *add_device(void);
-static struct device *dev_path_in_use(char const * dev_path);
 static int match_usbdev(const struct usb_dev_info *devinfo);
-static int usbdevtype(unsigned int vid, unsigned int pid);
-static unsigned int usbdevflags(unsigned int vid, unsigned int pid);
+static struct usbdb_entry *find_usbdb_entry(unsigned int vid, unsigned int pid);
 
 static struct device *dev_list = NULL;
 static unsigned short last_id;
@@ -152,6 +160,7 @@ int init_devices_usb(void)
 	int i;
 	struct device *dev;
 	struct usb_dev_info *usblist, *usbdev;
+	struct usbdb_entry *uent;
 	spnav_event ev = {0};
 	char buf[256];
 
@@ -162,16 +171,19 @@ int init_devices_usb(void)
 	while(usbdev) {
 		for(i=0; i<usbdev->num_devfiles; i++) {
 			if((dev = dev_path_in_use(usbdev->devfiles[i]))) {
-				if(verbose) {
+				if(verbose > 1) {
 					logmsg(LOG_WARNING, "already using device: %s (%s) (id: %d)\n", dev->name, dev->path, dev->id);
 				}
 				break;
 			}
 
+			uent = find_usbdb_entry(usbdev->vendorid, usbdev->productid);
+
 			dev = add_device();
 			strcpy(dev->path, usbdev->devfiles[i]);
-			dev->type = usbdevtype(usbdev->vendorid, usbdev->productid);
-			dev->flags = usbdevflags(usbdev->vendorid, usbdev->productid);
+			dev->type = uent ? uent->type : DEV_UNKNOWN;
+			dev->flags = uent ? uent->flags : 0;
+			dev->bnhack = uent ? uent->bnmap : 0;
 			dev->usbid[0] = usbdev->vendorid;
 			dev->usbid[1] = usbdev->productid;
 
@@ -212,7 +224,9 @@ int init_devices_usb(void)
 	free_usb_devices_list(usblist);
 
 	if(!usblist) {
-		logmsg(LOG_ERR, "failed to find any supported USB devices\n");
+		if(verbose > 1) {
+			logmsg(LOG_ERR, "failed to find any supported USB devices\n");
+		}
 		return -1;
 	}
 
@@ -279,7 +293,7 @@ void remove_device(struct device *dev)
 	free(dev);
 }
 
-static struct device *dev_path_in_use(char const *dev_path)
+struct device *dev_path_in_use(const char *dev_path)
 {
 	struct device *iter = dev_list;
 	while(iter) {
@@ -391,9 +405,9 @@ static int match_usbdev(const struct usb_dev_info *devinfo)
 			return 1;
 		}
 
-		/* match any device in the devid_list */
-		for(i=0; devid_list[i].usbid[0] > 0; i++) {
-			if(vid == devid_list[i].usbid[0] && pid == devid_list[i].usbid[1]) {
+		/* match any device in the usbdb */
+		for(i=0; usbdb[i].usbid[0] > 0; i++) {
+			if(vid == usbdb[i].usbid[0] && pid == usbdb[i].usbid[1]) {
 				return 1;
 			}
 		}
@@ -407,24 +421,93 @@ static int match_usbdev(const struct usb_dev_info *devinfo)
 	return 0;	/* no match */
 }
 
-static int usbdevtype(unsigned int vid, unsigned int pid)
+static struct usbdb_entry *find_usbdb_entry(unsigned int vid, unsigned int pid)
 {
 	int i;
-	for(i=0; devid_list[i].usbid[0] != -1; i++) {
-		if(devid_list[i].usbid[0] == vid && devid_list[i].usbid[1] == pid) {
-			return devid_list[i].type;
-		}
-	}
-	return DEV_UNKNOWN;
-}
-
-static unsigned int usbdevflags(unsigned int vid, unsigned int pid)
-{
-	int i;
-	for(i=0; devid_list[i].usbid[0] != -1; i++) {
-		if(devid_list[i].usbid[0] == vid && devid_list[i].usbid[1] == pid) {
-			return devid_list[i].flags;
+	for(i=0; usbdb[i].usbid[0] != -1; i++) {
+		if(usbdb[i].usbid[0] == vid && usbdb[i].usbid[1] == pid) {
+			return usbdb + i;
 		}
 	}
 	return 0;
+}
+
+
+/* --- button remapping hack functions --- */
+
+/* SpaceMouse Pro */
+int bnhack_smpro(int bn)
+{
+	if(bn < 0) return 15;	/* button count */
+
+	switch(bn) {
+	case 256: return 4;		/* menu */
+	case 257: return 5;		/* fit */
+	case 258: return 6;		/* [T] */
+	case 260: return 7;		/* [R] */
+	case 261: return 8;		/* [F] */
+	case 264: return 9;		/* [ ] */
+	case 268: return 0;		/* 1 */
+	case 269: return 1;		/* 2 */
+	case 270: return 2;		/* 3 */
+	case 271: return 3;		/* 4 */
+	case 278: return 11;	/* esc */
+	case 279: return 12;	/* alt */
+	case 280: return 13;	/* shift */
+	case 281: return 14;	/* ctrl */
+	case 282: return 10;	/* lock */
+	default:
+		break;
+	}
+	return -1;	/* ignore all other events */
+}
+
+/* SpaceMouse Enterprise */
+int bnhack_sment(int bn)
+{
+	if(bn < 0) return 31;	/* button count */
+
+	switch(bn) {
+	case 256: return 12;	/* menu */
+	case 257: return 13;	/* fit */
+	case 258: return 14;	/* [T] */
+	case 260: return 15;	/* [R] */
+	case 261: return 16;	/* [F] */
+	case 264: return 17;	/* [ ] */
+
+	case 266: return 30;	/* iso */
+
+	case 268: return 0;		/* 1 */
+	case 269: return 1;		/* 2 */
+	case 270: return 2;		/* 3 */
+	case 271: return 3;		/* 4 */
+	case 272: return 4;		/* 5 */
+	case 273: return 5;		/* 6 */
+	case 274: return 6;		/* 7 */
+	case 275: return 7;		/* 8 */
+	case 276: return 8;		/* 9 */
+	case 277: return 9;		/* 10 */
+
+	case 278: return 18;	/* esc */
+	case 279: return 19;	/* alt */
+	case 280: return 20;	/* shift */
+	case 281: return 21;	/* ctrl */
+	case 282: return 22;	/* lock */
+
+	case 291: return 23;	/* enter */
+	case 292: return 24;	/* delete */
+
+	case 332: return 10;	/* 11 */
+	case 333: return 11;	/* 12 */
+
+	case 358: return 27;	/* V1 */
+	case 359: return 28;	/* V2 */
+	case 360: return 29;	/* V3 */
+
+	case 430: return 25;	/* tab */
+	case 431: return 26;	/* space */
+	default:
+		break;
+	}
+	return -1;	/* ignore all other events */
 }
