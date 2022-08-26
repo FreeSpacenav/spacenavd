@@ -1,0 +1,15 @@
+# Sensible button mappings for the original SpacePilot
+# Copy to /etc/spnavrc to use
+
+kbmap6 = KP_7
+kbmap8 = KP_3
+kbmap9 = KP_1
+kbmap11 = Alt_L
+kbmap12 = Shift_L
+kbmap13 = Control_L
+kbmap14 = KP_Delete
+kbmap19 = KP_5
+bnact16 = sensitivity-up
+bnact17 = sensitivity-down
+bnact18 = sensitivity-reset
+kbmap10 = Escape
