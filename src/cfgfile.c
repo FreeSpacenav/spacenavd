@@ -469,6 +469,14 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		return -1;
 	}
 
+	if(!cfglines) {
+		if(!(cfglines = calloc(NUM_EXTRA_LINES, sizeof *cfglines))) {
+			logmsg(LOG_WARNING, "failed to allocate config lines buffer\n");
+			fclose(fp);
+			return -1;
+		}
+	}
+
 	default_cfg(&def);	/* default config for comparisons */
 
 	if(cfg->sensitivity != def.sensitivity) {
