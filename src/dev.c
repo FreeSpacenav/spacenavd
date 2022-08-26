@@ -35,8 +35,6 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 
-#define VENDOR_3DCONNEXION	0x256f
-
 /* The device flags are introduced to normalize input across all known
  * supported 6dof devices. Newer USB devices seem to use axis 1 as fwd/back and
  * axis 2 as up/down, while older serial devices (and possibly also the early
@@ -57,9 +55,6 @@ enum {
  * actual buttons when a negative number is passed as argument, and the button
  * mapping otherwise.
  */
-int bnhack_smpro(int bn);
-int bnhack_sment(int bn);
-
 static struct usbdb_entry {
 	int usbid[2];
 	int type;
@@ -76,7 +71,7 @@ static struct usbdb_entry {
 	{{0x046d, 0xc627}, DEV_SEXP,		DF_SWAPYZ | DF_INVYZ,	0},				/* space explorer */
 	{{0x046d, 0xc628}, DEV_SNAVNB,		DF_SWAPYZ | DF_INVYZ,	0},				/* space navigator for notebooks*/
 	{{0x046d, 0xc629}, DEV_SPILOTPRO,	DF_SWAPYZ | DF_INVYZ,	0},				/* space pilot pro*/
-	{{0x046d, 0xc62b}, DEV_SMPRO,		DF_SWAPYZ | DF_INVYZ,	0},				/* space mouse pro*/
+	{{0x046d, 0xc62b}, DEV_SMPRO,		DF_SWAPYZ | DF_INVYZ,	bnhack_smpro},	/* space mouse pro*/
 	{{0x046d, 0xc640}, DEV_NULOOQ,		0,						0},				/* nulooq */
 	{{0x256f, 0xc62e}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless (USB cable) */
 	{{0x256f, 0xc62f}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless  receiver */
@@ -191,7 +186,7 @@ int init_devices_usb(void)
 				remove_device(dev);
 			} else {
 				/* add the 6dof remapping flags to every future 3dconnexion device */
-				if(dev->usbid[0] == VENDOR_3DCONNEXION) {
+				if(dev->usbid[0] == VID_3DCONN) {
 					dev->flags |= DF_SWAPYZ | DF_INVYZ;
 				}
 				/* sanity-check the device flags */
@@ -395,7 +390,7 @@ static int match_usbdev(const struct usb_dev_info *devinfo)
 		}
 
 		/* match any device with the new 3Dconnexion device id */
-		if(vid == VENDOR_3DCONNEXION) {
+		if(vid == VID_3DCONN) {
 			/* avoid matching and trying to grab the CAD mouse, when connected
 			 * on the same universal receiver as the spacemouse.
 			 */

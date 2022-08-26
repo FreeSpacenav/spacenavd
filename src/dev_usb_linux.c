@@ -109,6 +109,15 @@ int open_dev_usb(struct device *dev)
 	}
 	dev->num_axes = axes_rel + axes_abs;
 	if(!dev->num_axes) {
+		if(dev->usbid[0] == VID_3DCONN && dev->usbid[1] == PID_WIRELESS) {
+			/* a wireless 3Dconnexion device without axes is probably one of the
+			 * CadMouse products, drop it.
+			 */
+			logmsg(LOG_DEBUG, "No axes detected, probably a CadMouse, dropping\n");
+			close(dev->fd);
+			dev->fd = -1;
+			return -1;
+		}
 		logmsg(LOG_WARNING, "failed to retrieve number of axes. assuming 6\n");
 		dev->num_axes = 6;
 	} else {
@@ -118,25 +127,49 @@ int open_dev_usb(struct device *dev)
 	}
 
 	/* get number of buttons */
+	dev->num_buttons = 0;
+	if(ioctl(dev->fd, EVIOCGBIT(EV_KEY, sizeof evtype_mask), evtype_mask) != -1) {
+		for(i=0; i<KEY_CNT; i++) {
+			int idx = i / 8;
+			int bit = i % 8;
+
+			if(evtype_mask[idx] & (1 << bit)) {
+				dev->num_buttons++;
+			}
+		}
+	} else {
+		logmsg(LOG_DEBUG, "EVIOCGBIT(EV_KEY) ioctl failed: %s\n", strerror(errno));
+	}
+
+	/* sanity check, problematic devices appear to report 256 buttons, if that's
+	 * not the case, this is probably a mistake.
+	 */
+	if(dev->bnhack && dev->num_buttons < 255) {
+		logmsg(LOG_DEBUG, "BUG! Please report this at https://github.com/FreeSpacenav/spacenavd/issues, "
+				"or by sending an email to nuclear@member.fsf.org.\n");
+		logmsg(LOG_DEBUG, "This device (%04x:%04x) was marked for disjointed "
+				"button remapping, but unexpectedly reports %d buttons\n",
+				dev->usbid[0], dev->usbid[1], dev->num_buttons);
+
+		dev->bnhack = 0;
+	}
+
 	if(dev->bnhack) {
-		/* for those problematic devices, rely on the hardcoded button value in
-		 * their button remapping hack
-		 */
 		dev->num_buttons = dev->bnhack(-1);
 	} else {
-		dev->num_buttons = 0;
-		if(ioctl(dev->fd, EVIOCGBIT(EV_KEY, sizeof evtype_mask), evtype_mask) != -1) {
-			for(i=0; i<KEY_CNT; i++) {
-				int idx = i / 8;
-				int bit = i % 8;
-
-				if(evtype_mask[idx] & (1 << bit)) {
-					logmsg(LOG_DEBUG, "bit %d (part %d bit %d)\n", idx * 8 + i, idx, bit);
-					dev->num_buttons++;
-				}
+		if(dev->usbid[0] == VID_3DCONN && dev->usbid[1] == PID_WIRELESS) {
+			/* Wireless devices use the same dongle, try to guess which actual
+			 * device this is, and apply the button hack if it's a SpcMouse Pro
+			 */
+			if(dev->num_buttons >= 255) {
+				dev->type = DEV_SMPROW;
+				dev->bnhack = bnhack_smpro;
+				dev->num_buttons = bnhack_smpro(-1);
+				strcpy(dev->name, "3Dconnexion SpaceMouse Pro Wireless (guess)");
+			} else {
+				dev->type = DEV_SMW;
+				strcpy(dev->name, "3Dconnexion SpaceMouse Wireless (guess)");
 			}
-		} else {
-			logmsg(LOG_DEBUG, "EVIOCGBIT(EV_KEY) ioctl failed: %s\n", strerror(errno));
 		}
 	}
 	if(!dev->num_buttons) {

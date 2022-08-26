@@ -18,6 +18,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifndef SPNAV_DEV_USB_H_
 #define SPNAV_DEV_USB_H_
 
+#define VID_3DCONN		0x256f
+#define PID_WIRELESS	0xc652
+
 struct device;
 
 int open_dev_usb(struct device *dev);
@@ -36,5 +39,9 @@ struct usb_dev_info {
 struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*));
 void free_usb_devices_list(struct usb_dev_info *list);
 void print_usb_device_info(struct usb_dev_info *devinfo);
+
+/* see usbdb_entry table bnmap field in dev.c */
+int bnhack_smpro(int bn);
+int bnhack_sment(int bn);
 
 #endif	/* SPNAV_DEV_USB_H_ */
