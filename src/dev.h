@@ -36,6 +36,7 @@ struct device {
 	unsigned int flags;
 
 	int num_axes, num_buttons;
+	int bnbase;				/* button base (reported number of first button) */
 	int *minval, *maxval;	/* input value range (default: -500, 500) */
 	int *fuzz;				/* noise threshold */
 

@@ -127,6 +127,7 @@ int open_dev_usb(struct device *dev)
 	}
 
 	/* get number of buttons */
+	dev->bnbase = -1;
 	dev->num_buttons = 0;
 	if(ioctl(dev->fd, EVIOCGBIT(EV_KEY, sizeof evtype_mask), evtype_mask) != -1) {
 		for(i=0; i<KEY_CNT; i++) {
@@ -134,11 +135,18 @@ int open_dev_usb(struct device *dev)
 			int bit = i % 8;
 
 			if(evtype_mask[idx] & (1 << bit)) {
+				if(dev->bnbase < 0) {
+					dev->bnbase = idx * 8 + bit;
+				}
 				dev->num_buttons++;
 			}
 		}
 	} else {
 		logmsg(LOG_DEBUG, "EVIOCGBIT(EV_KEY) ioctl failed: %s\n", strerror(errno));
+	}
+
+	if(dev->bnbase == -1) {
+		dev->bnbase = 0;
 	}
 
 	/* sanity check, problematic devices appear to report 256 buttons, if that's
@@ -177,7 +185,7 @@ int open_dev_usb(struct device *dev)
 		dev->num_buttons = 2;
 	} else {
 		if(verbose) {
-			logmsg(LOG_INFO, "  Number of buttons: %d\n", dev->num_buttons);
+			logmsg(LOG_INFO, "  Number of buttons: %d (evdev offset: %d)\n", dev->num_buttons, dev->bnbase);
 		}
 	}
 
@@ -312,7 +320,7 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 					return -1;
 				}
 			} else {
-				inp->idx = iev.code - BTN_0;
+				inp->idx = iev.code - dev->bnbase;
 			}
 			inp->val = iev.value;
 			/*logmsg(LOG_DEBUG, "EV_KEY c:%d (%d) v:%d\n", iev.code, inp->idx, iev.value);*/
