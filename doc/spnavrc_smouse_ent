@@ -1,0 +1,14 @@
+# Sensible button mappings for the SpaceMouse Enterprise
+# Copy to /etc/spnavrc to use
+
+bnact2 = sensitivity-reset
+bnact8 = sensitivity-down
+bnact9 = sensitivity-up
+kbmap18 = Escape
+bnact22 = disable-rotation
+kbmap13 = KP_Delete
+kbmap20 = Shift_L
+kbmap21 = Control_L
+kbmap24 = Delete
+kbmap25 = Tab
+kbmap26 = space
