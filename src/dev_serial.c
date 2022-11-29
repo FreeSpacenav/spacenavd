@@ -262,13 +262,9 @@ static int stty_sball(struct sball *sb)
 	return 0;
 }
 
-/* Logicad magellan spacemouse: 9600 8n1 CTS/RTS (see NOTE)
+/* Logicad magellan spacemouse: 9600 8n2 CTS/RTS
  * Since the magellan devices don't seem to send any newlines, we can rely on
  * canonical mode to feed us nice whole lines at a time.
- *
- * NOTE: the documentation specifies 2 stop bits instead of 1, but this seems to
- * cause incompatibilities with certain USB-serial converters, using one 1 stop
- * bit seems to work fine in all cases, so we'll go with that.
  */
 static int stty_mag(struct sball *sb)
 {
@@ -286,7 +282,7 @@ static int stty_mag(struct sball *sb)
 	term.c_cc[VERASE] = 0;
 	term.c_cc[VKILL] = 0;
 
-	term.c_cflag = CLOCAL | CREAD | CS8 | HUPCL;
+	term.c_cflag = CLOCAL | CREAD | CS8 | CSTOPB | HUPCL;
 #ifdef CCTS_OFLOW
 	term.c_cflag |= CCTS_OFLOW;
 #elif defined(CRTSCTS)
