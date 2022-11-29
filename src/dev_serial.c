@@ -139,9 +139,15 @@ int open_dev_serial(struct device *dev)
 	if(stty_sball(sb) == -1) {
 		goto err;
 	}
+
+	/* Apparently some spaceballs take some time to initialize, and it's
+	 * necessary to wait for a little while before we start sending commands.
+	 */
+	sleep(1);
+
 	write(fd, "\r@RESET\r", 8);
 
-	if((sz = read_timeout(fd, buf, sizeof buf - 1, 2000000)) > 0 && (buf[sz] = 0, strstr(buf, "\r@1"))) {
+	if((sz = read_timeout(fd, buf, sizeof buf - 1, 2000000)) > 0 && (buf[sz] = 0, strstr(buf, "@1"))) {
 		/* we got a response, so it's a spaceball */
 		make_printable(buf, sz);
 		logmsg(LOG_INFO, "Spaceball detected: %s\n", buf);
