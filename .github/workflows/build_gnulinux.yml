@@ -7,6 +7,7 @@ on:
 
 jobs:
   build:
+
     runs-on: ubuntu-latest
 
     steps:
@@ -32,13 +33,14 @@ jobs:
         path: spacenavd-gnulinux
 
   build-nox11:
+
     runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
 
     - name: configure
-      run: ./configure --disable-x11
+      run: ./configure
 
     - name: build
       run: make
@@ -46,7 +48,7 @@ jobs:
     - name: stage install
       run: DESTDIR=spacenavd-gnulinux-nox11 make install
 
-      - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v3
       with:
         name: spacenavd-gnulinux-nox11
         path: spacenavd-gnulinux-nox11
