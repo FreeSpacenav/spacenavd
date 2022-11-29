@@ -216,6 +216,13 @@ int open_dev_usb(struct device *dev)
 	dev->read = read_hid;
 	dev->set_led = set_led_hid;
 
+	/* TODO until we flesh out the USB code on FreeBSD, let's fill the structure
+	 * with fake but plausible information.
+	 */
+	dev->bnbase = 0;
+	dev->num_buttons = 2;
+	dev->num_axes = 6;
+
 	return 0;
 }
 
