@@ -1,0 +1,35 @@
+name: GNU/Linux build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install libx11-dev libxi-dev libxtst-dev
+
+    - name: configure
+      run: ./configure
+
+    - name: build
+      run: make
+
+    - name: stage install
+      run: DESTDIR=spacenavd-instdir make install
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: spacenavd-instdir
+        path: spacenavd-instdir
+
+# vi:ts=2 sts=2 sw=2 expandtab:
