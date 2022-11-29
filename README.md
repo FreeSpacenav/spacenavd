@@ -1,6 +1,9 @@
 spacenavd
 =========
 
+![GNU/Linux build status](https://github.com/FreeSpacenav/spacenavd/actions/workflows/build_gnulinux.yml/badge.svg)
+![MacOS X build status](https://github.com/FreeSpacenav/spacenavd/actions/workflows/build_macosx.yml/badge.svg)
+
 About
 -----
 Spacenavd is a free software user-space driver (daemon), for 6-dof input
