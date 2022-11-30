@@ -1,0 +1,32 @@
+name: FreeBSD build
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+
+    runs-on: macos-12
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: FreeBSD build
+      uses: vmactions/freebsd-vm@v0
+      with:
+        prepare: |
+          pkg install -y git gmake libX11 libXi libXtst
+
+        run: |
+          ./configure
+          gmake
+          gmake DESTDIR=spacenavd-freebsd install
+
+    - uses: actions/upload-artifact@v3
+      with:
+        name: spacenavd-freebsd
+        path: spacenavd-freebsd
+
+# vi:ts=2 sts=2 sw=2 expandtab:
