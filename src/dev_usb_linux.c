@@ -149,17 +149,12 @@ int open_dev_usb(struct device *dev)
 		dev->bnbase = 0;
 	}
 
-	/* sanity check, problematic devices appear to report 256 buttons, if that's
-	 * not the case, this is probably a mistake.
+	/* for devices marked for disjointed button range remapping, log the button
+	 * count reported before applying the remapping function
 	 */
-	if(dev->bnhack && dev->num_buttons < 255) {
-		logmsg(LOG_DEBUG, "BUG! Please report this at https://github.com/FreeSpacenav/spacenavd/issues, "
-				"or by sending an email to nuclear@member.fsf.org.\n");
-		logmsg(LOG_DEBUG, "This device (%04x:%04x) was marked for disjointed "
-				"button remapping, but unexpectedly reports %d buttons\n",
+	if(dev->bnhack) {
+		logmsg(LOG_DEBUG, "Device %04x:%04x reports %d buttons before disjointed button remapping\n",
 				dev->usbid[0], dev->usbid[1], dev->num_buttons);
-
-		dev->bnhack = 0;
 	}
 
 	if(dev->bnhack) {
