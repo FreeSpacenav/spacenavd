@@ -85,6 +85,7 @@
 #    sensitivity-up, sensitivity-down, sensitivity-reset
 #    disable-rotation
 #    disable-translation
+#    dominant-axis
 #
 #bnact16 = sensitivity-up
 #bnact17 = sensitivity-down

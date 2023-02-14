@@ -690,6 +690,7 @@ static struct {
 	{"sensitivity-reset", BNACT_SENS_RESET},
 	{"disable-rotation", BNACT_DISABLE_ROTATION},
 	{"disable-translation", BNACT_DISABLE_TRANSLATION},
+	{"dominant-axis", BNACT_DOMINANT_AXIS},
 	{0, 0}
 };
 
