@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2023 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "config.h"
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "event.h"
 #include "client.h"
 #include "proto_unix.h"
@@ -47,9 +48,8 @@ struct dev_event {
 	struct dev_event *next;
 };
 
-struct dev_input inp_dominant = { -1, {0}, -1, 0 };
-struct timeval dominant_offset = { 0, 100000 }; // 0.1s
-int dominant_axis_treshold = 2;
+static struct dev_input inp_dom = { -1, {0}, -1, 0 };
+static int dom_axis_thres = 2;
 
 static struct dev_event *add_dev_event(struct device *dev);
 static struct dev_event *device_event_in_use(struct device *dev);
@@ -60,7 +60,7 @@ static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
 
 static struct dev_event *dev_ev_list = NULL;
 
-static int disable_translation, disable_rotation, dominant_axis;
+static int disable_translation, disable_rotation, dom_axis_mode;
 
 
 static struct dev_event *add_dev_event(struct device *dev)
@@ -144,10 +144,6 @@ static inline int map_axis(int devaxis)
 	return axis;
 }
 
-int dominant_threshold(int val, int threshold) {
-	return val <= -threshold || val >= threshold;
-}
-
 /* process_input processes an device input event, and dispatches
  * spacenav events to the clients by calling dispatch_event.
  * relative inputs (INP_MOTION) are accumulated, and dispatched when
@@ -158,7 +154,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 {
 	int sign, axis;
 	struct dev_event *dev_ev;
-	float sens_rot, sens_trans, axis_sensitivity;
+	float sens_rot, sens_trans, axis_sens;
 	spnav_event ev;
 
 	switch(inp->type) {
@@ -178,30 +174,29 @@ void process_input(struct device *dev, struct dev_input *inp)
 
 		sens_rot = disable_rotation ? 0 : cfg.sens_rot[axis - 3];
 		sens_trans = disable_translation ? 0 : cfg.sens_trans[axis];
-		axis_sensitivity = axis < 3 ? sens_trans : sens_rot;
+		axis_sens = axis < 3 ? sens_trans : sens_rot;
 
-		if(dominant_axis) {
-			if(inp_dominant.idx != -1) {
-				struct timeval diff;
-				timersub(&(inp->tm), &(inp_dominant.tm), &diff);
-				if (timercmp(&diff, &dominant_offset, >=)) {
-					inp_dominant.idx = -1;
-					inp_dominant.tm = (struct timeval){0};
-					inp_dominant.type = INP_FLUSH;
-					inp_dominant.val = 0;
+		if(dom_axis_mode) {
+			if(inp_dom.idx != -1) {
+				/* if more than 100ms have passed ... */
+				if(inp->tm.tv_sec > inp_dom.tm.tv_sec || inp->tm.tv_usec - inp_dom.tm.tv_usec >= 100000) {
+					inp_dom.idx = -1;
+					memset(&inp_dom.tm, 0, sizeof inp_dom.tm);
+					inp_dom.type = INP_FLUSH;
+					inp_dom.val = 0;
 				}
 			}
-			if((inp_dominant.idx == -1 && dominant_threshold(inp->val, dominant_axis_treshold))
-                                        || inp_dominant.idx == axis) {
-				inp_dominant.idx = axis;
-				inp_dominant.tm = inp->tm;
-				inp_dominant.type = inp->type;
-				inp_dominant.val = inp->val;
+			if((inp_dom.idx == -1 && (inp->val <= dom_axis_thres || inp->val >= dom_axis_thres))
+					|| inp_dom.idx == axis) {
+				inp_dom.idx = axis;
+				inp_dom.tm = inp->tm;
+				inp_dom.type = inp->type;
+				inp_dom.val = inp->val;
 			} else {
-				axis_sensitivity = 0;
+				axis_sens = 0;
 			}
 		}
-		inp->val = (int)((float)inp->val * cfg.sensitivity * axis_sensitivity);
+		inp->val = (int)((float)inp->val * cfg.sensitivity * axis_sens);
 
 		dev_ev = device_event_in_use(dev);
 		if(verbose && dev_ev == NULL)
@@ -312,7 +307,7 @@ static void handle_button_action(int act, int pressed)
 		}
 		break;
 	case BNACT_DOMINANT_AXIS:
-		dominant_axis = !dominant_axis;
+		dom_axis_mode = !dom_axis_mode;
 		break;
 	}
 }
