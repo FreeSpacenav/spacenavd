@@ -106,9 +106,7 @@ static int read_timeout(int fd, char *buf, int bufsz, long tm_usec);
 static void enqueue_motion(struct sball *sb, int axis, int val);
 static void gen_button_events(struct sball *sb, unsigned int prev);
 
-
 static char *memstr(char *buf, int len, char *str);
-
 
 int open_dev_serial(struct device *dev)
 {
@@ -721,12 +719,13 @@ static void gen_button_events(struct sball *sb, unsigned int prev)
 	}
 }
 
-static char *memstr(char *buf, int len, char *str)  {
+static char *memstr(char *buf, int len, char *str)
+{
 	int i,slen = strlen(str);
 	for (i = 0; i < len - slen; i++) {
-					if(!memcmp(buf + i, str, slen)) {
-							return buf + i;
-					}
+		if(!memcmp(buf + i, str, slen)) {
+			return buf + i;
+		}
 	}
 	return NULL;
 }
