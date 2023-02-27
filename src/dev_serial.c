@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2021 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2023 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -106,7 +106,8 @@ static int read_timeout(int fd, char *buf, int bufsz, long tm_usec);
 static void enqueue_motion(struct sball *sb, int axis, int val);
 static void gen_button_events(struct sball *sb, unsigned int prev);
 
-static char *memstr(char *buf, int len, char *str);
+static char *memstr(char *buf, int len, const char *str);
+
 
 int open_dev_serial(struct device *dev)
 {
@@ -719,13 +720,13 @@ static void gen_button_events(struct sball *sb, unsigned int prev)
 	}
 }
 
-static char *memstr(char *buf, int len, char *str)
+static char *memstr(char *buf, int len, const char *str)
 {
-	int i,slen = strlen(str);
-	for (i = 0; i < len - slen; i++) {
-		if(!memcmp(buf + i, str, slen)) {
+	int i, slen = strlen(str);
+	for(i=0; i<len - slen; i++) {
+		if(memcmp(buf + i, str, slen) == 0) {
 			return buf + i;
 		}
 	}
-	return NULL;
+	return 0;
 }
