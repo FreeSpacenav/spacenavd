@@ -107,6 +107,9 @@ static void enqueue_motion(struct sball *sb, int axis, int val);
 static void gen_button_events(struct sball *sb, unsigned int prev);
 
 
+static char *memstr(char *buf, int len, char *str);
+
+
 int open_dev_serial(struct device *dev)
 {
 	int fd, sz;
@@ -147,7 +150,7 @@ int open_dev_serial(struct device *dev)
 
 	write(fd, "\r@RESET\r", 8);
 
-	if((sz = read_timeout(fd, buf, sizeof buf - 1, 2000000)) > 0 && (buf[sz] = 0, strstr(buf, "@1"))) {
+	if((sz = read_timeout(fd, buf, sizeof buf - 1, 2000000)) > 0 && memstr(buf, sz, "@1")) {
 		/* we got a response, so it's a spaceball */
 		make_printable(buf, sz);
 		logmsg(LOG_INFO, "Spaceball detected: %s\n", buf);
@@ -716,4 +719,14 @@ static void gen_button_events(struct sball *sb, unsigned int prev)
 		}
 		bit <<= 1;
 	}
+}
+
+static char *memstr(char *buf, int len, char *str)  {
+	int i,slen = strlen(str);
+	for (i = 0; i < len - slen; i++) {
+					if(!memcmp(buf + i, str, slen)) {
+							return buf + i;
+					}
+	}
+	return NULL;
 }
