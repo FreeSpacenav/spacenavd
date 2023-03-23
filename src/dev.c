@@ -91,6 +91,7 @@ static int devid_blacklist[][2] = {
 	{0x256f, 0xc650},	/* cadmouse */
 	{0x256f, 0xc651},	/* cadmouse wireless */
 	{0x256f, 0xc655},	/* CadMouse Compact */
+	{0x256f, 0xc658},	/* CadMouse Compact Wireless */
 	{0x256f, 0xc62c},	/* lipari(?) */
 	{0x256f, 0xc641},	/* scout(?) */
 
