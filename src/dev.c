@@ -90,7 +90,10 @@ static struct usbdb_entry {
 static int devid_blacklist[][2] = {
 	{0x256f, 0xc650},	/* cadmouse */
 	{0x256f, 0xc651},	/* cadmouse wireless */
+	{0x256f, 0xc654},	/* CadMouse Pro Wireless */
 	{0x256f, 0xc655},	/* CadMouse Compact */
+	{0x256f, 0xc656},	/* CadMouse Pro */
+	{0x256f, 0xc657},	/* CadMouse Pro Wireless Left */
 	{0x256f, 0xc62c},	/* lipari(?) */
 	{0x256f, 0xc641},	/* scout(?) */
 
