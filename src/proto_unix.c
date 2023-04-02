@@ -34,6 +34,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "kbemu.h"
 #endif
 
+#ifndef isfinite
+#define isfinite(x)	(!isnan(x))
+#endif
 
 static int lsock = -1;
 

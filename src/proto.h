@@ -1,7 +1,13 @@
 #ifndef PROTO_H_
 #define PROTO_H_
 
+#include "config.h"
+
+#ifdef HAVE_STDINT_H_
 #include <stdint.h>
+#elif defined(HAVE_INTTYPES_H_)
+#include <inttypes.h>
+#endif
 
 /* maximum supported protocol version */
 #define MAX_PROTO_VER	1

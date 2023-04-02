@@ -138,6 +138,8 @@ echo ""
 
 HAVE_ALLOCA_H=`check_header alloca.h`
 HAVE_MALLOC_H=`check_header malloc.h`
+HAVE_STDINT_H=`check_header stdint.h`
+HAVE_INTTYPES_H=`check_header inttypes.h`
 
 if [ "$X11" = "no" ]; then
 	echo "WARNING: you have disabled the X11 interface, the resulting daemon \
@@ -169,13 +171,14 @@ if [ "$OPT" = 'yes' ]; then
 fi
 
 if [ "$X11" = 'yes' ]; then
-	echo 'xlib = -L/usr/X11/lib -lX11' >>Makefile
+	echo 'xlib = -L/usr/X11/lib' >>Makefile
 	if [ -n "$HAVE_XINPUT2_H" ]; then
 		echo 'xlib += -lXi' >>Makefile
 	fi
 	if [ -n "$HAVE_XTEST_H" ]; then
 		echo xlib += -lXtst >>Makefile
 	fi
+	echo 'xlib += -lX11 -lXext' >>Makefile
 fi
 
 if [ -n "$CFLAGS" ]; then
@@ -209,6 +212,8 @@ echo >>$cfgheader
 # check for alloca.h
 [ -n "$HAVE_ALLOCA_H" ] && echo $HAVE_ALLOCA_H >>$cfgheader
 [ -n "$HAVE_MALLOC_H" ] && echo $HAVE_MALLOC_H >>$cfgheader
+[ -n "$HAVE_STDINT_H" ] && echo $HAVE_STDINT_H >>$cfgheader
+[ -n "$HAVE_INTTYPES_H" ] && echo $HAVE_INTTYPES_H >>$cfgheader
 [ -n "$HAVE_XINPUT2_H" ] && echo $HAVE_XINPUT2_H >>$cfgheader
 [ -n "$HAVE_XTEST_H" ] && echo $HAVE_XTEST_H >>$cfgheader
 echo >>$cfgheader

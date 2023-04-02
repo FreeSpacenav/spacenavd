@@ -31,10 +31,6 @@ struct usb_dev_info *find_usb_devices(int (*match)(const struct usb_dev_info*))
 	return 0;
 }
 
-void free_usb_devices_list(struct usb_dev_info *list)
-{
-}
-
 int open_dev_usb(struct device *dev)
 {
 	return -1;
