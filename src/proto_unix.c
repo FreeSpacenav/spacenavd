@@ -615,6 +615,16 @@ static int handle_request(struct client *c, struct reqresp *req)
 		spnav_send_str(c->sock, req->type, cfg.serial_dev);
 		break;
 
+	case REQ_SCFG_REPEAT:
+		cfg.repeat_msec = req->data[0];
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_GCFG_REPEAT:
+		req->data[0] = cfg.repeat_msec;
+		sendresp(c, req, 0);
+		break;
+
 	case REQ_CFG_SAVE:
 		sendresp(c, req, write_cfg(cfgfile, &cfg));
 		break;
