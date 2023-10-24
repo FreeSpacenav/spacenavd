@@ -141,6 +141,17 @@ HAVE_MALLOC_H=`check_header malloc.h`
 HAVE_STDINT_H=`check_header stdint.h`
 HAVE_INTTYPES_H=`check_header inttypes.h`
 
+#if [ `uname -s` != Linux ]; then
+	HAVE_HIDAPI_H=`check_header hidapi/hidapi.h`
+
+	if [ -z "$HAVE_HIDAPI_H" ]; then
+		echo "WARNING: without the hidapi library USB devices will not be \
+supported on this platform."
+		echo
+	fi
+#fi
+
+
 if [ "$X11" = "no" ]; then
 	echo "WARNING: you have disabled the X11 interface, the resulting daemon \
 won't be compatible with applications written for the proprietary 3Dconnexion \
@@ -181,6 +192,11 @@ if [ "$X11" = 'yes' ]; then
 	echo 'xlib += -lX11 -lXext' >>Makefile
 fi
 
+if [ -n "$HAVE_HIDAPI_H" ]; then
+	echo 'hidapi = -lhidapi-hidraw' >>Makefile
+	#echo 'hidapi = -lhidapi-libusb' >>Makefile
+fi
+
 if [ -n "$CFLAGS" ]; then
 	echo "add_cflags = $CFLAGS" >>Makefile
 fi
@@ -206,6 +222,10 @@ if [ "$HOTPLUG" = yes ]; then
 	echo '#define USE_NETLINK' >>$cfgheader
 	echo >>$cfgheader
 fi
+if [ -n "$HAVE_HIDAPI_H" ]; then
+	echo '#define USE_HIDAPI' >>$cfgheader
+	echo >>$cfgheader
+fi
 echo '#define VERSION "'$VER'"' >>$cfgheader
 echo >>$cfgheader
 
@@ -216,6 +236,7 @@ echo >>$cfgheader
 [ -n "$HAVE_INTTYPES_H" ] && echo $HAVE_INTTYPES_H >>$cfgheader
 [ -n "$HAVE_XINPUT2_H" ] && echo $HAVE_XINPUT2_H >>$cfgheader
 [ -n "$HAVE_XTEST_H" ] && echo $HAVE_XTEST_H >>$cfgheader
+[ -n "$HAVE_HIDAPI_H" ] && echo $HAVE_HIDAPI_H >>$cfgheader
 echo >>$cfgheader
 
 echo "#define CFGDIR \"$CFGDIR\"" >>$cfgheader
