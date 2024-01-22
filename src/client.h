@@ -85,6 +85,9 @@ float get_client_sensitivity(struct client *client);
 void set_client_device(struct client *client, struct device *dev);
 struct device *get_client_device(struct client *client);
 
+/* if client has has enabled multi-device mode, then return 1, otherwise 0*/
+int is_client_multidev(struct client *client);
+
 /* these two can be used to iterate over all clients */
 struct client *first_client(void);
 struct client *next_client(void);

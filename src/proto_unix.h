@@ -27,7 +27,7 @@ int init_unix(void);
 void close_unix(void);
 int get_unix_socket(void);
 
-void send_uevent(spnav_event *ev, struct client *c);
+void send_uevent(struct device *dev, spnav_event *ev, struct client *c);
 
 int handle_uevents(fd_set *rset);
 
