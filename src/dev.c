@@ -62,9 +62,9 @@ static struct usbdb_entry {
 	int (*bnmap)(int);		/* remap buttons on problematic devices */
 } usbdb[] = {
 	{{0x046d, 0xc603}, DEV_PLUSXT,		0,						0},				/* spacemouse plus XT */
-	{{0x046d, 0xc605}, DEV_CADMAN,		0,						0},				/* cadman */
+	{{0x046d, 0xc605}, DEV_CADMAN,		DF_SWAPYZ | DF_INVYZ,	0},				/* cadman */
 	{{0x046d, 0xc606}, DEV_SMCLASSIC,	0,						0},				/* spacemouse classic */
-	{{0x046d, 0xc621}, DEV_SB5000,		0,						0},				/* spaceball 5000 */
+	{{0x046d, 0xc621}, DEV_SB5000,		DF_SWAPYZ | DF_INVYZ,	0},				/* spaceball 5000 */
 	{{0x046d, 0xc623}, DEV_STRAVEL,		DF_SWAPYZ | DF_INVYZ,	0},				/* space traveller */
 	{{0x046d, 0xc625}, DEV_SPILOT,		DF_SWAPYZ | DF_INVYZ,	0},				/* space pilot */
 	{{0x046d, 0xc626}, DEV_SNAV,		DF_SWAPYZ | DF_INVYZ,	0},				/* space navigator */
