@@ -54,8 +54,8 @@ static int dom_axis_thres = 2;
 static struct dev_event *add_dev_event(struct device *dev);
 static struct dev_event *device_event_in_use(struct device *dev);
 static void handle_button_action(int act, int val);
-static void dispatch_event(struct dev_event *dev);
-static void send_event(spnav_event *ev, struct client *c);
+static void dispatch_event(struct device *dev, struct dev_event *dev_ev);
+static void send_event(struct device *dev, spnav_event *ev, struct client *c);
 static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
 
 static struct dev_event *dev_ev_list = NULL;
@@ -162,7 +162,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 		ev.type = EVENT_RAWAXIS;
 		ev.axis.idx = inp->idx;
 		ev.axis.value = inp->val;
-		broadcast_event(&ev);
+		broadcast_event(dev, &ev);
 
 		if(abs(inp->val) < cfg.dead_threshold[inp->idx] ) {
 			inp->val = 0;
@@ -215,7 +215,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 		ev.type = EVENT_RAWBUTTON;
 		ev.button.press = inp->val;
 		ev.button.bnum = inp->idx;
-		broadcast_event(&ev);
+		broadcast_event(dev, &ev);
 
 		/* check to see if the button has been bound to an action */
 		if(cfg.bnact[inp->idx] > 0) {
@@ -240,7 +240,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 #endif
 		dev_ev = device_event_in_use(dev);
 		if(dev_ev && dev_ev->pending) {
-			dispatch_event(dev_ev);
+			dispatch_event(dev, dev_ev);
 			dev_ev->pending = 0;
 		}
 		inp->idx = cfg.map_button[inp->idx];
@@ -252,7 +252,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 			dev_button_event.event.type = EVENT_BUTTON;
 			dev_button_event.event.button.press = inp->val;
 			dev_button_event.event.button.bnum = inp->idx;
-			dispatch_event(&dev_button_event);
+			dispatch_event(dev, &dev_button_event);
 		}
 
 		/* to have them replace motion events in the queue uncomment next section */
@@ -260,14 +260,14 @@ void process_input(struct device *dev, struct dev_input *inp)
 		 * dev_ev->event.type = EVENT_BUTTON;
 		 * dev_ev->event.button.press = inp->val;
 		 * dev_ev->event.button.bnum = inp->idx;
-		 * dispatch_event(dev_ev);
+		 * dispatch_event(dev, dev_ev);
 		 */
 		break;
 
 	case INP_FLUSH:
 		dev_ev = device_event_in_use(dev);
 		if(dev_ev && dev_ev->pending) {
-			dispatch_event(dev_ev);
+			dispatch_event(dev, dev_ev);
 			dev_ev->pending = 0;
 		}
 		break;
@@ -330,10 +330,10 @@ void repeat_last_event(struct device *dev)
 	struct dev_event *dev_ev;
 	if((dev_ev = device_event_in_use(dev)) == NULL)
 		return;
-	dispatch_event(dev_ev);
+	dispatch_event(dev, dev_ev);
 }
 
-static void dispatch_event(struct dev_event *dev_ev)
+static void dispatch_event(struct device *dev, struct dev_event *dev_ev)
 {
 	struct client *c, *client_iter;
 	struct device *client_dev;
@@ -353,22 +353,25 @@ static void dispatch_event(struct dev_event *dev_ev)
 
 		/* if the client has selected a single device to get input from, then
 		 * don't send the event if it originates from a different device
+		 * as of January 2024, there is no protocol mechanism for a client to
+		 * select a single device.
+		 * However, clients may select to receive events from all devices.
 		 */
 		client_dev = get_client_device(c);
-		if(!client_dev || client_dev == dev_ev->dev) {
-			send_event(&dev_ev->event, c);
+		if(!client_dev || client_dev == dev_ev->dev || is_client_multidev(c)) {
+			send_event(dev, &dev_ev->event, c);
 		}
 	}
 }
 
-void broadcast_event(spnav_event *ev)
+void broadcast_event(struct device *maybe_dev, spnav_event *ev)
 {
 	struct client *c;
 
 	c = first_client();
 	while(c) {
 		/* event masks will be checked at the protocol level (send_uevent) */
-		send_event(ev, c);
+		send_event(maybe_dev, ev, c);
 		c = c->next;
 	}
 }
@@ -380,10 +383,10 @@ void broadcast_cfg_event(int cfg, int val)
 	ev.type = EVENT_CFG;
 	ev.cfg.cfg = cfg;
 	ev.cfg.data[0] = val;
-	broadcast_event(&ev);
+	broadcast_event(NULL, &ev);
 }
 
-static void send_event(spnav_event *ev, struct client *c)
+static void send_event(struct device *dev, spnav_event *ev, struct client *c)
 {
 	switch(get_client_type(c)) {
 #ifdef USE_X11
@@ -393,7 +396,7 @@ static void send_event(spnav_event *ev, struct client *c)
 #endif
 
 	case CLIENT_UNIX:
-		send_uevent(ev, c);
+		send_uevent(dev, ev, c);
 		break;
 
 	default:

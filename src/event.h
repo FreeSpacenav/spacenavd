@@ -104,7 +104,8 @@ int in_deadzone(struct device *dev);
 void repeat_last_event(struct device *dev);
 
 /* broadcasts an event to all clients */
-void broadcast_event(spnav_event *ev);
+/* if event corresponds to a specific device, `maybe_dev` is not null */
+void broadcast_event(struct device *maybe_dev, spnav_event *ev);
 
 void broadcast_cfg_event(int cfg, int val);
 
