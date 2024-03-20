@@ -186,6 +186,8 @@ int open_dev_serial(struct device *dev)
 
 		/* set 3D mode, not-dominant-axis, pass through motion and button packets */
 		write(fd, "m3\r", 3);
+		/* also attempt the compress mode-set command with extended keys enabled */
+		write(fd, "c3B\r", 4);
 
 		sb->parse = mag_parsepkt;
 		return 0;
@@ -606,7 +608,7 @@ static int guess_num_buttons(struct device *dev, const char *verstr)
 	if(strstr(verstr, "MAGELLAN")) {
 		dev->type = DEV_SM;
 		strcpy(dev->name, "Magellan SpaceMouse");
-		return 9; /* magellan spacemouse */
+		return 11; /* magellan spacemouse (assume ext buttons on plus/xt) */
 	}
 
 	if(strstr(verstr, "SPACEBALL")) {
