@@ -28,7 +28,7 @@ test_kver() {
 check_header() {
 	printf "Looking for header: $1 ... " >&2
 	echo "#include <$1>" >.chkhdr.c
-	if cpp -I/usr/local/include .chkhdr.c >/dev/null 2>&1; then
+	if cpp -I/usr/local/include $x11inc .chkhdr.c >/dev/null 2>&1; then
 		echo found >&2
 		echo "#define HAVE_`basename $1 | tr '[:lower:]' '[:upper:]' | sed 's/\./_/g'`"
 	else
@@ -147,6 +147,22 @@ won't be compatible with applications written for the proprietary 3Dconnexion \
 daemon (3dxserv)!"
 	echo
 else
+	# find alternate X11 header/lib paths
+	if [ -e /usr/local/X11/Xlib.h ]; then
+		x11prefix='/usr/local'
+	elif [ -e /usr/X11/include/X11/Xlib.h ]; then
+		x11prefix='/usr/X11'
+	elif [ -e /usr/X11R6/include/X11/Xlib.h ]; then
+		x11prefix='/usr/X11R6'
+	elif [ -e /opt/homebrew/include/X11/Xlib.h ]; then
+		x11prefix='/opt/homebrew'
+	fi
+	if [ -n "$x11prefix" ]; then
+		echo "X11 prefix: $x11prefix"
+		x11inc=-I$x11prefix/include
+		x11lib=-L$x11prefix/lib
+	fi
+
 	HAVE_XINPUT2_H=`check_header X11/extensions/XInput2.h`
 	HAVE_XTEST_H=`check_header X11/extensions/XTest.h`
 
@@ -171,7 +187,9 @@ if [ "$OPT" = 'yes' ]; then
 fi
 
 if [ "$X11" = 'yes' ]; then
-	echo 'xlib = -L/usr/X11/lib' >>Makefile
+	echo "xinc = $x11inc" >>Makefile
+	echo "xlib = $x11lib" >>Makefile
+
 	if [ -n "$HAVE_XINPUT2_H" ]; then
 		echo 'xlib += -lXi' >>Makefile
 	fi
