@@ -148,7 +148,7 @@ daemon (3dxserv)!"
 	echo
 else
 	# find alternate X11 header/lib paths
-	if [ -e /usr/local/X11/Xlib.h ]; then
+	if [ -e /usr/local/include/X11/Xlib.h ]; then
 		x11prefix='/usr/local'
 	elif [ -e /usr/X11/include/X11/Xlib.h ]; then
 		x11prefix='/usr/X11'
