@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: install dependencies
       run: |
@@ -27,7 +27,7 @@ jobs:
     - name: stage install
       run: DESTDIR=spacenavd-gnulinux make install
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: spacenavd-gnulinux
         path: spacenavd-gnulinux
@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: configure
       run: ./configure --disable-x11
@@ -48,7 +48,7 @@ jobs:
     - name: stage install
       run: DESTDIR=spacenavd-gnulinux-nox11 make install
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: spacenavd-gnulinux-nox11
         path: spacenavd-gnulinux-nox11

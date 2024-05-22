@@ -11,7 +11,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: install dependencies
       run: |
@@ -26,7 +26,7 @@ jobs:
     - name: stage install
       run: DESTDIR=spacenavd-macosx make install
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: spacenavd-macosx
         path: spacenavd-macosx
@@ -36,7 +36,7 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: configure
       run: ./configure --disable-x11
@@ -47,7 +47,7 @@ jobs:
     - name: stage install
       run: DESTDIR=spacenavd-macosx-nox11 make install
 
-    - uses: actions/upload-artifact@v3
+    - uses: actions/upload-artifact@v4
       with:
         name: spacenavd-macosx-nox11
         path: spacenavd-macosx-nox11
