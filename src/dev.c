@@ -80,7 +80,7 @@ static struct usbdb_entry {
 	{{0x256f, 0xc633}, DEV_SMENT,		DF_SWAPYZ | DF_INVYZ,	bnhack_sment},	/* spacemouse enterprise */
 	{{0x256f, 0xc635}, DEV_SMCOMP,		DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse compact */
 	{{0x256f, 0xc636}, DEV_SMMOD,		DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse module */
-
+	{{0x256f, 0xc63a}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless (Bluetooth) */
 	{{-1, -1}, DEV_UNKNOWN, 0}
 };
 
