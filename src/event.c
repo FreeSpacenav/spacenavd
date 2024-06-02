@@ -48,9 +48,6 @@ struct dev_event {
 	struct dev_event *next;
 };
 
-static struct dev_input inp_dom = { -1, {0}, -1, 0 };
-static int dom_axis_thres = 2;
-
 static struct dev_event *add_dev_event(struct device *dev);
 static struct dev_event *device_event_in_use(struct device *dev);
 static void handle_button_action(int act, int val);
@@ -177,24 +174,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 		axis_sens = axis < 3 ? sens_trans : sens_rot;
 
 		if(dom_axis_mode) {
-			if(inp_dom.idx != -1) {
-				/* if more than 100ms have passed ... */
-				if(inp->tm.tv_sec > inp_dom.tm.tv_sec || inp->tm.tv_usec - inp_dom.tm.tv_usec >= 100000) {
-					inp_dom.idx = -1;
-					memset(&inp_dom.tm, 0, sizeof inp_dom.tm);
-					inp_dom.type = INP_FLUSH;
-					inp_dom.val = 0;
-				}
-			}
-			if((inp_dom.idx == -1 && (inp->val <= dom_axis_thres || inp->val >= dom_axis_thres))
-					|| inp_dom.idx == axis) {
-				inp_dom.idx = axis;
-				inp_dom.tm = inp->tm;
-				inp_dom.type = inp->type;
-				inp_dom.val = inp->val;
-			} else {
-				axis_sens = 0;
-			}
+			/* TODO */
 		}
 		inp->val = (int)((float)inp->val * cfg.sensitivity * axis_sens);
 

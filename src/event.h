@@ -88,7 +88,6 @@ enum {
 
 struct dev_input {
 	int type;
-	struct timeval tm;
 	int idx;
 	int val;
 };
