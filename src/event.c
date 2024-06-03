@@ -58,6 +58,7 @@ static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
 static struct dev_event *dev_ev_list = NULL;
 
 static int disable_translation, disable_rotation, dom_axis_mode;
+static int cur_axis_mag[6], cur_dom_axis;
 
 
 static struct dev_event *add_dev_event(struct device *dev)
@@ -149,7 +150,7 @@ static inline int map_axis(int devaxis)
  */
 void process_input(struct device *dev, struct dev_input *inp)
 {
-	int sign, axis;
+	int sign, axis, abs_val;
 	struct dev_event *dev_ev;
 	float sens_rot, sens_trans, axis_sens;
 	spnav_event ev;
@@ -161,7 +162,9 @@ void process_input(struct device *dev, struct dev_input *inp)
 		ev.axis.value = inp->val;
 		broadcast_event(&ev);
 
-		if(abs(inp->val) < cfg.dead_threshold[inp->idx] ) {
+		abs_val = abs(inp->val);
+
+		if(abs_val < cfg.dead_threshold[inp->idx] ) {
 			inp->val = 0;
 		}
 		if((axis = map_axis(inp->idx)) == -1) {
@@ -173,8 +176,13 @@ void process_input(struct device *dev, struct dev_input *inp)
 		sens_trans = disable_translation ? 0 : cfg.sens_trans[axis];
 		axis_sens = axis < 3 ? sens_trans : sens_rot;
 
-		if(dom_axis_mode) {
-			/* TODO */
+		if(dom_axis_mode && axis < 6) {
+			if(abs_val > cur_axis_mag[cur_dom_axis]) {
+				cur_dom_axis = axis;
+			} else {
+				inp->val = 0;
+			}
+			cur_axis_mag[axis] = abs_val;
 		}
 		inp->val = (int)((float)inp->val * cfg.sensitivity * axis_sens);
 
