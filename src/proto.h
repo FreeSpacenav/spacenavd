@@ -3,9 +3,9 @@
 
 #include "config.h"
 
-#ifdef HAVE_STDINT_H_
+#ifdef HAVE_STDINT_H
 #include <stdint.h>
-#elif defined(HAVE_INTTYPES_H_)
+#elif defined(HAVE_INTTYPES_H)
 #include <inttypes.h>
 #endif
 
