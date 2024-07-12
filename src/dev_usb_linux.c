@@ -164,7 +164,7 @@ int open_dev_usb(struct device *dev)
 			/* Wireless devices use the same dongle, try to guess which actual
 			 * device this is, and apply the button hack if it's a SpcMouse Pro
 			 */
-			if(dev->num_buttons >= 255) {
+			if(dev->num_buttons > 2) {
 				dev->type = DEV_SMPROW;
 				dev->bnhack = bnhack_smpro;
 				dev->num_buttons = bnhack_smpro(-1);
