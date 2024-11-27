@@ -2,7 +2,7 @@
 
 setup_sysv_init() {
 
-	rlvl=`cat /etc/inittab | grep :initdefault: | sed 's/^id://; s/:init.*$//'`
+	rlvl=`cat /etc/inittab | grep :initdefault: | sed 's/^i.://; s/:init.*$//'`
 	if [ $? != 0 -o -z "$rlvl" ]; then
 		echo 'default runlevel detection failed.'
 		rlvl=2
