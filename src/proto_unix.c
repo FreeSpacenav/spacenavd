@@ -99,7 +99,7 @@ int get_unix_socket(void)
 	return lsock;
 }
 
-void send_uevent(spnav_event *ev, struct client *c)
+void send_uevent(struct device *maybe_dev, spnav_event *ev, struct client *c)
 {
 	int i;
 	int32_t data[8] = {0};
@@ -107,24 +107,32 @@ void send_uevent(spnav_event *ev, struct client *c)
 
 	if(lsock == -1) return;
 
+	int send_multi_device_event = 0;
+	if(maybe_dev != NULL && is_client_multidev(c)) {
+		int spnav_dev_id = maybe_dev->id;
+		data[7] = spnav_dev_id;
+		send_multi_device_event = 1;
+	}
 	switch(ev->type) {
 	case EVENT_MOTION:
 		if(!(c->evmask & EVMASK_MOTION)) return;
 
-		data[0] = UEV_MOTION;
+		data[0] = send_multi_device_event ? UEV_MOTION_MULTIDEV: UEV_MOTION;
 
 		motion_mul = get_client_sensitivity(c);
 		for(i=0; i<6; i++) {
 			float val = (float)ev->motion.data[i] * motion_mul;
 			data[i + 1] = (int32_t)val;
 		}
-		data[7] = ev->motion.period;
+		if(!send_multi_device_event) {
+			data[7] = ev->motion.period;
+		}
 		break;
 
 	case EVENT_RAWAXIS:
 		if(!(c->evmask & EVMASK_RAWAXIS)) return;
 
-		data[0] = UEV_RAWAXIS;
+		data[0] = send_multi_device_event ? UEV_RAWAXIS_MULTIDEV : UEV_RAWAXIS;
 		data[1] = ev->axis.idx;
 		data[2] = ev->axis.value;
 		break;
@@ -132,7 +140,9 @@ void send_uevent(spnav_event *ev, struct client *c)
 	case EVENT_BUTTON:
 		if(!(c->evmask & EVMASK_BUTTON)) return;
 
-		data[0] = ev->button.press ? UEV_PRESS : UEV_RELEASE;
+		data[0] = send_multi_device_event ?
+			(ev->button.press ? UEV_PRESS_MULTIDEV : UEV_RELEASE_MULTIDEV):
+			(ev->button.press ? UEV_PRESS : UEV_RELEASE);
 		data[1] = ev->button.bnum;
 		data[2] = ev->button.press;
 		break;
@@ -140,7 +150,7 @@ void send_uevent(spnav_event *ev, struct client *c)
 	case EVENT_RAWBUTTON:
 		if(!(c->evmask & EVMASK_RAWBUTTON)) return;
 
-		data[0] = UEV_RAWBUTTON;
+		data[0] = send_multi_device_event ? UEV_RAWBUTTON_MULTIDEV : UEV_RAWBUTTON;
 		data[1] = ev->button.bnum;
 		data[2] = ev->button.press;
 		break;
