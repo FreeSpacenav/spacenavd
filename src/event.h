@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by

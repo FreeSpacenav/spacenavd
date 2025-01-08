@@ -25,7 +25,7 @@ For more info on the spacenav project, visit: http://spacenav.sourceforge.net
 
 License
 -------
-Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software. Feel free to copy, modify and/or redistribute it
 under the terms of the GNU General Public License version 3, or at your option,
