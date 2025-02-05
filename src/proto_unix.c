@@ -568,6 +568,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 	case REQ_SCFG_SWAPYZ:
 		cfg.swapyz = req->data[0] ? 1 : 0;
 		sendresp(c, req, 0);
+		break;
 
 	case REQ_GCFG_SWAPYZ:
 		req->data[0] = cfg.swapyz;
