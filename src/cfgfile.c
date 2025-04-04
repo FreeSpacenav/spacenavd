@@ -29,6 +29,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "logger.h"
 #include "spnavd.h"
 
+struct cfg cfg, prev_cfg;
+
 /* all parsable config options... some of them might map to the same cfg field */
 enum {
 	CFG_REPEAT,
@@ -120,7 +122,7 @@ void unlock_cfgfile(int fd)
 #define EXPECT(cond) \
 	do { \
 		if(!(cond)) { \
-			logmsg(LOG_ERR, "%s: invalid value for %s\n", __func__, key_str); \
+			logmsg(LOG_ERR, "read_cfg: invalid value for %s\n", key_str); \
 			continue; \
 		} \
 	} while(0)
@@ -455,6 +457,14 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	fclose(fp);
 	return 0;
 }
+
+
+#ifndef HAVE_VSNPRINTF
+static int vsnprintf(char *buf, size_t sz, const char *fmt, va_list ap)
+{
+	return vsprintf(buf, fmt, ap);
+}
+#endif
 
 int write_cfg(const char *fname, struct cfg *cfg)
 {

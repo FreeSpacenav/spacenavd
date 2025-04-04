@@ -47,6 +47,7 @@ static void handle_events(fd_set *rset);
 static void sig_handler(int s);
 static char *fix_path(char *str);
 
+int verbose;
 char *cfgfile = DEF_CFGFILE;
 static char *logfile = DEF_LOGFILE;
 static int pfd[2];

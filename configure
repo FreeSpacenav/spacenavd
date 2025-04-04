@@ -1,5 +1,9 @@
 #!/bin/sh
 
+if [ -z "$CC" ]; then
+	CC=cc
+fi
+
 test_kver() {
 	req_major=`echo $1 | awk -F . '{ print $1 }'`
 	req_minor=`echo $1 | awk -F . '{ print $2 }'`
@@ -28,7 +32,7 @@ test_kver() {
 check_header() {
 	printf "Looking for header: $1 ... " >&2
 	echo "#include <$1>" >.chkhdr.c
-	if cpp -I/usr/local/include $x11inc .chkhdr.c >/dev/null 2>&1; then
+	if $CC -E -I/usr/local/include $x11inc .chkhdr.c >/dev/null 2>&1; then
 		echo found >&2
 		echo "#define HAVE_`basename $1 | tr '[:lower:]' '[:upper:]' | sed 's/\./_/g'`"
 	else
@@ -36,6 +40,33 @@ check_header() {
 	fi
 	rm -f .chkhdr.c
 }
+
+check_func() {
+	printf "Check for $1 ... " >&2
+	echo "void $1(void);" >.chkfunc.c
+	echo "int main(void) { $1(); return 0; }" >>.chkfunc.c
+	if $CC -o .chkfunc .chkfunc.c >/dev/null 2>&1; then
+		echo found >&2
+		echo "#define HAVE_`basename $1 | tr '[:lower:]' '[:upper:]'`"
+	else
+		echo not found >&2
+	fi
+	rm -f .chkfunc .chkfunc.c
+}
+
+cfgtest_src=.cfgtest.c
+
+run_test() {
+	$CC -o .cfgtest $cfgtest_src >cfgtest.log 2>&1
+	if [ $? != 0 ]; then
+		echo "failed to compile test program, see cfgtest.log" >&2
+		exit 1
+	fi
+	./.cfgtest && cfgtest_result=0 || cfgtest_result=1
+	rm -f .cfgtest $cfgtest_src cfgtest.log
+	return $cfgtest_result
+}
+
 
 
 PREFIX=/usr/local
@@ -77,7 +108,7 @@ fi
 srcdir="`dirname "$0"`"
 
 # process arguments
-for arg; do
+for arg in $*; do
 	case "$arg" in
 	--prefix=*)
 		value=`echo $arg | sed 's/--prefix=//'`
@@ -135,6 +166,14 @@ echo "  x11 communication method: $X11"
 echo "  use hotplug: $HOTPLUG"
 echo ""
 
+# check if CC is gcc
+echo 'int main(void) {' >$cfgtest_src
+echo '#ifdef __GNUC__' >>$cfgtest_src
+echo '    return 0;' >>$cfgtest_src
+echo '#endif' >>$cfgtest_src
+echo '    return 1; }' >>$cfgtest_src
+run_test && cc_is_gcc=true || cc_is_gcc=false
+
 
 HAVE_ALLOCA_H=`check_header alloca.h`
 HAVE_MALLOC_H=`check_header malloc.h`
@@ -148,13 +187,13 @@ daemon (3dxserv)!"
 	echo
 else
 	# find alternate X11 header/lib paths
-	if [ -e /usr/local/include/X11/Xlib.h ]; then
+	if [ -r /usr/local/include/X11/Xlib.h ]; then
 		x11prefix='/usr/local'
-	elif [ -e /usr/X11/include/X11/Xlib.h ]; then
+	elif [ -r /usr/X11/include/X11/Xlib.h ]; then
 		x11prefix='/usr/X11'
-	elif [ -e /usr/X11R6/include/X11/Xlib.h ]; then
+	elif [ -r /usr/X11R6/include/X11/Xlib.h ]; then
 		x11prefix='/usr/X11R6'
-	elif [ -e /opt/homebrew/include/X11/Xlib.h ]; then
+	elif [ -r /opt/homebrew/include/X11/Xlib.h ]; then
 		x11prefix='/opt/homebrew'
 	fi
 	if [ -n "$x11prefix" ]; then
@@ -172,6 +211,8 @@ less reliable (fallback to XSendEvent)."
 	fi
 fi
 
+HAVE_VSNPRINTF=`check_func vsnprintf`
+
 # create Makefile
 echo 'creating Makefile ...'
 echo "PREFIX = $PREFIX" >Makefile
@@ -179,11 +220,15 @@ echo "srcdir = $srcdir" >>Makefile
 echo "ver = $VER" >>Makefile
 
 if [ "$DBG" = 'yes' ]; then
-	echo 'dbg = -g' >>Makefile
+	echo 'dbg = -g3' >>Makefile
 fi
 
 if [ "$OPT" = 'yes' ]; then
-	echo 'opt = -O2' >>Makefile
+	if $cc_is_gcc; then
+		echo 'opt = -O2 -fno-strict-aliasing' >>Makefile
+	else
+		echo 'opt = -O2' >>Makefile
+	fi
 fi
 
 if [ "$X11" = 'yes' ]; then
@@ -197,6 +242,10 @@ if [ "$X11" = 'yes' ]; then
 		echo xlib += -lXtst >>Makefile
 	fi
 	echo 'xlib += -lX11 -lXext' >>Makefile
+fi
+
+if $cc_is_gcc; then
+	echo 'cc_cflags = -pedantic -Wall -MMD' >>Makefile
 fi
 
 if [ -n "$CFLAGS" ]; then
@@ -227,13 +276,13 @@ fi
 echo '#define VERSION "'$VER'"' >>$cfgheader
 echo >>$cfgheader
 
-# check for alloca.h
 [ -n "$HAVE_ALLOCA_H" ] && echo $HAVE_ALLOCA_H >>$cfgheader
 [ -n "$HAVE_MALLOC_H" ] && echo $HAVE_MALLOC_H >>$cfgheader
 [ -n "$HAVE_STDINT_H" ] && echo $HAVE_STDINT_H >>$cfgheader
 [ -n "$HAVE_INTTYPES_H" ] && echo $HAVE_INTTYPES_H >>$cfgheader
 [ -n "$HAVE_XINPUT2_H" ] && echo $HAVE_XINPUT2_H >>$cfgheader
 [ -n "$HAVE_XTEST_H" ] && echo $HAVE_XTEST_H >>$cfgheader
+[ -n "$HAVE_VSNPRINTF" ] && echo $HAVE_VSNPRINTF >>$cfgheader
 echo >>$cfgheader
 
 echo "#define CFGDIR \"$CFGDIR\"" >>$cfgheader

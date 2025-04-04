@@ -127,7 +127,7 @@ static struct dev_event *device_event_in_use(struct device *dev)
 	return NULL;
 }
 
-static inline int map_axis(int devaxis)
+static INLINE int map_axis(int devaxis)
 {
 	const static int swaptab[] = {0, 2, 1, 3, 5, 4};
 

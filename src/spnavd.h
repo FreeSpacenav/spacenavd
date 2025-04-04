@@ -48,11 +48,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 
+/* defined in cfgfile.c */
+extern struct cfg cfg, prev_cfg;
 
-struct cfg cfg, prev_cfg;
-extern char *cfgfile;		/* defined in spnavd.c */
+/* defined in spnavd.c */
+extern int verbose;
+extern char *cfgfile;
 
-int verbose;
 
 void cfg_changed(void);
 

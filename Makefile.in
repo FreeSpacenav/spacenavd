@@ -5,11 +5,8 @@ dep = $(obj:.o=.d)
 bin = spacenavd
 ctl = spnavd_ctl
 
-warn = -pedantic -Wall
-
 CC ?= gcc
-CFLAGS = $(warn) $(dbg) $(opt) -fno-strict-aliasing -fcommon \
-		 -I$(srcdir)/src $(xinc) -MMD $(add_cflags)
+CFLAGS = $(cc_cflags) $(dbg) $(opt) -I$(srcdir)/src $(xinc) $(add_cflags)
 LDFLAGS = $(xlib) $(add_ldflags) -lm
 
 $(bin): $(obj)
