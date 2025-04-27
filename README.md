@@ -16,12 +16,13 @@ with spacenavd.
 
 For more info on the spacenav project, visit: http://spacenav.sourceforge.net
 
-> We are currently in the process of documenting how button numbers relate to
-> physical buttons, across all 6dof devices:
-> https://github.com/FreeSpacenav/spacenavd/wiki/Device-button-names
+> There's an effort to create a websocket layer, to allow web applications to
+> receive 6dof input from spacenavd. This is currently hosted separately at:
+> https://github.com/RmStorm/spacenav-ws
 >
-> If you have a device which is missing from that wiki page, please help us
-> expand the database by adding it, or send us the information through email.
+> We're looking for someone interested to take over maintainance of that
+> interface, in order to improve it past the proof of concept stage, and
+> make it a part of the free spacenav project.
 
 License
 -------
