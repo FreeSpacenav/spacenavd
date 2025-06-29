@@ -1,12 +1,10 @@
 [Unit]
 Description=3Dconnexion Input Devices Userspace Driver
-After=syslog.target
 
 [Service]
-Type=forking
+Type=exec
 PIDFile=/var/run/spnavd.pid
-ExecStart=/usr/local/bin/spacenavd
-StandardError=syslog
+ExecStart=/usr/local/bin/spacenavd -d -l /dev/stdout
 
 [Install]
 WantedBy=graphical.target
