@@ -27,6 +27,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
+#include <sys/stat.h>
 #include "spnavd.h"
 #include "logger.h"
 #include "dev.h"
@@ -50,6 +51,7 @@ static char *fix_path(char *str);
 int verbose;
 char *cfgfile = DEF_CFGFILE;
 static char *logfile = DEF_LOGFILE;
+static char *pidfile = DEF_PIDFILE;
 static int pfd[2];
 
 int main(int argc, char **argv)
@@ -97,6 +99,14 @@ int main(int argc, char **argv)
 					}
 					break;
 
+				case 'p':
+opt_pidfile:		if(!argv[++i]) {
+						fprintf(stderr, "%s should be followed by the pidfile name", argv[i - 1]);
+						return 1;
+					}
+					pidfile = argv[i];
+					break;
+
 				case 'V':
 					printf("spacenavd " VERSION "\n");
 					return 0;
@@ -113,6 +123,9 @@ int main(int argc, char **argv)
 			} else if(strcmp(argv[i], "-version") == 0) {
 				printf("spacenavd " VERSION "\n");
 				return 0;
+
+			} else if(strcmp(argv[i], "-pidfile") == 0) {
+				goto opt_pidfile;
 
 			} else if(strcmp(argv[i], "-help") == 0 || strcmp(argv[i], "--help") == 0) {
 				print_usage(argv[0]);
@@ -267,6 +280,7 @@ static void print_usage(const char *argv0)
 	printf(" -d: do not daemonize\n");
 	printf(" -c <file>: config file path (default: " DEF_CFGFILE ")\n");
 	printf(" -l <file>|syslog: log file path or log to syslog (default: " DEF_LOGFILE ")\n");
+	printf(" -p,-pidfile <file>: pidfile path (default: " DEF_PIDFILE ")\n");
 	printf(" -v: verbose output (use multiple times for greater effect)\n");
 	printf(" -V,-version: print version number and exit\n");
 	printf(" -h,-help: print usage information and exit\n");
@@ -290,7 +304,9 @@ static void cleanup(void)
 		remove_device(tmp);
 	}
 
-	remove(PIDFILE);
+	if(pidfile) {
+		remove(pidfile);
+	}
 }
 
 static void redir_log(int fallback_syslog)
@@ -346,10 +362,17 @@ static void daemonize(void)
 
 static int write_pid_file(void)
 {
+	struct stat st;
 	FILE *fp;
 	int pid = getpid();
 
-	if(!(fp = fopen(PIDFILE, "w"))) {
+	if(stat(pidfile, &st) == 0 && !(st.st_mode & S_IFREG)) {
+		/* don't try to use anything other than regular files as a pid file */
+		pidfile = 0;
+		return -1;
+	}
+
+	if(!(fp = fopen(pidfile, "w"))) {
 		return -1;
 	}
 	fprintf(fp, "%d\n", pid);
@@ -364,7 +387,7 @@ static int find_running_daemon(void)
 	struct sockaddr_un addr;
 
 	/* try to open the pid-file */
-	if(!(fp = fopen(PIDFILE, "r"))) {
+	if(!(fp = fopen(pidfile, "r"))) {
 		return -1;
 	}
 	if(fscanf(fp, "%d\n", &pid) != 1) {

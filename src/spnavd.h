@@ -25,9 +25,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #define DEF_CFGFILE		CFGDIR "/spnavrc"
 #define DEF_LOGFILE		"/var/log/spnavd.log"
+#define DEF_PIDFILE		"/var/run/spnavd.pid"
 
 #define SOCK_NAME	"/var/run/spnav.sock"
-#define PIDFILE		"/var/run/spnavd.pid"
 #define SYSLOG_ID	"spnavd"
 
 /* Multiple devices support */
