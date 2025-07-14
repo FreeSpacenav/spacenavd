@@ -3,8 +3,7 @@ Description=3Dconnexion Input Devices Userspace Driver
 
 [Service]
 Type=exec
-PIDFile=/var/run/spnavd.pid
-ExecStart=/usr/local/bin/spacenavd -d -l /dev/stdout
+ExecStart=/usr/local/bin/spacenavd -d -l /dev/stdout -p /dev/null
 
 [Install]
 WantedBy=graphical.target
