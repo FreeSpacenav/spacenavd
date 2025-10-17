@@ -1,3 +1,4 @@
+# --- build sources/objects/binaries ---
 src = $(sort $(wildcard src/*.c))
 hdr = $(wildcard src/*.h)
 obj = $(src:.c=.o)
@@ -8,6 +9,13 @@ ctl = spnavd_ctl
 CC ?= gcc
 CFLAGS = $(cc_cflags) $(dbg) $(opt) -I$(srcdir)/src $(xinc) $(add_cflags)
 LDFLAGS = $(xlib) $(add_ldflags) -lm
+
+# --- udev rule for VectorBridge ---
+# Place your rules file at: contrib/99-vectorbridge-ndof.rules
+UDEV_RULE_NAME = 99-vectorbridge-ndof.rules
+UDEV_RULE_SRC  = $(srcdir)/contrib/$(UDEV_RULE_NAME)
+UDEV_RULE_DIR  = $(DESTDIR)/etc/udev/rules.d
+UDEV_RULE_DST  = $(UDEV_RULE_DIR)/$(UDEV_RULE_NAME)
 
 $(bin): $(obj)
 	$(CC) -o $@ $(obj) $(LDFLAGS)
@@ -28,14 +36,44 @@ clean:
 cleandep:
 	rm -f $(dep)
 
+# --- install/uninstall ---
 .PHONY: install
-install: $(bin)
+install: $(bin) install-udev
 	mkdir -p $(DESTDIR)$(PREFIX)/bin
-	cp $(bin) $(DESTDIR)$(PREFIX)/bin/$(bin)
-	cp $(srcdir)/$(ctl) $(DESTDIR)$(PREFIX)/bin/$(ctl)
+	cp $(bin) $(DESTDIR)$(PREFIX)/bin$(PATH_SEP)$(bin)
+	cp $(srcdir)/$(ctl) $(DESTDIR)$(PREFIX)/bin$(PATH_SEP)$(ctl)
 	cd $(srcdir) && ./setup_init --no-install
 
 .PHONY: uninstall
-uninstall:
-	rm -f $(DESTDIR)$(PREFIX)/bin/$(bin)
-	rm -f $(DESTDIR)$(PREFIX)/bin/$(ctl)
+uninstall: uninstall-udev
+	rm -f $(DESTDIR)$(PREFIX)/bin$(PATH_SEP)$(bin)
+	rm -f $(DESTDIR)$(PREFIX)/bin$(PATH_SEP)$(ctl)
+
+# --- udev install helpers ---
+.PHONY: install-udev
+install-udev:
+	@if [ -f "$(UDEV_RULE_SRC)" ]; then \
+	  echo "Installing udev rule: $(UDEV_RULE_DST)"; \
+	  mkdir -p "$(UDEV_RULE_DIR)"; \
+	  install -m 0644 "$(UDEV_RULE_SRC)" "$(UDEV_RULE_DST)"; \
+	  if command -v udevadm >/dev/null 2>&1; then \
+	    echo "Reloading udev rules…"; \
+	    udevadm control --reload-rules || true; \
+	    echo "Triggering VectorBridge udev…"; \
+	    udevadm trigger --attr-match=idVendor=16d0 --attr-match=idProduct=1474 || true; \
+	  fi; \
+	else \
+	  echo "NOTE: $(UDEV_RULE_SRC) not found; skipping udev rule install."; \
+	fi
+
+.PHONY: uninstall-udev
+uninstall-udev:
+	@if [ -f "$(UDEV_RULE_DST)" ]; then \
+	  echo "Removing udev rule: $(UDEV_RULE_DST)"; \
+	  rm -f "$(UDEV_RULE_DST)"; \
+	  if command -v udevadm >/dev/null 2>&1; then \
+	    echo "Reloading udev rules…"; \
+	    udevadm control --reload-rules || true; \
+	    udevadm trigger || true; \
+	  fi; \
+	fi
