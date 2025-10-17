@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
+Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -37,6 +37,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "client.h"
 
 #define DEF_MINVAL	(-500)
+
+#ifndef TEST_BIT
+/* helper to test bits in the EVIOCGBIT() byte-masks */
+#define TEST_BIT(bit, array)   (((array)[(bit) / 8] >> ((bit) % 8)) & 1)
+#endif
 #define DEF_MAXVAL	500
 #define DEF_RANGE	(DEF_MAXVAL - DEF_MINVAL)
 
@@ -164,7 +169,7 @@ int open_dev_usb(struct device *dev)
 			/* Wireless devices use the same dongle, try to guess which actual
 			 * device this is, and apply the button hack if it's a SpcMouse Pro
 			 */
-			if(dev->num_buttons > 2) {
+			if(dev->num_buttons >= 255) {
 				dev->type = DEV_SMPROW;
 				dev->bnhack = bnhack_smpro;
 				dev->num_buttons = bnhack_smpro(-1);
@@ -290,6 +295,8 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 	}
 
 	if(rdbytes > 0) {
+		inp->tm = iev.time;
+
 		switch(iev.type) {
 		case EV_REL:
 			inp->type = INP_MOTION;
