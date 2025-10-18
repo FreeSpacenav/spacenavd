@@ -295,7 +295,6 @@ static int read_evdev(struct device *dev, struct dev_input *inp)
 	}
 
 	if(rdbytes > 0) {
-		inp->tm = iev.time;
 
 		switch(iev.type) {
 		case EV_REL:
