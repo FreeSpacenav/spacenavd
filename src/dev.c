@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2022 John Tsiombikas <nuclear@member.fsf.org>
+Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -62,9 +62,9 @@ static struct usbdb_entry {
 	int (*bnmap)(int);		/* remap buttons on problematic devices */
 } usbdb[] = {
 	{{0x046d, 0xc603}, DEV_PLUSXT,		0,						0},				/* spacemouse plus XT */
-	{{0x046d, 0xc605}, DEV_CADMAN,		0,						0},				/* cadman */
+	{{0x046d, 0xc605}, DEV_CADMAN,		DF_SWAPYZ | DF_INVYZ,	0},				/* cadman */
 	{{0x046d, 0xc606}, DEV_SMCLASSIC,	0,						0},				/* spacemouse classic */
-	{{0x046d, 0xc621}, DEV_SB5000,		0,						0},				/* spaceball 5000 */
+	{{0x046d, 0xc621}, DEV_SB5000,		DF_SWAPYZ | DF_INVYZ,	0},				/* spaceball 5000 */
 	{{0x046d, 0xc623}, DEV_STRAVEL,		DF_SWAPYZ | DF_INVYZ,	0},				/* space traveller */
 	{{0x046d, 0xc625}, DEV_SPILOT,		DF_SWAPYZ | DF_INVYZ,	0},				/* space pilot */
 	{{0x046d, 0xc626}, DEV_SNAV,		DF_SWAPYZ | DF_INVYZ,	0},				/* space navigator */
@@ -80,8 +80,8 @@ static struct usbdb_entry {
 	{{0x256f, 0xc633}, DEV_SMENT,		DF_SWAPYZ | DF_INVYZ,	bnhack_sment},	/* spacemouse enterprise */
 	{{0x256f, 0xc635}, DEV_SMCOMP,		DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse compact */
 	{{0x256f, 0xc636}, DEV_SMMOD,		DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse module */
-	{{0x16d0, 0x1474}, DEV_SNAV,		0,						0},				/* cosmiclayers vectorbridge */
-
+	{{0x256f, 0xc63a}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless (Bluetooth) */
+	{{0x16d0, 0x1474], DEV_SNAV,		0,						0,				/* cosmiclayers vectorbridge */
 	{{-1, -1}, DEV_UNKNOWN, 0}
 };
 
@@ -97,6 +97,7 @@ static int devid_blacklist[][2] = {
 	{0x256f, 0xc657},	/* CadMouse Pro Wireless Left */
 	{0x256f, 0xc658},	/* CadMouse Compact Wireless */
 	{0x256f, 0xc664},	/* Keyboard Pro */
+	{0x256f, 0xc668},	/* Keyboard Pro (newer version)*/
 	{0x256f, 0xc665},	/* Numpad Pro */
 	{0x256f, 0xc62c},	/* lipari(?) */
 	{0x256f, 0xc641},	/* scout(?) */
