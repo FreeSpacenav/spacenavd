@@ -1,2 +1,0 @@
-SUBSYSTEM=="input", KERNEL=="event*", ENV{ID_VENDOR_ID}=="16d0", ENV{ID_MODEL_ID}=="1474", MODE="0666", GROUP="dialout"
-
