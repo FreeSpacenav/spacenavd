@@ -69,18 +69,19 @@ static struct usbdb_entry {
 	{{0x046d, 0xc625}, DEV_SPILOT,		DF_SWAPYZ | DF_INVYZ,	0},				/* space pilot */
 	{{0x046d, 0xc626}, DEV_SNAV,		DF_SWAPYZ | DF_INVYZ,	0},				/* space navigator */
 	{{0x046d, 0xc627}, DEV_SEXP,		DF_SWAPYZ | DF_INVYZ,	0},				/* space explorer */
-	{{0x046d, 0xc628}, DEV_SNAVNB,		DF_SWAPYZ | DF_INVYZ,	0},				/* space navigator for notebooks*/
-	{{0x046d, 0xc629}, DEV_SPILOTPRO,	DF_SWAPYZ | DF_INVYZ,	0},				/* space pilot pro*/
-	{{0x046d, 0xc62b}, DEV_SMPRO,		DF_SWAPYZ | DF_INVYZ,	bnhack_smpro},	/* space mouse pro*/
+	{{0x046d, 0xc628}, DEV_SNAVNB,		DF_SWAPYZ | DF_INVYZ,	0},				/* space navigator for notebooks */
+	{{0x046d, 0xc629}, DEV_SPILOTPRO,	DF_SWAPYZ | DF_INVYZ,	0},				/* space pilot pro */
+	{{0x046d, 0xc62b}, DEV_SMPRO,		DF_SWAPYZ | DF_INVYZ,	bnhack_smpro},	/* space mouse pro */
 	{{0x046d, 0xc640}, DEV_NULOOQ,		0,						0},				/* nulooq */
-	{{0x256f, 0xc62e}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless (USB cable) */
+	{{0x256f, 0xc62e}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless (USB) */
 	{{0x256f, 0xc62f}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless  receiver */
 	{{0x256f, 0xc631}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ,	bnhack_smpro},	/* spacemouse pro wireless */
 	{{0x256f, 0xc632}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ,	bnhack_smpro},	/* spacemouse pro wireless receiver */
 	{{0x256f, 0xc633}, DEV_SMENT,		DF_SWAPYZ | DF_INVYZ,	bnhack_sment},	/* spacemouse enterprise */
 	{{0x256f, 0xc635}, DEV_SMCOMP,		DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse compact */
 	{{0x256f, 0xc636}, DEV_SMMOD,		DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse module */
-	{{0x256f, 0xc63a}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless (Bluetooth) */
+	{{0x256f, 0xc638}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ,	bnhack_smpro},	/* spacemouse pro wireless BT (USB) */
+	{{0x256f, 0xc63a}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless (bluetooth) */
 	{{-1, -1}, DEV_UNKNOWN, 0}
 };
 
