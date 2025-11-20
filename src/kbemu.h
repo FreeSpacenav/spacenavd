@@ -26,5 +26,6 @@ KeySym kbemu_keysym(const char *str);
 const char *kbemu_keyname(KeySym sym);
 
 void send_kbevent(KeySym key, int press);
+void send_kbevent_combo(KeySym *keys, int count, int press);
 
 #endif	/* KBEMU_H_ */
