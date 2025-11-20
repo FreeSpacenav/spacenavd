@@ -63,12 +63,19 @@ void send_kbevent(KeySym key, int press)
 	XEvent xevent;
 	Window win;
 	int rev_state;
+	KeyCode kc;
 
 	if(!dpy) return;
 
+	kc = XKeysymToKeycode(dpy, key);
+	if(!kc) {
+		logmsg(LOG_WARNING, "failed to convert keysym %lu to keycode\n", key);
+		return;
+	}
+
 #ifdef HAVE_XTEST_H
 	if(use_xtest) {
-		XTestFakeKeyEvent(dpy, XKeysymToKeycode(dpy, key), press, 0);
+		XTestFakeKeyEvent(dpy, kc, press, 0);
 		XFlush(dpy);
 		return;
 	}
@@ -81,7 +88,7 @@ void send_kbevent(KeySym key, int press)
 	xevent.xkey.root = DefaultRootWindow(dpy);
 	xevent.xkey.window = win;
 	xevent.xkey.subwindow = None;
-	xevent.xkey.keycode = XKeysymToKeycode(dpy, key);
+	xevent.xkey.keycode = kc;
 	xevent.xkey.state = 0;
 	xevent.xkey.time = CurrentTime;
 	xevent.xkey.x = xevent.xkey.y = 1;
@@ -89,6 +96,27 @@ void send_kbevent(KeySym key, int press)
 
 	XSendEvent(dpy, win, True, press ? KeyPressMask : KeyReleaseMask, &xevent);
 	XFlush(dpy);
+}
+
+void send_kbevent_combo(KeySym *keys, int count, int press)
+{
+	int i;
+
+	if(!dpy || count <= 0) return;
+
+	if(press) {
+		return;
+	}
+
+	/* send press events for all keys */
+	for(i=0; i<count; i++) {
+		send_kbevent(keys[i], 1);
+	}
+
+	/* send release events in reverse order */
+	for(i=count-1; i>=0; i--) {
+		send_kbevent(keys[i], 0);
+	}
 }
 #else
 int spacenavd_kbemu_shut_up_empty_source_warning;

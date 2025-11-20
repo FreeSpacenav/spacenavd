@@ -31,6 +31,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cfg cfg, prev_cfg;
 
+#ifdef USE_X11
+extern unsigned long kbemu_keysym(const char *str);
+#endif
+
 /* all parsable config options... some of them might map to the same cfg field */
 enum {
 	CFG_REPEAT,
@@ -57,6 +61,7 @@ enum { RMCFG_ALL, RMCFG_OWN };
 
 static int parse_bnact(const char *s);
 static const char *bnact_name(int bnact);
+static int parse_kbmap(const char *str, unsigned long *kbmap, int max_keys);
 static int add_cfgopt(int opt, int idx, const char *fmt, ...);
 static int add_cfgopt_devid(int vid, int pid);
 static int rm_cfgopt(const char *name, int mode);
@@ -97,9 +102,13 @@ void default_cfg(struct cfg *cfg)
 	}
 
 	for(i=0; i<MAX_BUTTONS; i++) {
+		int j;
 		cfg->map_button[i] = i;
 		cfg->kbmap_str[i] = 0;
-		cfg->kbmap[i] = 0;
+		cfg->kbmap_count[i] = 0;
+		for(j=0; j<MAX_KEYS_PER_BUTTON; j++) {
+			cfg->kbmap[i][j] = 0;
+		}
 	}
 
 	cfg->repeat_msec = -1;
@@ -399,6 +408,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				free(cfg->kbmap_str[bnidx]);
 			}
 			cfg->kbmap_str[bnidx] = strdup(val_str);
+			cfg->kbmap_count[bnidx] = parse_kbmap(val_str, cfg->kbmap[bnidx], MAX_KEYS_PER_BUTTON);
 
 		} else if(strcmp(key_str, "led") == 0) {
 			lptr->opt = CFG_LED;
@@ -724,6 +734,51 @@ static const char *bnact_name(int bnact)
 		}
 	}
 	return "none";
+}
+
+static int parse_kbmap(const char *str, unsigned long *kbmap, int max_keys)
+{
+#ifdef USE_X11
+	char buf[256], *ptr, *start;
+	int count = 0;
+
+	if(!str || !*str) return 0;
+
+	strncpy(buf, str, sizeof buf - 1);
+	buf[sizeof buf - 1] = 0;
+
+	start = buf;
+	while(*start && count < max_keys) {
+		ptr = strchr(start, '+');
+		if(ptr) *ptr = 0;
+
+		while(*start && isspace(*start)) start++;
+		if(*start) {
+			char *end = start + strlen(start) - 1;
+			while(end > start && isspace(*end)) *end-- = 0;
+		}
+
+		if(*start) {
+			unsigned long ksym = (unsigned long)kbemu_keysym(start);
+			if(ksym == 0) {
+				logmsg(LOG_WARNING, "invalid key name in keyboard mapping: \"%s\"\n", start);
+			} else {
+				kbmap[count++] = ksym;
+			}
+		}
+
+		if(!ptr) break;
+		start = ptr + 1;
+	}
+
+	if(count >= max_keys && *start) {
+		logmsg(LOG_WARNING, "keyboard mapping truncated, max %d keys supported\n", max_keys);
+	}
+
+	return count;
+#else
+	return 0;
+#endif
 }
 
 static struct cfgline *find_cfgopt(int opt, int idx)

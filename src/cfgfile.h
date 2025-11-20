@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_AXES		64
 #define MAX_BUTTONS		64
 #define MAX_CUSTOM		64
+#define MAX_KEYS_PER_BUTTON	8
 
 enum {
 	LED_OFF		= 0,
@@ -51,7 +52,8 @@ struct cfg {
 	int map_axis[MAX_AXES];
 	int map_button[MAX_BUTTONS];
 	int bnact[MAX_BUTTONS];
-	int kbmap[MAX_BUTTONS];
+	unsigned long kbmap[MAX_BUTTONS][MAX_KEYS_PER_BUTTON];
+	int kbmap_count[MAX_BUTTONS];
 	char *kbmap_str[MAX_BUTTONS];
 	int swapyz;
 	int led, grab_device;

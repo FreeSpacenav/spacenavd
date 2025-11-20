@@ -532,7 +532,8 @@ static int handle_request(struct client *c, struct reqresp *req)
 			sendresp(c, req, -1);
 			return 0;
 		}
-		cfg.kbmap[idx] = req->data[1];
+		cfg.kbmap[idx][0] = req->data[1];
+		cfg.kbmap_count[idx] = req->data[1] > 0 ? 1 : 0;
 		free(cfg.kbmap_str[idx]);
 		cfg.kbmap_str[idx] = req->data[1] > 0 ? strdup(str) : 0;
 		sendresp(c, req, 0);
@@ -550,11 +551,8 @@ static int handle_request(struct client *c, struct reqresp *req)
 			sendresp(c, req, -1);
 			return 0;
 		}
-		if(cfg.kbmap_str[idx]) {
-			if(!cfg.kbmap[idx]) {
-				cfg.kbmap[idx] = kbemu_keysym(cfg.kbmap_str[idx]);
-			}
-			req->data[1] = cfg.kbmap[idx];
+		if(cfg.kbmap_count[idx] > 0) {
+			req->data[1] = cfg.kbmap[idx][0];
 		} else {
 			req->data[1] = 0;
 		}

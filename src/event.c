@@ -215,14 +215,9 @@ void process_input(struct device *dev, struct dev_input *inp)
 		/* check to see if we must emulate a keyboard event instead of a
 		 * retular button event for this button
 		 */
-		if(cfg.kbmap_str[inp->idx]) {
-			if(!cfg.kbmap[inp->idx]) {
-				cfg.kbmap[inp->idx] = kbemu_keysym(cfg.kbmap_str[inp->idx]);
-				if(verbose) {
-					logmsg(LOG_DEBUG, "mapping ``%s'' to keysym %d\n", cfg.kbmap_str[inp->idx], (int)cfg.kbmap[inp->idx]);
-				}
-			}
-			send_kbevent(cfg.kbmap[inp->idx], inp->val);
+		if(cfg.kbmap_count[inp->idx] > 0) {
+			KeySym *keys = (KeySym*)cfg.kbmap[inp->idx];
+			send_kbevent_combo(keys, cfg.kbmap_count[inp->idx], inp->val);
 			break;
 		}
 #endif
