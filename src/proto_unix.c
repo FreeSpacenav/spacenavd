@@ -532,6 +532,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 			sendresp(c, req, -1);
 			return 0;
 		}
+		/* TODO handle multi-key sequences in a backwards compatible way */
 		cfg.kbmap[idx][0] = req->data[1];
 		cfg.kbmap_count[idx] = req->data[1] > 0 ? 1 : 0;
 		free(cfg.kbmap_str[idx]);
@@ -551,6 +552,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 			sendresp(c, req, -1);
 			return 0;
 		}
+		/* TODO handle multi-key sequences in a backwards compatible way */
 		if(cfg.kbmap_count[idx] > 0) {
 			req->data[1] = cfg.kbmap[idx][0];
 		} else {
