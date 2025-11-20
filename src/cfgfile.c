@@ -32,7 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 struct cfg cfg, prev_cfg;
 
 #ifdef USE_X11
-extern unsigned long kbemu_keysym(const char *str);
+unsigned long kbemu_keysym(const char *str);
 #endif
 
 /* all parsable config options... some of them might map to the same cfg field */
@@ -81,7 +81,7 @@ static int num_lines;
 
 void default_cfg(struct cfg *cfg)
 {
-	int i;
+	int i, j;
 
 	memset(cfg, 0, sizeof *cfg);
 
@@ -102,7 +102,6 @@ void default_cfg(struct cfg *cfg)
 	}
 
 	for(i=0; i<MAX_BUTTONS; i++) {
-		int j;
 		cfg->map_button[i] = i;
 		cfg->kbmap_str[i] = 0;
 		cfg->kbmap_count[i] = 0;

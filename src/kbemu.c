@@ -67,8 +67,7 @@ void send_kbevent(KeySym key, int press)
 
 	if(!dpy) return;
 
-	kc = XKeysymToKeycode(dpy, key);
-	if(!kc) {
+	if(!(kc = XKeysymToKeycode(dpy, key))) {
 		logmsg(LOG_WARNING, "failed to convert keysym %lu to keycode\n", key);
 		return;
 	}
@@ -114,8 +113,8 @@ void send_kbevent_combo(KeySym *keys, int count, int press)
 	}
 
 	/* send release events in reverse order */
-	for(i=count-1; i>=0; i--) {
-		send_kbevent(keys[i], 0);
+	for(i=0; i<count; i++) {
+		send_kbevent(keys[count - 1 - i], 0);
 	}
 }
 #else
