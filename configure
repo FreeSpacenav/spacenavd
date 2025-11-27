@@ -213,6 +213,14 @@ fi
 
 HAVE_VSNPRINTF=`check_func vsnprintf`
 
+# Check for uinput support (Linux only)
+if [ "$sys" = "Linux" ]; then
+	HAVE_UINPUT_H=`check_header linux/uinput.h`
+	if [ -n "$HAVE_UINPUT_H" ]; then
+		echo "Found uinput support (keyboard emulation for Wayland)"
+	fi
+fi
+
 # create Makefile
 echo 'creating Makefile ...'
 echo "PREFIX = $PREFIX" >Makefile
@@ -282,6 +290,7 @@ echo >>$cfgheader
 [ -n "$HAVE_INTTYPES_H" ] && echo $HAVE_INTTYPES_H >>$cfgheader
 [ -n "$HAVE_XINPUT2_H" ] && echo $HAVE_XINPUT2_H >>$cfgheader
 [ -n "$HAVE_XTEST_H" ] && echo $HAVE_XTEST_H >>$cfgheader
+[ -n "$HAVE_UINPUT_H" ] && echo $HAVE_UINPUT_H >>$cfgheader
 [ -n "$HAVE_VSNPRINTF" ] && echo $HAVE_VSNPRINTF >>$cfgheader
 echo >>$cfgheader
 

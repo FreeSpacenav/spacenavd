@@ -46,7 +46,7 @@ enum {
 	CFG_SENS_ROT, CFG_SENS_RX, CFG_SENS_RY, CFG_SENS_RZ,
 	CFG_INVROT, CFG_INVTRANS, CFG_SWAPYZ,
 	CFG_AXISMAP_N, CFG_BNMAP_N, CFG_BNACT_N, CFG_KBMAP_N,
-	CFG_LED, CFG_GRAB,
+	CFG_LED, CFG_GRAB, CFG_KBEMU_BACKEND,
 	CFG_SERIAL, CFG_DEVID,
 
 	NUM_CFG_OPTIONS
@@ -96,6 +96,7 @@ void default_cfg(struct cfg *cfg)
 
 	cfg->led = LED_ON;
 	cfg->grab_device = 1;
+	cfg->kbemu_backend = KBEMU_BACKEND_AUTO;
 
 	for(i=0; i<6; i++) {
 		cfg->map_axis[i] = i;
@@ -424,6 +425,19 @@ int read_cfg(const char *fname, struct cfg *cfg)
 					logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
 					continue;
 				}
+			}
+
+		} else if(strcmp(key_str, "kbemu-backend") == 0) {
+			lptr->opt = CFG_KBEMU_BACKEND;
+			if(strcmp(val_str, "auto") == 0) {
+				cfg->kbemu_backend = KBEMU_BACKEND_AUTO;
+			} else if(strcmp(val_str, "x11") == 0) {
+				cfg->kbemu_backend = KBEMU_BACKEND_X11;
+			} else if(strcmp(val_str, "uinput") == 0) {
+				cfg->kbemu_backend = KBEMU_BACKEND_UINPUT;
+			} else {
+				logmsg(LOG_WARNING, "invalid configuration value for %s, expected auto, x11, or uinput.\n", key_str);
+				continue;
 			}
 
 		} else if(strcmp(key_str, "grab") == 0) {

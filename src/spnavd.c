@@ -34,6 +34,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "hotplug.h"
 #include "client.h"
 #include "proto_unix.h"
+#include "kbemu.h"
 #ifdef USE_X11
 #include "proto_x11.h"
 #endif
@@ -162,6 +163,10 @@ opt_pidfile:		if(!argv[++i]) {
 
 	read_cfg(cfgfile, &cfg);
 	prev_cfg = cfg;
+
+	/* Initialize keyboard emulation backend based on config */
+	kbemu_init();
+
 	pipe(pfd);
 
 	signal(SIGINT, sig_handler);
