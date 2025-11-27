@@ -55,32 +55,6 @@ static struct keymap_entry keymap[] = {
 	{0x0078, KEY_X},		/* XK_x */
 	{0x0079, KEY_Y},		/* XK_y */
 	{0x007a, KEY_Z},		/* XK_z */
-	{0x0041, KEY_A},		/* XK_A */
-	{0x0042, KEY_B},		/* XK_B */
-	{0x0043, KEY_C},		/* XK_C */
-	{0x0044, KEY_D},		/* XK_D */
-	{0x0045, KEY_E},		/* XK_E */
-	{0x0046, KEY_F},		/* XK_F */
-	{0x0047, KEY_G},		/* XK_G */
-	{0x0048, KEY_H},		/* XK_H */
-	{0x0049, KEY_I},		/* XK_I */
-	{0x004a, KEY_J},		/* XK_J */
-	{0x004b, KEY_K},		/* XK_K */
-	{0x004c, KEY_L},		/* XK_L */
-	{0x004d, KEY_M},		/* XK_M */
-	{0x004e, KEY_N},		/* XK_N */
-	{0x004f, KEY_O},		/* XK_O */
-	{0x0050, KEY_P},		/* XK_P */
-	{0x0051, KEY_Q},		/* XK_Q */
-	{0x0052, KEY_R},		/* XK_R */
-	{0x0053, KEY_S},		/* XK_S */
-	{0x0054, KEY_T},		/* XK_T */
-	{0x0055, KEY_U},		/* XK_U */
-	{0x0056, KEY_V},		/* XK_V */
-	{0x0057, KEY_W},		/* XK_W */
-	{0x0058, KEY_X},		/* XK_X */
-	{0x0059, KEY_Y},		/* XK_Y */
-	{0x005a, KEY_Z},		/* XK_Z */
 
 	/* Number keys */
 	{0x0030, KEY_0},		/* XK_0 */
@@ -141,38 +115,17 @@ static struct keymap_entry keymap[] = {
 	{0xff54, KEY_DOWN},		/* XK_Down */
 
 	/* Punctuation and symbols */
-	{0x0021, KEY_1},		/* XK_exclam ! */
-	{0x0022, KEY_APOSTROPHE},	/* XK_quotedbl " */
-	{0x0023, KEY_3},		/* XK_numbersign # */
-	{0x0024, KEY_4},		/* XK_dollar $ */
-	{0x0025, KEY_5},		/* XK_percent % */
-	{0x0026, KEY_7},		/* XK_ampersand & */
 	{0x0027, KEY_APOSTROPHE},	/* XK_apostrophe ' */
-	{0x0028, KEY_9},		/* XK_parenleft ( */
-	{0x0029, KEY_0},		/* XK_parenright ) */
-	{0x002a, KEY_8},		/* XK_asterisk * */
-	{0x002b, KEY_EQUAL},		/* XK_plus + */
 	{0x002c, KEY_COMMA},		/* XK_comma , */
 	{0x002d, KEY_MINUS},		/* XK_minus - */
 	{0x002e, KEY_DOT},		/* XK_period . */
 	{0x002f, KEY_SLASH},		/* XK_slash / */
-	{0x003a, KEY_SEMICOLON},	/* XK_colon : */
 	{0x003b, KEY_SEMICOLON},	/* XK_semicolon ; */
-	{0x003c, KEY_COMMA},		/* XK_less < */
 	{0x003d, KEY_EQUAL},		/* XK_equal = */
-	{0x003e, KEY_DOT},		/* XK_greater > */
-	{0x003f, KEY_SLASH},		/* XK_question ? */
-	{0x0040, KEY_2},		/* XK_at @ */
 	{0x005b, KEY_LEFTBRACE},	/* XK_bracketleft [ */
 	{0x005c, KEY_BACKSLASH},	/* XK_backslash \ */
 	{0x005d, KEY_RIGHTBRACE},	/* XK_bracketright ] */
-	{0x005e, KEY_6},		/* XK_asciicircum ^ */
-	{0x005f, KEY_MINUS},		/* XK_underscore _ */
 	{0x0060, KEY_GRAVE},		/* XK_grave ` */
-	{0x007b, KEY_LEFTBRACE},	/* XK_braceleft { */
-	{0x007c, KEY_BACKSLASH},	/* XK_bar | */
-	{0x007d, KEY_RIGHTBRACE},	/* XK_braceright } */
-	{0x007e, KEY_GRAVE},		/* XK_asciitilde ~ */
 
 	{0, 0}	/* terminator */
 };
