@@ -57,6 +57,7 @@ struct cfg {
 	char *kbmap_str[MAX_BUTTONS];
 	int swapyz;
 	int led, grab_device;
+	int kbemu_use_x11;
 	char serial_dev[PATH_MAX];
 	int repeat_msec;
 
