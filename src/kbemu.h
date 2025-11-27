@@ -28,7 +28,7 @@ void kbemu_set_display(Display *dpy);
 typedef unsigned long KeySym;
 #endif
 
-/* Initialize keyboard emulation based on config (call after reading config) */
+/* Initialize keyboard emulation based on config */
 void kbemu_init(void);
 
 KeySym kbemu_keysym(const char *str);
@@ -37,7 +37,7 @@ const char *kbemu_keyname(KeySym sym);
 void send_kbevent(KeySym key, int press);
 void send_kbevent_combo(KeySym *keys, int count, int press);
 
-/* Backend-specific functions (internal use) */
+/* Backend-specific functions */
 #ifdef USE_X11
 int kbemu_x11_init(Display *dpy);
 void kbemu_x11_cleanup(void);
