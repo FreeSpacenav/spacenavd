@@ -32,12 +32,6 @@ enum {
 	LED_AUTO	= 2
 };
 
-enum {
-	KBEMU_BACKEND_AUTO,	/* auto-detect based on display server */
-	KBEMU_BACKEND_X11,	/* force X11 backend */
-	KBEMU_BACKEND_UINPUT	/* force uinput backend */
-};
-
 /* button actions (XXX: must correspond to SPNAV_BNACT_* in libspnav) */
 enum {
 	BNACT_NONE,
@@ -63,7 +57,7 @@ struct cfg {
 	char *kbmap_str[MAX_BUTTONS];
 	int swapyz;
 	int led, grab_device;
-	int kbemu_backend;
+	int kbemu_use_x11;
 	char serial_dev[PATH_MAX];
 	int repeat_msec;
 

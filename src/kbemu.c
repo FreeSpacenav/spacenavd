@@ -37,10 +37,10 @@ extern struct cfg cfg;
 void kbemu_init(void)
 {
 #if defined(__linux__) && defined(HAVE_UINPUT_H)
-	/* If config forces uinput, initialize it now */
-	if(cfg.kbemu_backend == KBEMU_BACKEND_UINPUT) {
+	/* For uinput builds, default to uinput unless kbmap_use_x11 is set */
+	if(!cfg.kbemu_use_x11) {
 		if(backend == KBEMU_NONE) {
-			logmsg(LOG_INFO, "Config forces uinput backend, initializing...\n");
+			logmsg(LOG_INFO, "Initializing uinput keyboard emulation backend\n");
 			if(kbemu_uinput_init() == 0) {
 				backend = KBEMU_UINPUT;
 				logmsg(LOG_INFO, "Using uinput keyboard emulation backend\n");
@@ -66,70 +66,16 @@ void kbemu_set_display(Display *dpy)
 		return;
 	}
 
-	/* If we already have a backend, don't override */
+	/* If we already have a backend (from kbemu_init), don't override */
 	if(backend != KBEMU_NONE) {
 		logmsg(LOG_DEBUG, "kbemu backend already initialized\n");
 		return;
 	}
 
-	/* Check config file for forced backend selection */
-#if defined(__linux__) && defined(HAVE_UINPUT_H)
-	if(cfg.kbemu_backend == KBEMU_BACKEND_UINPUT) {
-		logmsg(LOG_INFO, "Config forces uinput backend\n");
-		if(kbemu_uinput_init() == 0) {
-			backend = KBEMU_UINPUT;
-			logmsg(LOG_INFO, "Using uinput keyboard emulation backend\n");
-			return;
-		}
-		logmsg(LOG_WARNING, "Failed to initialize uinput, falling back to X11\n");
-	}
-#endif
-
-	if(cfg.kbemu_backend == KBEMU_BACKEND_X11) {
-		logmsg(LOG_INFO, "Config forces X11 backend\n");
-		/* Skip auto-detection, go straight to X11 */
-		goto use_x11;
-	}
-
-	/* Auto-detect: On Wayland, prefer uinput over X11 (XWayland)
-	 * X11 through XWayland only works for X11 apps, not native Wayland apps.
-	 * uinput works universally for all apps on Wayland.
+	/* Use X11 backend as fallback if uinput wasn't initialized
+	 * (either because HAVE_UINPUT_H not defined, or kbmap_use_x11 was set,
+	 * or uinput initialization failed)
 	 */
-#if defined(__linux__) && defined(HAVE_UINPUT_H)
-	if(cfg.kbemu_backend == KBEMU_BACKEND_AUTO) {
-		int is_wayland = 0;
-		char *session_type, *wayland_display;
-
-		/* Check multiple indicators of Wayland session */
-		session_type = getenv("XDG_SESSION_TYPE");
-		wayland_display = getenv("WAYLAND_DISPLAY");
-
-		logmsg(LOG_DEBUG, "Auto-detecting display server: XDG_SESSION_TYPE=%s, WAYLAND_DISPLAY=%s\n",
-			session_type ? session_type : "unset",
-			wayland_display ? wayland_display : "unset");
-
-		if((session_type && strcmp(session_type, "wayland") == 0) || wayland_display) {
-			is_wayland = 1;
-			logmsg(LOG_INFO, "Detected Wayland session\n");
-		}
-
-		if(is_wayland) {
-			logmsg(LOG_INFO, "Trying uinput backend for Wayland compatibility\n");
-			if(kbemu_uinput_init() == 0) {
-				backend = KBEMU_UINPUT;
-				logmsg(LOG_INFO, "Using uinput keyboard emulation backend\n");
-				return;
-			}
-			logmsg(LOG_WARNING, "Failed to initialize uinput, falling back to X11\n");
-		} else {
-			logmsg(LOG_DEBUG, "No Wayland session detected, will use X11 backend\n");
-		}
-	}
-#endif
-
-use_x11:
-
-	/* Use X11 backend (either on native X11 or as fallback on Wayland) */
 	if(kbemu_x11_init(dpy) == 0) {
 		backend = KBEMU_X11;
 		logmsg(LOG_INFO, "Using X11 keyboard emulation backend\n");
