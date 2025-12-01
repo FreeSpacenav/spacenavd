@@ -25,7 +25,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 void kbemu_set_display(Display *dpy);
 #else
 /* When X11 is not available, define KeySym for API compatibility */
-typedef unsigned long KeySym;
+typedef unsigned int KeySym;
 #endif
 
 /* Initialize keyboard emulation based on config */

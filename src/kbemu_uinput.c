@@ -27,7 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <linux/uinput.h>
 #include "logger.h"
 #include "kbemu.h"
-#include "keymap.h"
+
+unsigned int keysym_to_linux_keycode(unsigned int sym);		/* keymap.c */
 
 static int uinput_fd = -1;
 
