@@ -30,9 +30,10 @@ void kbemu_uinput_cleanup(void);
 
 #ifdef USE_X11
 int kbemu_x11_init(void);
+#endif
+
 unsigned int kbemu_x11_keysym(const char *str);
 const char *kbemu_x11_keyname(unsigned int sym);
-#endif
 
 static void dummy_sendkey(unsigned int key, int press);
 static void dummy_sendcombo(unsigned int *keys, int count, int press);

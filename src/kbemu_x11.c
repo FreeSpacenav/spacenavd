@@ -20,11 +20,11 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 /* Allin Demopolis: implemented key combos */
 
 #include "config.h"
+#include "logger.h"
 
 #ifdef USE_X11
 #include <stdio.h>
 #include <string.h>
-#include "logger.h"
 #include "kbemu.h"
 
 #ifdef HAVE_XTEST_H
