@@ -17,9 +17,7 @@ You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
 
-/* Allin Demopolis: refactored this code, to make it one of the available kbemu
- * methods, selectable at runtime.
- */
+/* Allin Demopolis: implemented key combos */
 
 #include "config.h"
 
@@ -36,30 +34,60 @@ static int use_xtest;
 
 static Display *dpy;
 
-int kbemu_x11_init(Display *d)
+unsigned int kbemu_x11_keysym(const char *str);
+const char *kbemu_x11_keyname(unsigned int sym);
+
+static void send_kbevent(unsigned int key, int press);
+static void send_kbcombo(unsigned int *keys, int count, int press);
+
+
+int kbemu_x11_init(void)
 {
-	if(!d) return -1;
-	dpy = d;
+	kbemu_keysym = kbemu_x11_keysym;
+	kbemu_keyname = kbemu_x11_keyname;
 
-#ifdef HAVE_XTEST_H
-	int tmp;
-	use_xtest = XTestQueryExtension(dpy, &tmp, &tmp, &tmp, &tmp);
-
-	if(use_xtest) {
-		logmsg(LOG_DEBUG, "Using XTEST to send key events\n");
-	} else
-#endif
-		logmsg(LOG_DEBUG, "Using XSendEvent to send key events\n");
-
+	kbemu_send_key = send_kbevent;
+	kbemu_send_combo = send_kbcombo;
 	return 0;
 }
 
-void kbemu_x11_cleanup(void)
+void kbemu_set_display(Display *d)
 {
-	dpy = 0;
+	if(!d) return;
+
+	/* if kbemu is already active, don't override */
+	if(kbemu_active()) {
+		return;
+	}
+
+	dpy = d;
+
+#ifdef HAVE_XTEST_H
+	{
+		int tmp;
+		use_xtest = XTestQueryExtension(dpy, &tmp, &tmp, &tmp, &tmp);
+	}
+
+	if(use_xtest)
+		logmsg(LOG_DEBUG, "Using XTEST to send key events\n");
+	else
+#endif
+		logmsg(LOG_DEBUG, "Using XSendEvent to send key events\n");
+
+	kbemu_x11_init();	/* re-register the calls just in case */
 }
 
-void kbemu_x11_send_key(KeySym key, int press)
+unsigned int kbemu_x11_keysym(const char *str)
+{
+	return XStringToKeysym(str);
+}
+
+const char *kbemu_x11_keyname(unsigned int sym)
+{
+	return XKeysymToString(sym);
+}
+
+static void send_kbevent(unsigned int key, int press)
 {
 	XEvent xevent;
 	Window win;
@@ -98,7 +126,7 @@ void kbemu_x11_send_key(KeySym key, int press)
 	XFlush(dpy);
 }
 
-void kbemu_x11_send_key_combo(KeySym *keys, int count, int press)
+static void send_kbcombo(unsigned int *keys, int count, int press)
 {
 	int i;
 
@@ -110,15 +138,25 @@ void kbemu_x11_send_key_combo(KeySym *keys, int count, int press)
 
 	/* send press events for all keys */
 	for(i=0; i<count; i++) {
-		kbemu_x11_send_key(keys[i], 1);
+		send_kbevent(keys[i], 1);
 	}
 
 	/* send release events in reverse order */
-	for(i=count-1; i>=0; i--) {
-		kbemu_x11_send_key(keys[i], 0);
+	for(i=0; i<count; i++) {
+		send_kbevent(keys[count - 1 - i], 0);
 	}
 }
 
 #else
-int spacenavd_kbemu_shut_up_empty_source_warning;
+unsigned int kbemu_x11_keysym(const char *str)
+{
+	logmsg(LOG_WARNING, "Unable to parse key mapping \"%s\", not compiled with X11 support\n",
+			str);
+	return 0;
+}
+
+const char *kbemu_x11_keyname(unsigned int sym)
+{
+	return 0;
+}
 #endif	/* USE_X11 */

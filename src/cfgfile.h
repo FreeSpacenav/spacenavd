@@ -52,7 +52,7 @@ struct cfg {
 	int map_axis[MAX_AXES];
 	int map_button[MAX_BUTTONS];
 	int bnact[MAX_BUTTONS];
-	unsigned long kbmap[MAX_BUTTONS][MAX_KEYS_PER_BUTTON];
+	unsigned int kbmap[MAX_BUTTONS][MAX_KEYS_PER_BUTTON];
 	int kbmap_count[MAX_BUTTONS];
 	char *kbmap_str[MAX_BUTTONS];
 	int swapyz;

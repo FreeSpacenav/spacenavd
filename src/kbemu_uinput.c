@@ -28,10 +28,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "logger.h"
 #include "kbemu.h"
 
-unsigned int keysym_to_linux_keycode(unsigned int sym);		/* keymap.c */
+/* keymap.c */
+unsigned int keysym_to_linux_keycode(unsigned int sym);
 
 static int uinput_fd = -1;
 
+static void send_key_uinput(unsigned int keysym, int press);
+static void send_combo_uinput(unsigned int *keys, int count, int press);
 static void emit_event(int type, int code, int val);
 
 int kbemu_uinput_init(void)
@@ -81,7 +84,13 @@ int kbemu_uinput_init(void)
 		goto err_close;
 	}
 
-	logmsg(LOG_INFO, "uinput virtual keyboard created successfully\n");
+	/* register handlers
+	 * don't touch keysym/keyname, since we can't do anything useful there
+	 */
+	kbemu_send_key = send_key_uinput;
+	kbemu_send_combo = send_combo_uinput;
+
+	logmsg(LOG_INFO, "Using uinput for keyboard emulation\n");
 	return 0;
 
 err_close:
@@ -100,7 +109,7 @@ void kbemu_uinput_cleanup(void)
 	}
 }
 
-void kbemu_uinput_send_key(KeySym keysym, int press)
+static void send_key_uinput(unsigned int keysym, int press)
 {
 	unsigned int keycode;
 
@@ -120,7 +129,7 @@ void kbemu_uinput_send_key(KeySym keysym, int press)
 	emit_event(EV_SYN, SYN_REPORT, 0);
 }
 
-void kbemu_uinput_send_key_combo(KeySym *keys, int count, int press)
+static void send_combo_uinput(unsigned int *keys, int count, int press)
 {
 	int i;
 

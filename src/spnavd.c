@@ -164,9 +164,6 @@ opt_pidfile:		if(!argv[++i]) {
 	read_cfg(cfgfile, &cfg);
 	prev_cfg = cfg;
 
-	/* Initialize keyboard emulation backend based on config */
-	kbemu_init();
-
 	pipe(pfd);
 
 	signal(SIGINT, sig_handler);
@@ -184,6 +181,7 @@ opt_pidfile:		if(!argv[++i]) {
 #ifdef USE_X11
 	init_x11();
 #endif
+	kbemu_init();
 
 	atexit(cleanup);
 
@@ -294,6 +292,8 @@ static void print_usage(const char *argv0)
 static void cleanup(void)
 {
 	struct device *dev;
+
+	kbemu_cleanup();
 
 #ifdef USE_X11
 	close_x11();	/* call to avoid leaving garbage in the X server's root windows */

@@ -28,12 +28,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "cfgfile.h"
 #include "logger.h"
 #include "spnavd.h"
+#include "kbemu.h"
 
 struct cfg cfg, prev_cfg;
-
-#ifdef USE_X11
-unsigned long kbemu_keysym(const char *str);
-#endif
 
 /* all parsable config options... some of them might map to the same cfg field */
 enum {
@@ -64,7 +61,7 @@ enum { RMCFG_ALL, RMCFG_OWN };
 
 static int parse_bnact(const char *s);
 static const char *bnact_name(int bnact);
-static int parse_kbmap(const char *str, unsigned long *kbmap, int max_keys);
+static int parse_kbmap(const char *str, unsigned int *kbmap, int max_keys);
 static int add_cfgopt(int opt, int idx, const char *fmt, ...);
 static int add_cfgopt_devid(int vid, int pid);
 static int rm_cfgopt(const char *name, int mode);
@@ -750,7 +747,7 @@ static const char *bnact_name(int bnact)
 	return "none";
 }
 
-static int parse_kbmap(const char *str, unsigned long *kbmap, int max_keys)
+static int parse_kbmap(const char *str, unsigned int *kbmap, int max_keys)
 {
 #ifdef USE_X11
 	char buf[256], *ptr, *start;
@@ -773,7 +770,7 @@ static int parse_kbmap(const char *str, unsigned long *kbmap, int max_keys)
 		}
 
 		if(*start) {
-			unsigned long ksym = (unsigned long)kbemu_keysym(start);
+			unsigned int ksym = kbemu_keysym(start);
 			if(ksym == 0) {
 				logmsg(LOG_WARNING, "invalid key name in keyboard mapping: \"%s\"\n", start);
 			} else {

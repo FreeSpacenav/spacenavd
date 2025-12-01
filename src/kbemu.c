@@ -23,167 +23,67 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "kbemu.h"
 #include "cfgfile.h"
 
-enum {
-	KBEMU_NONE,
-	KBEMU_X11,
-	KBEMU_UINPUT
-};
+#ifdef HAVE_UINPUT_H
+int kbemu_uinput_init(void);
+void kbemu_uinput_cleanup(void);
+#endif
 
-static int backend = KBEMU_NONE;
+#ifdef USE_X11
+int kbemu_x11_init(void);
+unsigned int kbemu_x11_keysym(const char *str);
+const char *kbemu_x11_keyname(unsigned int sym);
+#endif
+
+static void dummy_sendkey(unsigned int key, int press);
+static void dummy_sendcombo(unsigned int *keys, int count, int press);
 
 extern struct cfg cfg;
 
-/* Initialize keyboard emulation based on config, independent of X11 */
+/* For now we'll initialize these to the X11 variants statically, because we
+ * need them when we read the config file. Eventually we should implement our
+ * own translation functions that don't depend on X11 (TODO).
+ */
+unsigned int (*kbemu_keysym)(const char *str) = kbemu_x11_keysym;
+const char *(*kbemu_keyname)(unsigned int sym) = kbemu_x11_keyname;
+
+void (*kbemu_send_key)(unsigned int key, int press);
+void (*kbemu_send_combo)(unsigned int *keys, int count, int press);
+
+
 void kbemu_init(void)
 {
-#if defined(__linux__) && defined(HAVE_UINPUT_H)
-	/* For uinput builds, default to uinput unless kbmap_use_x11 is set */
+	kbemu_send_key = dummy_sendkey;
+	kbemu_send_combo = dummy_sendcombo;
+
+#ifdef USE_X11
+	kbemu_x11_init();
+#endif
+
+#ifdef HAVE_UINPUT_H
 	if(!cfg.kbemu_use_x11) {
-		if(backend == KBEMU_NONE) {
-			logmsg(LOG_INFO, "Initializing uinput keyboard emulation backend\n");
-			if(kbemu_uinput_init() == 0) {
-				backend = KBEMU_UINPUT;
-				logmsg(LOG_INFO, "Using uinput keyboard emulation backend\n");
-			} else {
-				logmsg(LOG_WARNING, "Failed to initialize uinput backend\n");
-			}
-		}
+		kbemu_uinput_init();
 	}
 #endif
 }
 
-#ifdef USE_X11
-#include <X11/Xlib.h>
-
-/* Called by proto_x11.c when X11 connection is established */
-void kbemu_set_display(Display *dpy)
+void kbemu_cleanup(void)
 {
-	if(!dpy) {
-		if(backend == KBEMU_X11) {
-			kbemu_x11_cleanup();
-			backend = KBEMU_NONE;
-		}
-		return;
-	}
-
-	/* If we already have a backend (from kbemu_init), don't override */
-	if(backend != KBEMU_NONE) {
-		logmsg(LOG_DEBUG, "kbemu backend already initialized\n");
-		return;
-	}
-
-	/* Use X11 backend as fallback if uinput wasn't initialized
-	 * (either because HAVE_UINPUT_H not defined, or kbmap_use_x11 was set,
-	 * or uinput initialization failed)
-	 */
-	if(kbemu_x11_init(dpy) == 0) {
-		backend = KBEMU_X11;
-		logmsg(LOG_INFO, "Using X11 keyboard emulation backend\n");
-		return;
-	}
-
-	logmsg(LOG_WARNING, "Failed to initialize X11 keyboard emulation\n");
-}
-
-#else  /* !USE_X11 */
-
-/* When X11 is not available, try uinput */
-static void kbemu_init_fallback(void)
-{
-	if(backend != KBEMU_NONE) {
-		return;	/* already initialized */
-	}
-
-#if defined(__linux__) && defined(HAVE_UINPUT_H)
-	logmsg(LOG_INFO, "X11 not available, trying uinput keyboard emulation\n");
-	if(kbemu_uinput_init() == 0) {
-		backend = KBEMU_UINPUT;
-		logmsg(LOG_INFO, "Using uinput keyboard emulation backend\n");
-		return;
-	}
-	logmsg(LOG_WARNING, "Failed to initialize uinput keyboard emulation\n");
-#else
-	logmsg(LOG_WARNING, "No keyboard emulation backend available\n");
+#ifdef HAVE_UINPUT_H
+	kbemu_uinput_cleanup();
 #endif
 }
 
-#endif	/* USE_X11 */
-
-KeySym kbemu_keysym(const char *str)
+int kbemu_active(void)
 {
-#ifdef USE_X11
-	return XStringToKeysym(str);
-#else
-	/* Without X11, we can't parse key names properly.
-	 * This function is mainly used during config parsing. */
-	logmsg(LOG_WARNING, "kbemu_keysym: X11 not available, cannot parse key name: %s\n", str);
-	return 0;
-#endif
+	return kbemu_send_key && kbemu_send_key != dummy_sendkey;
 }
 
-const char *kbemu_keyname(KeySym sym)
+static void dummy_sendkey(unsigned int key, int press)
 {
-#ifdef USE_X11
-	return XKeysymToString(sym);
-#else
-	static char buf[32];
-	snprintf(buf, sizeof buf, "0x%lx", sym);
-	return buf;
-#endif
+	logmsg(LOG_DEBUG, "dummy_sendkey\n");
 }
 
-void send_kbevent(KeySym key, int press)
+static void dummy_sendcombo(unsigned int *keys, int count, int press)
 {
-#ifndef USE_X11
-	/* Auto-initialize if not already done */
-	if(backend == KBEMU_NONE) {
-		kbemu_init_fallback();
-	}
-#endif
-
-	switch(backend) {
-#ifdef USE_X11
-	case KBEMU_X11:
-		kbemu_x11_send_key(key, press);
-		break;
-#endif
-
-#if defined(__linux__) && defined(HAVE_UINPUT_H)
-	case KBEMU_UINPUT:
-		kbemu_uinput_send_key(key, press);
-		break;
-#endif
-
-	default:
-		/* No backend available or not initialized */
-		break;
-	}
-}
-
-void send_kbevent_combo(KeySym *keys, int count, int press)
-{
-#ifndef USE_X11
-	/* Auto-initialize if not already done */
-	if(backend == KBEMU_NONE) {
-		kbemu_init_fallback();
-	}
-#endif
-
-	switch(backend) {
-#ifdef USE_X11
-	case KBEMU_X11:
-		kbemu_x11_send_key_combo(keys, count, press);
-		break;
-#endif
-
-#if defined(__linux__) && defined(HAVE_UINPUT_H)
-	case KBEMU_UINPUT:
-		kbemu_uinput_send_key_combo(keys, count, press);
-		break;
-#endif
-
-	default:
-		/* No backend available or not initialized */
-		break;
-	}
+	logmsg(LOG_DEBUG, "dummy_sendcombo\n");
 }

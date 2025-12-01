@@ -211,16 +211,15 @@ void process_input(struct device *dev, struct dev_input *inp)
 			break;
 		}
 
-#ifdef USE_X11
 		/* check to see if we must emulate a keyboard event instead of a
-		 * retular button event for this button
+		 * regular button event for this button
 		 */
 		if(cfg.kbmap_count[inp->idx] > 0) {
-			KeySym *keys = (KeySym*)cfg.kbmap[inp->idx];
-			send_kbevent_combo(keys, cfg.kbmap_count[inp->idx], inp->val);
+			unsigned int *keys = cfg.kbmap[inp->idx];
+			kbemu_send_combo(keys, cfg.kbmap_count[inp->idx], inp->val);
 			break;
 		}
-#endif
+
 		dev_ev = device_event_in_use(dev);
 		if(dev_ev && dev_ev->pending) {
 			dispatch_event(dev_ev);
