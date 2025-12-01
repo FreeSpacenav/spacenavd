@@ -46,8 +46,11 @@ enum {
 	CFG_SENS_ROT, CFG_SENS_RX, CFG_SENS_RY, CFG_SENS_RZ,
 	CFG_INVROT, CFG_INVTRANS, CFG_SWAPYZ,
 	CFG_AXISMAP_N, CFG_BNMAP_N, CFG_BNACT_N, CFG_KBMAP_N,
-	CFG_LED, CFG_GRAB, CFG_KBMAP_USE_X11,
+	CFG_LED, CFG_GRAB,
 	CFG_SERIAL, CFG_DEVID,
+
+	/* debug options, not part of the protocol, can change at any time */
+	CFG_KBMAP_USE_X11,
 
 	NUM_CFG_OPTIONS
 };
@@ -136,6 +139,14 @@ void unlock_cfgfile(int fd)
 		} \
 	} while(0)
 
+/* maintain false->true order of the strings so that bit 0 of the index can be
+ * used directly as the boolean value
+ */
+static const char *bool_str[] = {
+	"false", "true", "no", "yes", "off", "on",
+	0
+};
+
 int read_cfg(const char *fname, struct cfg *cfg)
 {
 	FILE *fp;
@@ -180,7 +191,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	/* parse config file */
 	num_lines = 0;
 	while(fgets(buf, sizeof buf, fp)) {
-		int isint, isfloat, ival, bnidx, axisidx;
+		int isint, isfloat, isbool, ival, bnidx, axisidx;
 		float fval;
 		char *endp, *key_str, *val_str, *line = buf;
 
@@ -214,6 +225,16 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 		fval = strtod(val_str, &endp);
 		isfloat = (endp > val_str);
+
+		isbool = 0;
+		if(!isint && !isfloat) {
+			for(i=0; bool_str[i]; i++) {
+				if(strcmp(val_str, bool_str[i]) == 0) {
+					isbool = 1;
+					ival = i & 1;	/* order is false, true, off, on ... */
+				}
+			}
+		}
 
 		if(strcmp(key_str, "repeat-interval") == 0) {
 			lptr->opt = CFG_REPEAT;
@@ -343,17 +364,11 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 		} else if(strcmp(key_str, "swap-yz") == 0) {
 			lptr->opt = CFG_SWAPYZ;
-			if(isint) {
+			if(isint || isbool) {
 				cfg->swapyz = ival;
 			} else {
-				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
-					cfg->swapyz = 1;
-				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
-					cfg->swapyz = 0;
-				} else {
-					logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
-					continue;
-				}
+				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
+				continue;
 			}
 
 		} else if(sscanf(key_str, "axismap%d", &axisidx) == 1) {
@@ -412,49 +427,33 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 		} else if(strcmp(key_str, "led") == 0) {
 			lptr->opt = CFG_LED;
-			if(isint) {
+			if(isint || isbool) {
 				cfg->led = ival;
 			} else {
 				if(strcmp(val_str, "auto") == 0) {
 					cfg->led = LED_AUTO;
-				} else if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
-					cfg->led = LED_ON;
-				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
-					cfg->led = LED_OFF;
 				} else {
-					logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
+					logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value or \"auto\".\n", key_str);
 					continue;
 				}
 			}
 
 		} else if(strcmp(key_str, "kbmap_use_x11") == 0) {
 			lptr->opt = CFG_KBMAP_USE_X11;
-			if(isint) {
+			if(isint || isbool) {
 				cfg->kbemu_use_x11 = ival;
 			} else {
-				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
-					cfg->kbemu_use_x11 = 1;
-				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
-					cfg->kbemu_use_x11 = 0;
-				} else {
-					logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
-					continue;
-				}
+				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
+				continue;
 			}
 
 		} else if(strcmp(key_str, "grab") == 0) {
 			lptr->opt = CFG_GRAB;
-			if(isint) {
+			if(isint || isbool) {
 				cfg->grab_device = ival;
 			} else {
-				if(strcmp(val_str, "true") == 0 || strcmp(val_str, "on") == 0 || strcmp(val_str, "yes") == 0) {
-					cfg->grab_device = 1;
-				} else if(strcmp(val_str, "false") == 0 || strcmp(val_str, "off") == 0 || strcmp(val_str, "no") == 0) {
-					cfg->grab_device = 0;
-				} else {
-					logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
-					continue;
-				}
+				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
+				continue;
 			}
 
 		} else if(strcmp(key_str, "serial") == 0) {

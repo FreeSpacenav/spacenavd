@@ -57,12 +57,14 @@ struct cfg {
 	char *kbmap_str[MAX_BUTTONS];
 	int swapyz;
 	int led, grab_device;
-	int kbemu_use_x11;
 	char serial_dev[PATH_MAX];
 	int repeat_msec;
 
 	char *devname[MAX_CUSTOM];	/* custom USB device name list */
 	int devid[MAX_CUSTOM][2];	/* custom USB vendor/product id list */
+
+	/* debug options, might change at any time */
+	int kbemu_use_x11;			/* force X11 for kbemu, instead of uinput */
 };
 
 void default_cfg(struct cfg *cfg);
