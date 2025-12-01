@@ -1,5 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
+Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
 Copyright (C) 2025 Allin Demopolis <allindemopolis@gmail.com>
 
 This program is free software: you can redistribute it and/or modify
@@ -15,6 +16,10 @@ GNU General Public License for more details.
 You should have received a copy of the GNU General Public License
 along with this program.  If not, see <http://www.gnu.org/licenses/>.
 */
+
+/* Allin Demopolis: refactored this code, to make it one of the available kbemu
+ * methods, selectable at runtime.
+ */
 
 #include "config.h"
 
@@ -33,10 +38,7 @@ static Display *dpy;
 
 int kbemu_x11_init(Display *d)
 {
-	if(!d) {
-		return -1;
-	}
-
+	if(!d) return -1;
 	dpy = d;
 
 #ifdef HAVE_XTEST_H
@@ -66,8 +68,7 @@ void kbemu_x11_send_key(KeySym key, int press)
 
 	if(!dpy) return;
 
-	kc = XKeysymToKeycode(dpy, key);
-	if(!kc) {
+	if(!(kc = XKeysymToKeycode(dpy, key))) {
 		logmsg(LOG_WARNING, "failed to convert keysym %lu to keycode\n", key);
 		return;
 	}
