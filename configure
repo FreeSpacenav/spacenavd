@@ -75,6 +75,7 @@ DBG=yes
 X11=yes
 HOTPLUG=yes
 XINPUT=yes
+UINPUT=yes
 VER=`git describe --tags 2>/dev/null`
 CFGDIR=/etc
 
@@ -140,31 +141,26 @@ for arg in $*; do
 	--disable-hotplug)
 		HOTPLUG=no;;
 
+	--enable-uinput)
+		UINPUT=yes;;
+	--disable-uinput)
+		UINPUT=no;;
+
 	--help)
 		echo 'usage: ./configure [options]'
 		echo 'options:'
 		echo '  --prefix=<path>: installation path (default: /usr/local)'
-		echo '  --enable-x11: enable X11 communication mode (default)'
-		echo '  --disable-x11: disable X11 communication mode'
-		echo '  --enable-hotplug: enable hotplug using NETLINK_KOBJECT_UEVENT (default)'
-		echo '  --disable-hotplug: disable hotplug, fallback to polling for the device'
-		echo '  --enable-opt: enable speed optimizations (default)'
-		echo '  --disable-opt: disable speed optimizations'
-		echo '  --enable-debug: include debugging symbols (default)'
-		echo '  --disable-debug: do not include debugging symbols'
+		echo '  --enable-<thing>/--disable-<thing>, where <thing> can be:'
+		echo '      opt: compiler optimizations (default: on)'
+		echo '      debug: include debugging symbols (default: on)'
+		echo '      x11: X11 support, needed for 3dxsrv compatibility (default: on)'
+		echo '      hotplug: enable hotplug device detection (default: on)'
+		echo '      uinput: use uinput for keyboard emulation on linux (default: on)'
 		echo 'all invalid options are silently ignored'
 		exit 0
 		;;
 	esac
 done
-
-echo "  prefix: $PREFIX"
-echo "  config dir: $CFGDIR"
-echo "  optimize for speed: $OPT"
-echo "  include debugging symbols: $DBG"
-echo "  x11 communication method: $X11"
-echo "  use hotplug: $HOTPLUG"
-echo ""
 
 # check if CC is gcc
 echo 'int main(void) {' >$cfgtest_src
@@ -179,6 +175,17 @@ HAVE_ALLOCA_H=`check_header alloca.h`
 HAVE_MALLOC_H=`check_header malloc.h`
 HAVE_STDINT_H=`check_header stdint.h`
 HAVE_INTTYPES_H=`check_header inttypes.h`
+
+# Check for uinput support (Linux only)
+if [ "$UINPUT" = yes -a "$sys" = "Linux" ]; then
+	HAVE_UINPUT_H=`check_header linux/uinput.h`
+	if [ -z "$HAVE_UINPUT_H" ]; then
+		echo "Failed to find the uinput header, keyboard emulation will only work \
+			with X11 applications."
+		echo
+		UINPUT=no
+	fi
+fi
 
 if [ "$X11" = "no" ]; then
 	echo "WARNING: you have disabled the X11 interface, the resulting daemon \
@@ -205,7 +212,7 @@ else
 	HAVE_XINPUT2_H=`check_header X11/extensions/XInput2.h`
 	HAVE_XTEST_H=`check_header X11/extensions/XTest.h`
 
-	if [ -z "$HAVE_XTEST_H" ]; then
+	if [ -z "$HAVE_XTEST_H" -a -z "$HAVE_UINPUT_H" ]; then
 		echo "WARNING: building without XTEST support, makes keyboard emulation \
 less reliable (fallback to XSendEvent)."
 	fi
@@ -213,13 +220,23 @@ fi
 
 HAVE_VSNPRINTF=`check_func vsnprintf`
 
-# Check for uinput support (Linux only)
-if [ "$sys" = "Linux" ]; then
-	HAVE_UINPUT_H=`check_header linux/uinput.h`
-	if [ -n "$HAVE_UINPUT_H" ]; then
-		echo "Found uinput support (keyboard emulation for Wayland)"
-	fi
+# print configuration results
+echo
+echo 'Build configuration:'
+echo "  prefix: $PREFIX"
+echo "  config dir: $CFGDIR"
+echo "  optimize for speed: $OPT"
+echo "  include debugging symbols: $DBG"
+echo "  x11 communication method: $X11"
+echo "  use hotplug: $HOTPLUG"
+if [ "$sys" = Linux ]; then
+	echo "  uinput for keyboard emulation: $UINPUT"
 fi
+if [ "$UINPUT" != yes -a "$X11" = yes ]; then
+	[ -n "$HAVE_XTEST_H" ] && foo=yes || foo=no
+	echo "  XTest for keyboard emulation: $foo"
+fi
+echo ""
 
 # create Makefile
 echo 'creating Makefile ...'
