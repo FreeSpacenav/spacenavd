@@ -94,10 +94,13 @@
 # Map buttons to keyboard keys (experimental)
 # By default no such mappings are active. Use the following syntax:
 #    kbmapN = <keysym>
+# or
+#    kbmapN = <keysym>+<keysym>
 # where N is the button number (zero-based), and <keysym> is a keysym name from
 # /usr/include/X11/keysymdef.h, without the leading XK_
 # Example:
 #    kbmap0 = Escape
+#    kbmap1 = Shift_L+s
 
 
 # Serial device
