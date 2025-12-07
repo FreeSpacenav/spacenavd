@@ -57,7 +57,7 @@ static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
 
 static struct dev_event *dev_ev_list = NULL;
 
-static int disable_translation, disable_rotation, dom_axis_mode;
+int disable_translation, disable_rotation, dom_axis_mode;
 static int cur_axis_mag[6], cur_dom_axis;
 
 
@@ -290,6 +290,46 @@ static void handle_button_action(int act, int pressed)
 		break;
 	case BNACT_DOMINANT_AXIS:
 		dom_axis_mode = !dom_axis_mode;
+		break;
+	case BNACT_PROFILE_0:
+	case BNACT_PROFILE_1:
+	case BNACT_PROFILE_2:
+	case BNACT_PROFILE_3:
+	case BNACT_PROFILE_4:
+	case BNACT_PROFILE_5:
+	case BNACT_PROFILE_6:
+	case BNACT_PROFILE_7:
+	case BNACT_PROFILE_8:
+	case BNACT_PROFILE_9:
+	case BNACT_PROFILE_10:
+	case BNACT_PROFILE_11:
+	case BNACT_PROFILE_12:
+	case BNACT_PROFILE_13:
+	case BNACT_PROFILE_14:
+	case BNACT_PROFILE_15:
+		{
+			int profile_idx = act - BNACT_PROFILE_0;
+			int current = get_current_profile();
+			const char *profile_name = get_profile_name(profile_idx);
+
+			/* toggle behavior */
+			if(current == profile_idx) {
+				/* return to default */
+				logmsg(LOG_INFO, "Button pressed: toggling OFF profile '%s' (returning to default)\n",
+					profile_name ? profile_name : "unknown");
+				switch_profile(-1);
+			} else {
+				/* switch to this profile */
+				logmsg(LOG_INFO, "Button pressed: toggling ON profile '%s'\n",
+					profile_name ? profile_name : "unknown");
+				switch_profile(profile_idx);
+			}
+
+			/* reset runtime state */
+			disable_translation = 0;
+			disable_rotation = 0;
+			dom_axis_mode = 0;
+		}
 		break;
 	}
 }

@@ -83,6 +83,14 @@ void remove_client(struct client *client)
 	struct client *iter = client_list;
 	if(!iter) return;
 
+	/* if client had a name and triggered a profile switch, restore previous profile */
+	if(client && client->name) {
+		int profile_idx = find_profile_by_appname(client->name);
+		if(profile_idx != -1 && profile_idx == get_current_profile()) {
+			restore_previous_profile();
+		}
+	}
+
 	if(iter == client) {
 		client_list = iter->next;
 		free_client(iter);

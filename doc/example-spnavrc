@@ -144,3 +144,73 @@
 # the re-centering power of the device.
 #
 #repeat-interval = -1
+
+
+# Profile support
+# Profiles allow you to define multiple configurations and switch between them
+# either manually via spacemouse buttons OR automatically when applications identify
+# themselves. There is no persistence across restarts, the daemon always starts with
+# the default profile.
+#
+# Profiles inherit all settings from the main config and only override what they
+# explicitly specify. This means button bindings, sensitivity, etc. carry over
+# unless the profile overrides them. All profile-specific settings must come AFTER
+# the profile definition in the config file.
+#
+#
+# Define profiles (in main /etc/spnavrc):
+#    profile = <name> [app=<appname>]
+# Where:
+#   <name>    = descriptive profile name
+#   <appname> = optional application name for auto-switching
+#
+# Profile-specific settings use dot notation:
+#    <profile-name>.<option> = <value>
+#
+# Manual switching - bind buttons to toggle profiles:
+#    bnactN = <profile-name>
+# Or use the numeric form:
+#    bnactN = profile-M
+# Where N is the button number, M is the profile index (0-15), and
+# <profile-name> is the name you defined. Pressing the button toggles
+# between that profile and default.
+#
+# Example configuration:
+#profile = blender
+#profile = cad
+#profile = houdini
+#
+## Blender profile settings (higher sensitivity for modeling)
+#blender.sensitivity = 1.5
+#blender.dead-zone = 3
+#blender.bnact10 = sensitivity-reset
+#
+## CAD profile settings (lower sensitivity for precision)
+#cad.sensitivity = 0.5
+#cad.dead-zone = 5
+#
+## Houdini profile settings
+#houdini.sensitivity = 1.2
+#houdini.kbmap8 = h
+#houdini.kbmap9 = g
+#
+## Bind buttons to toggle profiles
+#bnact10 = blender    # Toggle blender profile
+#bnact11 = cad        # Toggle CAD profile
+#bnact12 = profile-2  # Toggle houdini profile
+#
+# Automatic switching - profiles activate when matching application connects:
+#profile = openscad app=openscad
+#profile = freecad app=freecad
+#
+#openscad.sensitivity = 1.5
+#freecad.sensitivity = 1.0
+#
+# When an application identifies itself via libspnav's spnav_set_name, the daemon
+# automatically switches to the matching profile. When the application disconnects,
+# it restores the previous profile. You can combine both manual and automatic
+# switching - manual button presses work even when an app profile is active.
+#
+# Apps provided in this auto-switching example are only for reference, as we are
+# not aware of any applications that self-identify, yet. This documentation will be
+# updated when we are made aware of this happening.
