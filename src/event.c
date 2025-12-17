@@ -214,7 +214,14 @@ void process_input(struct device *dev, struct dev_input *inp)
 		/* check to see if we must emulate a keyboard event instead of a
 		 * regular button event for this button
 		 */
-		if(cfg.kbmap_count[inp->idx] > 0) {
+		if(cfg.kbmap_count[inp->idx] == 1) {
+			/* single key */
+			unsigned int key = cfg.kbmap[inp->idx][0];
+			kbemu_send_key(key, inp->val);
+			break;
+		}
+		if(cfg.kbmap_count[inp->idx] > 1) {
+			/* multi-key combo */
 			unsigned int *keys = cfg.kbmap[inp->idx];
 			kbemu_send_combo(keys, cfg.kbmap_count[inp->idx], inp->val);
 			break;

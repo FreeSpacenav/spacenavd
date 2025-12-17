@@ -142,7 +142,7 @@ static void send_combo_uinput(unsigned int *keys, int count, int press)
 	}
 
 	/* Send press events for all keys */
-	for(i = 0; i < count; i++) {
+	for(i=0; i<count; i++) {
 		unsigned int keycode = keysym_to_linux_keycode(keys[i]);
 		if(keycode) {
 			emit_event(EV_KEY, keycode, 1);
@@ -151,8 +151,8 @@ static void send_combo_uinput(unsigned int *keys, int count, int press)
 	emit_event(EV_SYN, SYN_REPORT, 0);
 
 	/* Send release events in reverse order */
-	for(i = count - 1; i >= 0; i--) {
-		unsigned int keycode = keysym_to_linux_keycode(keys[i]);
+	for(i=0; i<count; i++) {
+		unsigned int keycode = keysym_to_linux_keycode(keys[count - 1 - i]);
 		if(keycode) {
 			emit_event(EV_KEY, keycode, 0);
 		}
