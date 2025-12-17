@@ -25,11 +25,19 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define MAX_BUTTONS		64
 #define MAX_CUSTOM		64
 #define MAX_KEYS_PER_BUTTON	8
+#define MAX_PROFILES		16
 
 enum {
 	LED_OFF		= 0,
 	LED_ON		= 1,
 	LED_AUTO	= 2
+};
+
+struct profile {
+	char *name;		/* profile name (e.g., "blender", "cad") */
+	char *appname;	/* optional application name for auto-switching */
+	char **config_overrides;	/* array of "key = value" strings for inline config */
+	int num_overrides;
 };
 
 /* button actions (XXX: must correspond to SPNAV_BNACT_* in libspnav) */
@@ -41,6 +49,22 @@ enum {
 	BNACT_DISABLE_ROTATION,
 	BNACT_DISABLE_TRANSLATION,
 	BNACT_DOMINANT_AXIS,
+	BNACT_PROFILE_0,
+	BNACT_PROFILE_1,
+	BNACT_PROFILE_2,
+	BNACT_PROFILE_3,
+	BNACT_PROFILE_4,
+	BNACT_PROFILE_5,
+	BNACT_PROFILE_6,
+	BNACT_PROFILE_7,
+	BNACT_PROFILE_8,
+	BNACT_PROFILE_9,
+	BNACT_PROFILE_10,
+	BNACT_PROFILE_11,
+	BNACT_PROFILE_12,
+	BNACT_PROFILE_13,
+	BNACT_PROFILE_14,
+	BNACT_PROFILE_15,
 
 	MAX_BNACT
 };
@@ -65,10 +89,22 @@ struct cfg {
 
 	/* debug options, might change at any time */
 	int kbemu_use_x11;			/* force X11 for kbemu, instead of uinput */
+
+	/* profile support */
+	struct profile profiles[MAX_PROFILES];
+	int num_profiles;
 };
 
 void default_cfg(struct cfg *cfg);
 int read_cfg(const char *fname, struct cfg *cfg);
 int write_cfg(const char *fname, struct cfg *cfg);
+
+/* profile management */
+int switch_profile(int profile_idx);
+int get_current_profile(void);
+const char *get_profile_name(int profile_idx);
+int find_profile_by_appname(const char *appname);
+void switch_profile_by_appname(const char *appname);
+void restore_previous_profile(void);
 
 #endif	/* CFGFILE_H_ */

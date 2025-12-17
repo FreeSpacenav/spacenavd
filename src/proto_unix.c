@@ -304,6 +304,9 @@ static int handle_request(struct client *c, struct reqresp *req)
 			c->name = c->strbuf.buf;
 			c->strbuf.buf = 0;
 			logmsg(LOG_INFO, "client name: %s\n", c->name);
+
+			/* check for profile matching this application name */
+			switch_profile_by_appname(c->name);
 		}
 		break;
 
