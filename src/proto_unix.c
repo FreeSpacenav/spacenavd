@@ -30,6 +30,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto.h"
 #include "proto_unix.h"
 #include "spnavd.h"
+#include "profile.h"
+#include "lcd.h"
 #ifdef USE_X11
 #include "kbemu.h"
 #endif
@@ -305,6 +307,38 @@ static int handle_request(struct client *c, struct reqresp *req)
 			c->strbuf.buf = 0;
 			logmsg(LOG_INFO, "client name: %s\n", c->name);
 		}
+		break;
+
+	case REQ_SET_APP_ID:
+		if((res = spnav_recv_str(&c->strbuf, req)) == -1) {
+			logmsg(LOG_ERR, "SET_APP_ID: failed to receive string\n");
+			break;
+		}
+		if(res) {
+			free(c->app_id);
+			c->app_id = c->strbuf.buf;
+			c->strbuf.buf = 0;
+			logmsg(LOG_INFO, "client app_id: %s\n", c->app_id);
+			if(profile_match_app_id(c->app_id)) {
+				lcd_update_mappings();
+			}
+		}
+		break;
+
+	case REQ_SET_PROFILE:
+		res = profile_set_manual(req->data[0]);
+		if(res >= 0) {
+			if(res) lcd_update_mappings();
+			sendresp(c, req, 0);
+		} else {
+			sendresp(c, req, -1);
+		}
+		break;
+
+	case REQ_GET_PROFILE:
+		req->data[0] = profile_active_index();
+		req->data[1] = num_profiles;
+		sendresp(c, req, 0);
 		break;
 
 	case REQ_SET_SENS:

@@ -39,5 +39,7 @@ void remove_client_window(Window win);
 
 void drop_xinput(void);
 
+int x11_get_focused_wm_class(char *buf, int bufsz);
+
 
 #endif	/* PROTO_X11_H_ */

@@ -144,3 +144,15 @@
 # the re-centering power of the device.
 #
 #repeat-interval = -1
+
+
+# Per-application profiles
+# Profiles override global settings for specific applications.
+# The "class" value is matched (case-insensitive substring) against
+# the WM_CLASS of the currently focused window.
+#
+#profile "Blender" class=blender
+#    kbmap0 = Escape
+#    kbmap1 = Return
+#    sensitivity = 2.0
+#end

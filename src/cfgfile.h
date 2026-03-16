@@ -67,6 +67,17 @@ struct cfg {
 	int kbemu_use_x11;			/* force X11 for kbemu, instead of uinput */
 };
 
+#define MAX_PROFILES 16
+
+struct profile {
+	char *name;          /* display name */
+	char *match_class;   /* WM_CLASS substring to match (case-insensitive) */
+	struct cfg pcfg;     /* full config with profile overrides applied */
+};
+
+extern struct profile profiles[MAX_PROFILES];
+extern int num_profiles;
+
 void default_cfg(struct cfg *cfg);
 int read_cfg(const char *fname, struct cfg *cfg);
 int write_cfg(const char *fname, struct cfg *cfg);

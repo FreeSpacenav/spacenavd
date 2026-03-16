@@ -54,6 +54,9 @@ enum {
 	REQ_GET_SENS,			/* get client sensitivity:	R[0] float R[6] status */
 	REQ_SET_EVMASK,			/* set event mask: Q[0] mask - R[6] status */
 	REQ_GET_EVMASK,			/* get event mask: R[0] mask R[6] status */
+	REQ_SET_APP_ID,			/* set app id for profile matching: Q[0-5] next 24 bytes Q[6] remaining length - R[6] status */
+	REQ_SET_PROFILE,		/* set active profile: Q[0] index (-1 for auto) - R[6] status */
+	REQ_GET_PROFILE,		/* get active profile: R[0] index (-1 if none) R[1] num_profiles R[6] status */
 
 	/* device queries */
 	REQ_DEV_NAME = 0x2000,	/* get device name:	R[0-5] next 24 bytes R[6] remaining length or -1 for failure */
@@ -144,7 +147,10 @@ const char *spnav_reqnames_1000[] = {
 	"SET_SENS",
 	"GET_SENS",
 	"SET_EVMASK",
-	"GET_EVMASK"
+	"GET_EVMASK",
+	"SET_APP_ID",
+	"SET_PROFILE",
+	"GET_PROFILE"
 };
 const char *spnav_reqnames_2000[] = {
 	"DEV_NAME",

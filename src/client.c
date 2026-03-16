@@ -110,6 +110,7 @@ void free_client(struct client *client)
 {
 	if(client) {
 		free(client->name);
+		free(client->app_id);
 		free(client->strbuf.buf);
 		free(client);
 	}

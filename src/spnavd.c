@@ -24,6 +24,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <assert.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <sys/time.h>
 #include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/un.h>
@@ -38,6 +39,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #ifdef USE_X11
 #include "proto_x11.h"
 #endif
+#include "profile.h"
+#include "lcd.h"
 
 static void print_usage(const char *argv0);
 static void cleanup(void);
@@ -162,6 +165,9 @@ opt_pidfile:		if(!argv[++i]) {
 	logmsg(LOG_INFO, "Spacenav daemon " VERSION "\n");
 
 	read_cfg(cfgfile, &cfg);
+	profile_on_cfg_reload(&cfg);
+	profile_refresh_active();
+	lcd_update_mappings();
 	prev_cfg = cfg;
 
 	pipe(pfd);
@@ -184,6 +190,10 @@ opt_pidfile:		if(!argv[++i]) {
 	kbemu_init();
 
 	atexit(cleanup);
+
+	{
+	struct timeval last_profile_check;
+	gettimeofday(&last_profile_check, 0);
 
 	for(;;) {
 		fd_set rset;
@@ -256,8 +266,32 @@ opt_pidfile:		if(!argv[++i]) {
 				}
 			}
 
+			/* cap timeout to 500ms for periodic profile polling */
+			if(num_profiles > 0) {
+				if(!timeout || tv.tv_sec > 0 || tv.tv_usec > 500000) {
+					tv.tv_sec = 0;
+					tv.tv_usec = 500000;
+					timeout = &tv;
+				}
+			}
+
 			ret = select(max_fd + 1, &rset, 0, 0, timeout);
 		} while(ret == -1 && errno == EINTR);
+
+		/* periodic profile polling */
+		if(num_profiles > 0) {
+			struct timeval now;
+			long elapsed_ms;
+			gettimeofday(&now, 0);
+			elapsed_ms = (now.tv_sec - last_profile_check.tv_sec) * 1000 +
+				(now.tv_usec - last_profile_check.tv_usec) / 1000;
+			if(elapsed_ms >= 500) {
+				last_profile_check = now;
+				if(profile_refresh_active()) {
+					lcd_update_mappings();
+				}
+			}
+		}
 
 		if(ret > 0) {
 			handle_events(&rset);
@@ -273,6 +307,7 @@ opt_pidfile:		if(!argv[++i]) {
 			}
 		}
 	}
+	}  /* end of scope for last_profile_check */
 	return 0;	/* unreachable */
 }
 
@@ -432,6 +467,10 @@ static void handle_events(fd_set *rset)
 
 		read_cfg(cfgfile, &cfg);
 		cfg_changed();
+		/* re-evaluate profiles and refresh LCD after config reload */
+		profile_on_cfg_reload(&cfg);
+		profile_refresh_active();
+		lcd_update_mappings();
 	}
 
 	/* handle anything coming through the UNIX socket */

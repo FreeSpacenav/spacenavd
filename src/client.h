@@ -58,6 +58,7 @@ struct client {
 	struct device *dev;
 
 	char *name;				/* client name (not unique) */
+	char *app_id;			/* application identifier for profile matching */
 	unsigned int evmask;	/* event selection mask */
 
 	char reqbuf[64];

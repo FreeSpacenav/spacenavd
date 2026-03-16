@@ -430,6 +430,45 @@ static int xioerr(Display *display)
 	return 0;
 }
 
+int x11_get_focused_wm_class(char *buf, int bufsz)
+{
+	Window focused;
+	int revert;
+	Window w, root, parent, *children;
+	unsigned int nchildren;
+	XClassHint hint;
+
+	if(!dpy || bufsz <= 0) return -1;
+
+	if(setjmp(jbuf)) {
+		return -1;
+	}
+
+	XGetInputFocus(dpy, &focused, &revert);
+	if(focused == None || focused == PointerRoot) return -1;
+
+	/* walk up the window tree looking for WM_CLASS */
+	w = focused;
+	for(;;) {
+		if(XGetClassHint(dpy, w, &hint)) {
+			if(hint.res_class) {
+				strncpy(buf, hint.res_class, bufsz - 1);
+				buf[bufsz - 1] = 0;
+			}
+			if(hint.res_name) XFree(hint.res_name);
+			if(hint.res_class) XFree(hint.res_class);
+			return 0;
+		}
+
+		if(!XQueryTree(dpy, w, &root, &parent, &children, &nchildren)) {
+			return -1;
+		}
+		if(children) XFree(children);
+		if(parent == root || parent == None) return -1;
+		w = parent;
+	}
+}
+
 #else
 int spacenavd_proto_x11_shut_up_empty_source_warning;
 #endif	/* USE_X11 */

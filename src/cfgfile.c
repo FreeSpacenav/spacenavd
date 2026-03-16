@@ -32,6 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cfg cfg, prev_cfg;
 
+struct profile profiles[MAX_PROFILES];
+int num_profiles;
+
 /* all parsable config options... some of them might map to the same cfg field */
 enum {
 	CFG_REPEAT,
@@ -82,6 +85,16 @@ static int num_lines;
 void default_cfg(struct cfg *cfg)
 {
 	int i, j;
+
+	for(i = 0; i < num_profiles; i++) {
+		free(profiles[i].name);
+		free(profiles[i].match_class);
+		for(j = 0; j < MAX_BUTTONS; j++) {
+			free(profiles[i].pcfg.kbmap_str[j]);
+		}
+	}
+	num_profiles = 0;
+	memset(profiles, 0, sizeof profiles);
 
 	memset(cfg, 0, sizeof *cfg);
 
@@ -152,6 +165,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	struct flock flk;
 	int num_devid = 0;
 	struct cfgline *lptr;
+	int cur_profile = -1;
 
 	default_cfg(cfg);
 
@@ -191,6 +205,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		int isint, isfloat, isbool, ival, bnidx, axisidx;
 		float fval;
 		char *endp, *key_str, *val_str, *line = buf;
+		struct cfg *target;
 
 		lptr = cfglines + num_lines++;
 
@@ -207,6 +222,79 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		if(!*line || *line == '\n' || *line == '\r' || *line == '#') {
 			continue;	/* ignore comments and empty lines */
 		}
+
+		/* check for profile block start: profile "Name" class=match */
+		if(strncmp(line, "profile", 7) == 0 && (line[7] == ' ' || line[7] == '\t' || line[7] == '"')) {
+			char *p, *name_start, *name_end, *class_val;
+
+			if(num_profiles >= MAX_PROFILES) {
+				logmsg(LOG_WARNING, "too many profiles (max %d), ignoring\n", MAX_PROFILES);
+				continue;
+			}
+
+			/* parse quoted name */
+			p = line + 7;
+			while(*p == ' ' || *p == '\t') p++;
+			if(*p == '"') {
+				name_start = ++p;
+				name_end = strchr(p, '"');
+				if(!name_end) {
+					logmsg(LOG_WARNING, "unterminated profile name string\n");
+					continue;
+				}
+				*name_end = 0;
+				p = name_end + 1;
+			} else {
+				name_start = p;
+				while(*p && *p != ' ' && *p != '\t') p++;
+				if(*p) *p++ = 0;
+			}
+
+			/* parse class=value */
+			while(*p == ' ' || *p == '\t') p++;
+			class_val = 0;
+			if(strncmp(p, "class=", 6) == 0) {
+				class_val = p + 6;
+				/* trim trailing whitespace */
+				endp = class_val + strlen(class_val) - 1;
+				while(endp > class_val && (*endp == ' ' || *endp == '\t' || *endp == '\n' || *endp == '\r')) {
+					*endp-- = 0;
+				}
+			}
+			if(!class_val || !*class_val) {
+				logmsg(LOG_WARNING, "profile missing class= specifier, ignoring\n");
+				continue;
+			}
+
+			/* initialize profile with a copy of the current global config */
+			profiles[num_profiles].pcfg = *cfg;
+			/* deep copy kbmap_str pointers */
+			for(i = 0; i < MAX_BUTTONS; i++) {
+				profiles[num_profiles].pcfg.kbmap_str[i] = cfg->kbmap_str[i] ? strdup(cfg->kbmap_str[i]) : 0;
+			}
+			/* deep copy devname pointers */
+			for(i = 0; i < MAX_CUSTOM; i++) {
+				profiles[num_profiles].pcfg.devname[i] = cfg->devname[i] ? strdup(cfg->devname[i]) : 0;
+			}
+			profiles[num_profiles].name = strdup(name_start);
+			profiles[num_profiles].match_class = strdup(class_val);
+			cur_profile = num_profiles++;
+			logmsg(LOG_INFO, "profile \"%s\" class=%s\n", profiles[cur_profile].name, profiles[cur_profile].match_class);
+			continue;
+		}
+
+		/* check for end of profile block */
+		if(strcmp(line, "end") == 0) {
+			if(cur_profile >= 0) {
+				cur_profile = -1;
+			} else {
+				logmsg(LOG_WARNING, "unexpected 'end' outside profile block\n");
+			}
+			continue;
+		}
+
+		/* select target config: profile or global */
+		target = (cur_profile >= 0) ? &profiles[cur_profile].pcfg : cfg;
 
 		if(!(key_str = strtok(line, " =\n\t\r"))) {
 			logmsg(LOG_WARNING, "invalid config line: %s, skipping.\n", line);
@@ -236,13 +324,13 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		if(strcmp(key_str, "repeat-interval") == 0) {
 			lptr->opt = CFG_REPEAT;
 			EXPECT(isint);
-			cfg->repeat_msec = ival;
+			target->repeat_msec = ival;
 
 		} else if(strcmp(key_str, "dead-zone") == 0) {
 			lptr->opt = CFG_DEADZONE;
 			EXPECT(isint);
 			for(i=0; i<MAX_AXES; i++) {
-				cfg->dead_threshold[i] = ival;
+				target->dead_threshold[i] = ival;
 			}
 
 		} else if(sscanf(key_str, "dead-zone%d", &axisidx) == 1) {
@@ -252,117 +340,117 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			lptr->opt = CFG_DEADZONE_N;
 			lptr->idx = axisidx;
-			cfg->dead_threshold[axisidx] = ival;
+			target->dead_threshold[axisidx] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-x") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_TX;
 			EXPECT(isint);
-			cfg->dead_threshold[0] = ival;
+			target->dead_threshold[0] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-y") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_TY;
 			EXPECT(isint);
-			cfg->dead_threshold[1] = ival;
+			target->dead_threshold[1] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-z") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_TZ;
 			EXPECT(isint);
-			cfg->dead_threshold[2] = ival;
+			target->dead_threshold[2] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-x") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_RX;
 			EXPECT(isint);
-			cfg->dead_threshold[3] = ival;
+			target->dead_threshold[3] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-y") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_RY;
 			EXPECT(isint);
-			cfg->dead_threshold[4] = ival;
+			target->dead_threshold[4] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-z") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_RZ;
 			EXPECT(isint);
-			cfg->dead_threshold[5] = ival;
+			target->dead_threshold[5] = ival;
 
 		} else if(strcmp(key_str, "sensitivity") == 0) {
 			lptr->opt = CFG_SENS;
 			EXPECT(isfloat);
-			cfg->sensitivity = fval;
+			target->sensitivity = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation") == 0) {
 			lptr->opt = CFG_SENS_TRANS;
 			EXPECT(isfloat);
-			cfg->sens_trans[0] = cfg->sens_trans[1] = cfg->sens_trans[2] = fval;
+			target->sens_trans[0] = target->sens_trans[1] = target->sens_trans[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-x") == 0) {
 			lptr->opt = CFG_SENS_TX;
 			EXPECT(isfloat);
-			cfg->sens_trans[0] = fval;
+			target->sens_trans[0] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-y") == 0) {
 			lptr->opt = CFG_SENS_TY;
 			EXPECT(isfloat);
-			cfg->sens_trans[1] = fval;
+			target->sens_trans[1] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-z") == 0) {
 			lptr->opt = CFG_SENS_TZ;
 			EXPECT(isfloat);
-			cfg->sens_trans[2] = fval;
+			target->sens_trans[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation") == 0) {
 			lptr->opt = CFG_SENS_ROT;
 			EXPECT(isfloat);
-			cfg->sens_rot[0] = cfg->sens_rot[1] = cfg->sens_rot[2] = fval;
+			target->sens_rot[0] = target->sens_rot[1] = target->sens_rot[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-x") == 0) {
 			lptr->opt = CFG_SENS_RX;
 			EXPECT(isfloat);
-			cfg->sens_rot[0] = fval;
+			target->sens_rot[0] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-y") == 0) {
 			lptr->opt = CFG_SENS_RY;
 			EXPECT(isfloat);
-			cfg->sens_rot[1] = fval;
+			target->sens_rot[1] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-z") == 0) {
 			lptr->opt = CFG_SENS_RZ;
 			EXPECT(isfloat);
-			cfg->sens_rot[2] = fval;
+			target->sens_rot[2] = fval;
 
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			lptr->opt = CFG_INVROT;
 			if(strchr(val_str, 'x')) {
-				cfg->invert[RX] = 1;
+				target->invert[RX] = 1;
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[RY] = 1;
+				target->invert[RY] = 1;
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[RZ] = 1;
+				target->invert[RZ] = 1;
 			}
 
 		} else if(strcmp(key_str, "invert-trans") == 0) {
 			lptr->opt = CFG_INVTRANS;
 			if(strchr(val_str, 'x')) {
-				cfg->invert[TX] = 1;
+				target->invert[TX] = 1;
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[TY] = 1;
+				target->invert[TY] = 1;
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[TZ] = 1;
+				target->invert[TZ] = 1;
 			}
 
 		} else if(strcmp(key_str, "swap-yz") == 0) {
 			lptr->opt = CFG_SWAPYZ;
 			if(isint || isbool) {
-				cfg->swapyz = ival;
+				target->swapyz = ival;
 			} else {
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
 				continue;
@@ -380,7 +468,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			lptr->opt = CFG_AXISMAP_N;
 			lptr->idx = axisidx;
-			cfg->map_axis[axisidx] = ival;
+			target->map_axis[axisidx] = ival;
 
 		} else if(sscanf(key_str, "bnmap%d", &bnidx) == 1) {
 			EXPECT(isint);
@@ -388,12 +476,12 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a number from 0 to %d\n", key_str, MAX_BUTTONS);
 				continue;
 			}
-			if(cfg->map_button[bnidx] != bnidx) {
+			if(target->map_button[bnidx] != bnidx) {
 				logmsg(LOG_WARNING, "warning: multiple mappings for button %d\n", bnidx);
 			}
 			lptr->opt = CFG_BNMAP_N;
 			lptr->idx = bnidx;
-			cfg->map_button[bnidx] = ival;
+			target->map_button[bnidx] = ival;
 
 		} else if(sscanf(key_str, "bnact%d", &bnidx) == 1) {
 			if(bnidx < 0 || bnidx >= MAX_BUTTONS) {
@@ -402,8 +490,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			lptr->opt = CFG_BNACT_N;
 			lptr->idx = bnidx;
-			if((cfg->bnact[bnidx] = parse_bnact(val_str)) == -1) {
-				cfg->bnact[bnidx] = BNACT_NONE;
+			if((target->bnact[bnidx] = parse_bnact(val_str)) == -1) {
+				target->bnact[bnidx] = BNACT_NONE;
 				logmsg(LOG_WARNING, "invalid button action: \"%s\"\n", val_str);
 				continue;
 			}
@@ -415,20 +503,20 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			lptr->opt = CFG_KBMAP_N;
 			lptr->idx = bnidx;
-			if(cfg->kbmap_str[bnidx]) {
-				logmsg(LOG_WARNING, "warning: multiple keyboard mappings for button %d: %s -> %s\n", bnidx, cfg->kbmap_str[bnidx], val_str);
-				free(cfg->kbmap_str[bnidx]);
+			if(target->kbmap_str[bnidx]) {
+				logmsg(LOG_WARNING, "warning: multiple keyboard mappings for button %d: %s -> %s\n", bnidx, target->kbmap_str[bnidx], val_str);
+				free(target->kbmap_str[bnidx]);
 			}
-			cfg->kbmap_str[bnidx] = strdup(val_str);
-			cfg->kbmap_count[bnidx] = parse_kbmap(val_str, cfg->kbmap[bnidx], MAX_KEYS_PER_BUTTON);
+			target->kbmap_str[bnidx] = strdup(val_str);
+			target->kbmap_count[bnidx] = parse_kbmap(val_str, target->kbmap[bnidx], MAX_KEYS_PER_BUTTON);
 
 		} else if(strcmp(key_str, "led") == 0) {
 			lptr->opt = CFG_LED;
 			if(isint || isbool) {
-				cfg->led = ival;
+				target->led = ival;
 			} else {
 				if(strcmp(val_str, "auto") == 0) {
-					cfg->led = LED_AUTO;
+					target->led = LED_AUTO;
 				} else {
 					logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value or \"auto\".\n", key_str);
 					continue;
@@ -438,7 +526,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "kbmap_use_x11") == 0) {
 			lptr->opt = CFG_KBMAP_USE_X11;
 			if(isint || isbool) {
-				cfg->kbemu_use_x11 = ival;
+				target->kbemu_use_x11 = ival;
 			} else {
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
 				continue;
@@ -447,7 +535,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "grab") == 0) {
 			lptr->opt = CFG_GRAB;
 			if(isint || isbool) {
-				cfg->grab_device = ival;
+				target->grab_device = ival;
 			} else {
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
 				continue;
@@ -455,14 +543,14 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 		} else if(strcmp(key_str, "serial") == 0) {
 			lptr->opt = CFG_SERIAL;
-			strncpy(cfg->serial_dev, val_str, PATH_MAX - 1);
+			strncpy(target->serial_dev, val_str, PATH_MAX - 1);
 
 		} else if(strcmp(key_str, "device-id") == 0) {
 			unsigned int vendor, prod;
 			lptr->opt = CFG_DEVID;
 			if(sscanf(val_str, "%x:%x", &vendor, &prod) == 2) {
-				cfg->devid[num_devid][0] = (int)vendor;
-				cfg->devid[num_devid][1] = (int)prod;
+				target->devid[num_devid][0] = (int)vendor;
+				target->devid[num_devid][1] = (int)prod;
 				num_devid++;
 			} else {
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a vendorid:productid pair\n", key_str);
@@ -473,6 +561,12 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			logmsg(LOG_WARNING, "unrecognized config option: %s\n", key_str);
 		}
 	}
+
+	if(cur_profile >= 0) {
+		logmsg(LOG_WARNING, "unterminated profile block at end of config file\n");
+	}
+
+	logmsg(LOG_INFO, "%d profiles loaded\n", num_profiles);
 
 	unlock_cfgfile(fd);
 	fclose(fp);
