@@ -9,7 +9,7 @@
 
 #ifdef HAVE_SPACELCD
 #include <stdint.h>
-#include <librsvg/rsvg.h>
+#include <cairo/cairo.h>
 #include <libusb.h>
 #include <zlib.h>
 
@@ -35,42 +35,55 @@ static void rgb_to_bgr(uint8_t *dst, const uint8_t *src, int size)
 	}
 }
 
-static int svg_to_rgb565(const char *svg, int svglen, uint8_t *buffer)
+static void render_bitmap(uint8_t *buffer)
 {
-	GError *error = NULL;
-	RsvgHandle *handle;
+	const int cols = 6;
+	const int rows = 2;
+	int btn = 0;
+	int r, c;
 	cairo_surface_t *surface;
 	cairo_t *cr;
-
-	handle = rsvg_handle_new_from_data((const guint8 *)svg, (gsize)svglen, &error);
-	if(error) {
-		logmsg(LOG_WARNING, "lcd: failed to parse SVG: %s\n", error->message);
-		g_error_free(error);
-		return -1;
-	}
 
 	surface = cairo_image_surface_create(CAIRO_FORMAT_RGB16_565, LCD_WIDTH, LCD_HEIGHT);
 	cr = cairo_create(surface);
 
-	{
-		RsvgRectangle viewport = {0, 0, LCD_WIDTH, LCD_HEIGHT};
-		rsvg_handle_render_document(handle, cr, &viewport, &error);
-	}
-	if(error) {
-		logmsg(LOG_WARNING, "lcd: render failed: %s\n", error->message);
-		g_error_free(error);
-		cairo_destroy(cr);
-		cairo_surface_destroy(surface);
-		g_object_unref(handle);
-		return -1;
+	/* black background */
+	cairo_set_source_rgb(cr, 0, 0, 0);
+	cairo_paint(cr);
+
+	/* profile name */
+	cairo_select_font_face(cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
+	cairo_set_font_size(cr, 18);
+	cairo_set_source_rgb(cr, 1, 1, 1);
+	cairo_move_to(cr, 10, 20);
+	cairo_show_text(cr, profile_get_name());
+
+	/* button labels */
+	cairo_set_font_size(cr, 16);
+	for(r = 0; r < rows; r++) {
+		for(c = 0; c < cols; c++, btn++) {
+			const char *lbl = profile_get_button_label(btn);
+			int x = 10 + c * (LCD_WIDTH / cols);
+			int y = 50 + r * 45;
+			char text[64];
+
+			if(lbl[0]) {
+				cairo_set_source_rgb(cr, 0, 1, 1);	/* cyan */
+				snprintf(text, sizeof text, "%d: %s", btn + 1, lbl);
+			} else {
+				cairo_set_source_rgb(cr, 0.33, 0.33, 0.33);	/* #555 */
+				snprintf(text, sizeof text, "%d: None", btn + 1);
+			}
+			cairo_move_to(cr, x, y);
+			cairo_show_text(cr, text);
+		}
 	}
 
+	cairo_surface_flush(surface);
 	rgb_to_bgr(buffer, cairo_image_surface_get_data(surface), LCD_BITMAP_BYTES);
 
 	cairo_destroy(cr);
 	cairo_surface_destroy(surface);
-	g_object_unref(handle);
-	return 0;
 }
 
 static int lcd_compress(const uint8_t *src, uint8_t *dst, int srclen)
@@ -133,42 +146,11 @@ static int lcd_usb_send(uint8_t *data, int size)
 
 extern struct cfg cfg;
 
-static void build_svg(char *out, size_t outsz)
-{
-	const int cols = 6;
-	const int rows = 2;
-	int btn = 0;
-	int r, c;
-	size_t off = 0;
-
-	off += snprintf(out + off, outsz - off,
-		"<svg xmlns='http://www.w3.org/2000/svg' width='640' height='150'>"
-		"<rect width='640' height='150' fill='black'/>");
-	off += snprintf(out + off, outsz - off,
-		"<text x='10' y='20' font-size='18' fill='white'>%s</text>", profile_get_name());
-
-	for(r = 0; r < rows; r++) {
-		for(c = 0; c < cols; c++, btn++) {
-			const char *lbl = profile_get_button_label(btn);
-			int x = 10 + c * (640 / cols);
-			int y = 50 + r * 45;
-			off += snprintf(out + off, outsz - off,
-				"<text x='%d' y='%d' font-size='16' fill='%s'>%d: %s</text>",
-				x, y, lbl[0] ? "cyan" : "#555", btn + 1, lbl[0] ? lbl : "None");
-			if(off >= outsz) return;
-		}
-	}
-	off += snprintf(out + off, outsz - off, "</svg>");
-}
-
 void lcd_update_mappings(void)
 {
 #ifdef HAVE_SPACELCD
-	char svg[4096];
 	uint8_t *bitmap, *usbdata;
 	int compressed_size;
-
-	build_svg(svg, sizeof svg);
 
 	bitmap = malloc(LCD_BITMAP_BYTES);
 	usbdata = calloc(1, LCD_DEFLATED_MAX + LCD_HEADER_SIZE);
@@ -178,11 +160,7 @@ void lcd_update_mappings(void)
 		return;
 	}
 
-	if(svg_to_rgb565(svg, strlen(svg), bitmap) != 0) {
-		free(bitmap);
-		free(usbdata);
-		return;
-	}
+	render_bitmap(bitmap);
 
 	compressed_size = lcd_compress(bitmap, usbdata + LCD_HEADER_SIZE, LCD_BITMAP_BYTES);
 	free(bitmap);
