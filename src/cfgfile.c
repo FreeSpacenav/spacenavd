@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
+Copyright (C) 2007-2026 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -45,6 +45,8 @@ enum {
 	CFG_AXISMAP_N, CFG_BNMAP_N, CFG_BNACT_N, CFG_KBMAP_N,
 	CFG_LED, CFG_GRAB,
 	CFG_SERIAL, CFG_DEVID,
+
+	CFG_SOCKPATH,
 
 	/* debug options, not part of the protocol, can change at any time */
 	CFG_KBMAP_USE_X11,
@@ -469,6 +471,10 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				continue;
 			}
 
+		} else if(strcmp(key_str, "socket") == 0) {
+			lptr->opt = CFG_SOCKPATH;
+			strncpy(cfg->sockpath, val_str, PATH_MAX - 1);
+
 		} else {
 			logmsg(LOG_WARNING, "unrecognized config option: %s\n", key_str);
 		}
@@ -695,6 +701,12 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		if(cfg->devid[i][0] != -1 && cfg->devid[i][1] != -1) {
 			add_cfgopt_devid(cfg->devid[i][0], cfg->devid[i][1]);
 		}
+	}
+
+	if(cfg->sockpath[0]) {
+		add_cfgopt(CFG_SOCKPATH, 0, "socket = %s", cfg->sockpath);
+	} else {
+		rm_cfgopt("socket", RMCFG_ALL);
 	}
 
 	/* acquire exclusive write lock */

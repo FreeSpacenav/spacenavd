@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
+Copyright (C) 2007-2026 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -62,6 +62,8 @@ struct cfg {
 
 	char *devname[MAX_CUSTOM];	/* custom USB device name list */
 	int devid[MAX_CUSTOM][2];	/* custom USB vendor/product id list */
+
+	char sockpath[PATH_MAX];
 
 	/* debug options, might change at any time */
 	int kbemu_use_x11;			/* force X11 for kbemu, instead of uinput */
