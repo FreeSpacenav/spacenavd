@@ -153,7 +153,7 @@ void init_devices_serial(void)
 			ev.dev.op = DEV_ADD;
 			ev.dev.id = dev->id;
 			ev.dev.devtype = dev->type;
-			broadcast_event(&ev);
+			broadcast_event(NULL, &ev);
 		}
 	}
 }
@@ -218,7 +218,7 @@ int init_devices_usb(void)
 				ev.dev.devtype = dev->type;
 				ev.dev.usbid[0] = dev->usbid[0];
 				ev.dev.usbid[1] = dev->usbid[1];
-				broadcast_event(&ev);
+				broadcast_event(NULL, &ev);
 				break;
 			}
 		}
@@ -292,7 +292,7 @@ void remove_device(struct device *dev)
 	ev.dev.devtype = dev->type;
 	ev.dev.usbid[0] = dev->usbid[0];
 	ev.dev.usbid[1] = dev->usbid[1];
-	broadcast_event(&ev);
+	broadcast_event(NULL, &ev);
 
 	free(dev);
 }

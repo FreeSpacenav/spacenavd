@@ -152,6 +152,11 @@ struct device *get_client_device(struct client *client)
 	return client->dev ? client->dev : get_devices();
 }
 
+int is_client_multidev(struct client *client)
+{
+	return 0;
+}
+
 struct client *first_client(void)
 {
 	client_iter = client_list;
