@@ -102,6 +102,10 @@ int in_deadzone(struct device *dev);
 /* dispatches the last event */
 void repeat_last_motion_event(struct device *dev);
 
+int next_button_timeout(struct device *dev, struct timeval *timeout);
+
+void emit_button_timeouts(struct device *dev);
+
 /* broadcasts an event to all clients */
 void broadcast_event(spnav_event *ev);
 

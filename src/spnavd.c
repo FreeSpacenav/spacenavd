@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
+Copyright (C) 2007-2026 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -190,6 +190,7 @@ opt_pidfile:		if(!argv[++i]) {
 		int fd, max_fd = 0;
 		struct client *client_iter;
 		struct device *dev;
+		int repeat_on_timeout = 0;
 
 		FD_ZERO(&rset);
 
@@ -239,17 +240,27 @@ opt_pidfile:		if(!argv[++i]) {
 		if(pfd[0] > max_fd) max_fd = fd;
 
 		do {
-			/* if there is at least one device out of the deadzone and repeat is enabled
-			 * wait for only as long as specified in cfg.repeat_msec
+			struct timeval tv_repeat, tv_button, *timeout = 0;
+
+			repeat_on_timeout = 0;
+			dev = get_devices();
+			if(!next_button_timeout(dev, &tv_button)) {
+				timeout = &tv_button;
+			}
+
+			/* If there is at least one device out of the deadzone and repeat is enabled,
+			 * use the repeat interval unless a button timeout occurs sooner.
 			 */
-			struct timeval tv, *timeout = 0;
 			if(cfg.repeat_msec >= 0) {
-				dev = get_devices();
 				while(dev) {
 					if(is_device_valid(dev) && !in_deadzone(dev)) {
-						tv.tv_sec = cfg.repeat_msec / 1000;
-						tv.tv_usec = cfg.repeat_msec % 1000 * 1000;
-						timeout = &tv;
+						tv_repeat.tv_sec = cfg.repeat_msec / 1000;
+						tv_repeat.tv_usec = cfg.repeat_msec % 1000 * 1000;
+
+						if(!timeout || TIMERCMP(&tv_repeat, <, &tv_button)) {
+							timeout = &tv_repeat;
+							repeat_on_timeout = 1;
+						}
 						break;
 					}
 					dev = dev->next;
@@ -261,7 +272,7 @@ opt_pidfile:		if(!argv[++i]) {
 
 		if(ret > 0) {
 			handle_events(&rset);
-		} else {
+		} else if(repeat_on_timeout) {
 			if(cfg.repeat_msec >= 0) {
 				dev = get_devices();
 				while(dev) {
@@ -272,6 +283,9 @@ opt_pidfile:		if(!argv[++i]) {
 				}
 			}
 		}
+
+		dev = get_devices();
+		emit_button_timeouts(dev);
 	}
 	return 0;	/* unreachable */
 }

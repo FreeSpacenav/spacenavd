@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
+Copyright (C) 2007-2026 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -47,6 +47,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #endif
 
+#define TIMERCMP(a, cmp, b) ((a)->tv_sec == (b)->tv_sec ? \
+		(a)->tv_usec cmp (b)->tv_usec : (a)->tv_sec cmp (b)->tv_sec)
 
 /* defined in cfgfile.c */
 extern struct cfg cfg, prev_cfg;
