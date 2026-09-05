@@ -76,6 +76,17 @@
 #...
 #bnmapN = N  (N < 64)
 
+# Button hold remapping (zero-based)
+#
+#bnhold0 = 0
+#bnhold1 = 1
+#...
+#bnholdN = N  (N < 64)
+
+# Time before hold mapping activates (milliseconds)
+#
+#hold-timeout = 350
+
 # Button action mapping
 # Use the following syntax:
 #    bnactN = <action>
