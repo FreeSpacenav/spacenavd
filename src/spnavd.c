@@ -248,7 +248,7 @@ opt_pidfile:		if(!argv[++i]) {
 				while(dev) {
 					if(is_device_valid(dev) && !in_deadzone(dev)) {
 						tv.tv_sec = cfg.repeat_msec / 1000;
-						tv.tv_usec = cfg.repeat_msec % 1000;
+						tv.tv_usec = cfg.repeat_msec % 1000 * 1000;
 						timeout = &tv;
 						break;
 					}
