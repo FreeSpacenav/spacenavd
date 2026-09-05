@@ -39,3 +39,7 @@ install: $(bin)
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(bin)
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(ctl)
+
+.PHONY: test
+test:
+	cd $(srcdir) && ./tests/run.sh

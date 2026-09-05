@@ -12,11 +12,6 @@ void profile_on_cfg_reload(struct cfg *c);
  */
 int profile_refresh_active(void);
 
-/* Try to match a profile by app_id string (client-reported).
- * Returns 1 if profile changed.
- */
-int profile_match_app_id(const char *app_id);
-
 /* Manually set active profile by index. -1 returns to auto mode.
  * Returns 1 if profile changed, 0 if unchanged, -1 on invalid index.
  */

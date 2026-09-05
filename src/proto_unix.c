@@ -319,9 +319,9 @@ static int handle_request(struct client *c, struct reqresp *req)
 			c->app_id = c->strbuf.buf;
 			c->strbuf.buf = 0;
 			logmsg(LOG_INFO, "client app_id: %s\n", c->app_id);
-			if(profile_match_app_id(c->app_id)) {
-				lcd_update_mappings();
-			}
+			/* Identity is not focus: a background client must not change
+			 * global mappings merely by registering its application ID.
+			 */
 		}
 		break;
 
@@ -670,13 +670,19 @@ static int handle_request(struct client *c, struct reqresp *req)
 					cfgfile);
 			default_cfg(&cfg);
 		}
+		profile_on_cfg_reload(&cfg);
+		profile_refresh_active();
 		cfg_changed();
+		lcd_update_mappings();
 		sendresp(c, req, 0);
 		break;
 
 	case REQ_CFG_RESET:
 		default_cfg(&cfg);
+		profile_on_cfg_reload(&cfg);
+		profile_refresh_active();
 		cfg_changed();
+		lcd_update_mappings();
 		sendresp(c, req, 0);
 		break;
 

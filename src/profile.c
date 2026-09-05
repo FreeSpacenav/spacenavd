@@ -21,6 +21,7 @@ void profile_on_cfg_reload(struct cfg *c)
 	manual_override = 0;
 }
 
+#ifdef USE_X11
 static int match_class(const char *str, const char *match)
 {
 	char buf1[256], buf2[256];
@@ -34,6 +35,8 @@ static int match_class(const char *str, const char *match)
 	buf2[i] = 0;
 	return strstr(buf1, buf2) != NULL;
 }
+
+#endif
 
 static int activate_profile(int new_index)
 {
@@ -51,6 +54,7 @@ static int activate_profile(int new_index)
 	return 0;
 }
 
+#ifdef USE_X11
 static int find_profile(const char *id)
 {
 	int i;
@@ -65,6 +69,8 @@ static int find_profile(const char *id)
 	return -1;
 }
 
+#endif
+
 int profile_refresh_active(void)
 {
 	if(manual_override) return 0;
@@ -76,14 +82,8 @@ int profile_refresh_active(void)
 		return activate_profile(find_profile(cls));
 	}
 #else
-	return 0;
+	return activate_profile(-1);
 #endif
-}
-
-int profile_match_app_id(const char *app_id)
-{
-	if(manual_override) return 0;
-	return activate_profile(find_profile(app_id));
 }
 
 int profile_set_manual(int index)
@@ -94,7 +94,7 @@ int profile_set_manual(int index)
 		/* return to auto mode */
 		manual_override = 0;
 		logmsg(LOG_INFO, "Profile mode: auto\n");
-		return 0;
+		return profile_refresh_active();
 	}
 
 	manual_override = 1;
@@ -110,6 +110,7 @@ const char *profile_get_button_label(int button)
 {
 	if(button < 0 || button >= MAX_BUTTONS) return "";
 	if(cfg.kbmap_count[button] <= 0) return "";
+	if(cfg.kbmap_str[button]) return cfg.kbmap_str[button];
 	if(kbemu_keyname) {
 		const char *nm = kbemu_keyname(cfg.kbmap[button][0]);
 		return nm ? nm : "";

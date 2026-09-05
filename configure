@@ -225,17 +225,17 @@ less reliable (fallback to XSendEvent)."
 	fi
 fi
 
-# Check for SpaceMouse Enterprise LCD support (needs cairo, libusb, zlib)
+# Check for SpaceMouse Enterprise LCD support (needs libusb, zlib)
 if [ "$SPACELCD" = auto ]; then
-	if pkg-config --exists cairo libusb-1.0 zlib 2>/dev/null; then
+	if pkg-config --exists libusb-1.0 zlib 2>/dev/null; then
 		SPACELCD=yes
 	else
 		SPACELCD=no
 	fi
 elif [ "$SPACELCD" = yes ]; then
-	if ! pkg-config --exists cairo libusb-1.0 zlib 2>/dev/null; then
-		echo "WARNING: LCD dependencies not found (cairo, libusb-1.0, zlib), disabling"
-		SPACELCD=no
+	if ! pkg-config --exists libusb-1.0 zlib 2>/dev/null; then
+		echo "ERROR: --enable-spacelcd requires libusb-1.0 and zlib" >&2
+		exit 1
 	fi
 fi
 
@@ -292,8 +292,8 @@ if [ "$X11" = 'yes' ]; then
 fi
 
 if [ "$SPACELCD" = yes ]; then
-	lcd_cflags=`pkg-config --cflags cairo libusb-1.0 zlib`
-	lcd_ldflags=`pkg-config --libs cairo libusb-1.0 zlib`
+	lcd_cflags=`pkg-config --cflags libusb-1.0 zlib`
+	lcd_ldflags=`pkg-config --libs libusb-1.0 zlib`
 	echo "lcd_cflags = $lcd_cflags" >>Makefile
 	echo "lcd_ldflags = $lcd_ldflags" >>Makefile
 fi

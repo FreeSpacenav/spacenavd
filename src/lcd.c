@@ -9,7 +9,7 @@
 
 #ifdef HAVE_SPACELCD
 #include <stdint.h>
-#include <cairo/cairo.h>
+#include "lcd_font.h"
 #include <libusb.h>
 #include <zlib.h>
 
@@ -26,64 +26,63 @@
 #define LCD_USB_PACKET_MAX	64
 #define LCD_USB_TIMEOUT		1000
 
-static void rgb_to_bgr(uint8_t *dst, const uint8_t *src, int size)
+/* Draw directly in the device's little-endian BGR565 format. The fixed
+ * 5x7 font avoids font discovery, allocation and a graphics dependency.
+ * Unsupported UTF-8 sequences are shown as one '?' per character.
+ */
+static void draw_text(uint8_t *buffer, int x, int y, int right,
+        const char *text, unsigned int color, int scale)
 {
-	int i;
-	for(i = 0; i < size; i += 2) {
-		dst[i]     = (src[i + 1] >> 3) | (src[i] & 0xe0);
-		dst[i + 1] = (src[i] << 3) | (src[i + 1] & 0x07);
+	const unsigned char *p = (const unsigned char*)text;
+	int row, col, dx, dy;
+
+	if(right > LCD_WIDTH) right = LCD_WIDTH;
+	while(*p && x + 5 * scale <= right) {
+		unsigned int ch = *p++;
+		if(ch < 32 || ch > 126) {
+			if(ch >= 0xc0) {
+				while((*p & 0xc0) == 0x80) p++;
+			}
+			ch = '?';
+		}
+		for(row = 0; row < 7; row++) {
+			for(col = 0; col < 5; col++) {
+				if(!(lcd_font[ch - 32][row] & (1 << (4 - col)))) continue;
+				for(dy = 0; dy < scale; dy++) {
+					for(dx = 0; dx < scale; dx++) {
+						int px = x + col * scale + dx;
+						int py = y + row * scale + dy;
+						if(px >= 0 && px < right && py >= 0 && py < LCD_HEIGHT) {
+							int offset = (py * LCD_WIDTH + px) * LCD_BPP;
+							buffer[offset] = color & 0xff;
+							buffer[offset + 1] = color >> 8;
+						}
+					}
+				}
+			}
+		}
+		x += 6 * scale;
 	}
 }
 
 static void render_bitmap(uint8_t *buffer)
 {
-	const int cols = 6;
-	const int rows = 2;
-	int btn = 0;
-	int r, c;
-	cairo_surface_t *surface;
-	cairo_t *cr;
+	int button;
 
-	surface = cairo_image_surface_create(CAIRO_FORMAT_RGB16_565, LCD_WIDTH, LCD_HEIGHT);
-	cr = cairo_create(surface);
+	memset(buffer, 0, LCD_BITMAP_BYTES);
+	draw_text(buffer, 10, 6, LCD_WIDTH - 10, profile_get_name(), 0xffff, 2);
+	for(button = 0; button < 12; button++) {
+		const char *label = profile_get_button_label(button);
+		int x = 10 + (button % 6) * (LCD_WIDTH / 6);
+		int y = 36 + (button / 6) * 45;
+		char number[8];
 
-	/* black background */
-	cairo_set_source_rgb(cr, 0, 0, 0);
-	cairo_paint(cr);
-
-	/* profile name */
-	cairo_select_font_face(cr, "sans-serif", CAIRO_FONT_SLANT_NORMAL, CAIRO_FONT_WEIGHT_BOLD);
-	cairo_set_font_size(cr, 18);
-	cairo_set_source_rgb(cr, 1, 1, 1);
-	cairo_move_to(cr, 10, 20);
-	cairo_show_text(cr, profile_get_name());
-
-	/* button labels */
-	cairo_set_font_size(cr, 16);
-	for(r = 0; r < rows; r++) {
-		for(c = 0; c < cols; c++, btn++) {
-			const char *lbl = profile_get_button_label(btn);
-			int x = 10 + c * (LCD_WIDTH / cols);
-			int y = 50 + r * 45;
-			char text[64];
-
-			if(lbl[0]) {
-				cairo_set_source_rgb(cr, 0, 1, 1);	/* cyan */
-				snprintf(text, sizeof text, "%d: %s", btn + 1, lbl);
-			} else {
-				cairo_set_source_rgb(cr, 0.33, 0.33, 0.33);	/* #555 */
-				snprintf(text, sizeof text, "%d: None", btn + 1);
-			}
-			cairo_move_to(cr, x, y);
-			cairo_show_text(cr, text);
-		}
+		/* Separate the button number from its label to leave more room. */
+		snprintf(number, sizeof number, "%d", button + 1);
+		draw_text(buffer, x, y, x + 96, number, 0xffff, 1);
+		draw_text(buffer, x, y + 11, x + 96, *label ? label : "None",
+				*label ? 0xffe0 : 0x52aa, strlen(label) > 8 ? 1 : 2);
 	}
-
-	cairo_surface_flush(surface);
-	rgb_to_bgr(buffer, cairo_image_surface_get_data(surface), LCD_BITMAP_BYTES);
-
-	cairo_destroy(cr);
-	cairo_surface_destroy(surface);
 }
 
 static int lcd_compress(const uint8_t *src, uint8_t *dst, int srclen)
@@ -97,7 +96,9 @@ static int lcd_compress(const uint8_t *src, uint8_t *dst, int srclen)
 	stream.avail_out = LCD_DEFLATED_MAX;
 	stream.next_out = dst;
 
-	deflateInit2(&stream, -1, Z_DEFLATED, -15, 9, Z_FIXED);
+	if(deflateInit2(&stream, -1, Z_DEFLATED, -15, 9, Z_FIXED) != Z_OK) {
+		return -1;
+	}
 	result = deflate(&stream, Z_FINISH);
 	outsize = LCD_DEFLATED_MAX - stream.avail_out;
 	deflateEnd(&stream);
@@ -105,42 +106,89 @@ static int lcd_compress(const uint8_t *src, uint8_t *dst, int srclen)
 	return (result == Z_STREAM_END) ? outsize : -1;
 }
 
+/* Find the non-HID interface containing the LCD bulk OUT endpoint.
+ * Only alternate setting zero is supported; never reconfigure the device
+ * or detach its input driver just to update the display.
+ */
+static int lcd_usb_interface(libusb_device_handle *handle)
+{
+	struct libusb_config_descriptor *config;
+	int i, j, k, interface = -1;
+	int rc = libusb_get_active_config_descriptor(libusb_get_device(handle), &config);
+
+	if(rc < 0) {
+		logmsg(LOG_WARNING, "lcd: cannot read USB configuration: %s\n", libusb_strerror(rc));
+		return -1;
+	}
+	for(i = 0; i < config->bNumInterfaces && interface < 0; i++) {
+		const struct libusb_interface *iface = config->interface + i;
+		for(j = 0; j < iface->num_altsetting && interface < 0; j++) {
+			const struct libusb_interface_descriptor *alt = iface->altsetting + j;
+			if(alt->bAlternateSetting || alt->bInterfaceClass == LIBUSB_CLASS_HID) continue;
+			for(k = 0; k < alt->bNumEndpoints; k++) {
+				const struct libusb_endpoint_descriptor *ep = alt->endpoint + k;
+				if(ep->bEndpointAddress == 0x01 &&
+						(ep->bmAttributes & LIBUSB_TRANSFER_TYPE_MASK) == LIBUSB_TRANSFER_TYPE_BULK) {
+					interface = alt->bInterfaceNumber;
+					break;
+				}
+			}
+		}
+	}
+	libusb_free_config_descriptor(config);
+	return interface;
+}
+
 static int lcd_usb_send(uint8_t *data, int size)
 {
+	libusb_context *context;
 	libusb_device_handle *handle;
-	int transferred, i, rc;
+	int transferred, interface, rc, result = -1;
 
-	rc = libusb_init(NULL);
+	rc = libusb_init(&context);
 	if(rc < 0) {
 		logmsg(LOG_WARNING, "lcd: libusb_init failed: %s\n", libusb_strerror(rc));
 		return -1;
 	}
-
-	handle = libusb_open_device_with_vid_pid(NULL, LCD_USB_VENDOR, LCD_USB_PRODUCT);
+	handle = libusb_open_device_with_vid_pid(context, LCD_USB_VENDOR, LCD_USB_PRODUCT);
 	if(!handle) {
-		libusb_exit(NULL);
-		return -1;	/* device not present, not an error worth logging */
+		libusb_exit(context);
+		return -1;	/* Device absent or inaccessible. */
 	}
-
-	libusb_set_auto_detach_kernel_driver(handle, 1);
-	for(i = 0; i < 2; i++) {
-		libusb_claim_interface(handle, i);
-		libusb_reset_device(handle);
+	interface = lcd_usb_interface(handle);
+	if(interface < 0) {
+		logmsg(LOG_WARNING, "lcd: no supported LCD interface found\n");
+		goto close;
+	}
+	rc = libusb_claim_interface(handle, interface);
+	if(rc < 0) {
+		logmsg(LOG_WARNING, "lcd: cannot claim interface %d: %s\n", interface, libusb_strerror(rc));
+		goto close;
 	}
 
 	while(size > 0) {
 		int chunk = size > LCD_USB_PACKET_MAX ? LCD_USB_PACKET_MAX : size;
-		libusb_bulk_transfer(handle, 0x01, data, chunk, &transferred, LCD_USB_TIMEOUT);
+		transferred = 0;
+		rc = libusb_bulk_transfer(handle, 0x01, data, chunk, &transferred, LCD_USB_TIMEOUT);
+		if(rc < 0 || transferred <= 0 || transferred > chunk) {
+			logmsg(LOG_WARNING, "lcd: USB transfer failed (%s, %d/%d bytes)\n",
+					rc < 0 ? libusb_strerror(rc) : "invalid transfer length", transferred, chunk);
+			goto release;
+		}
 		data += transferred;
 		size -= transferred;
 	}
-
-	for(i = 0; i < 2; i++) {
-		libusb_release_interface(handle, i);
+	result = 0;
+release:
+	rc = libusb_release_interface(handle, interface);
+	if(rc < 0) {
+		logmsg(LOG_WARNING, "lcd: cannot release interface %d: %s\n", interface, libusb_strerror(rc));
+		result = -1;
 	}
+close:
 	libusb_close(handle);
-	libusb_exit(NULL);
-	return 0;
+	libusb_exit(context);
+	return result;
 }
 #endif	/* HAVE_SPACELCD */
 
