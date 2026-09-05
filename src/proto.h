@@ -94,6 +94,8 @@ enum {
 	REQ_GCFG_SERDEV,		/* get serial device path:	R[0-5] next 24 bytes R[6] remaining length or -1 for failure */
 	REQ_SCFG_REPEAT,		/* set repeat interval:		Q[0] interval (msec) - R[6] status */
 	REQ_GCFG_REPEAT,		/* get repeat interval:		R[0] interval (msec) R[6] status */
+	REQ_SCFG_SOCKET,		/* set socket path:			Q[0-5] next 24 bytes Q[6] remaining length - R[6] status */
+	REQ_GCFG_SOCKET,		/* get socket path:			R[0-5] next 24 bytes R[6] remaining length or -1 for failure */
 	/* TODO ... more */
 	REQ_CFG_SAVE = 0x3ffe,	/* save config file:        R[6] status */
 	REQ_CFG_RESTORE,		/* load config from file:   R[6] status */
@@ -186,7 +188,9 @@ const char *spnav_reqnames_3000[] = {
 	"SCFG_SERDEV",
 	"GCFG_SERDEV",
 	"SCFG_REPEAT",
-	"GCFG_REPEAT"
+	"GCFG_REPEAT",
+	"SCFG_SOCKET",
+	"GCFG_SOCKET"
 };
 
 const int spnav_reqnames_1000_size = sizeof spnav_reqnames_1000 / sizeof *spnav_reqnames_1000;

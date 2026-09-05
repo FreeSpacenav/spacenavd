@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
+Copyright (C) 2007-2026 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 
 static int lsock = -1;
+static char *sockpath;
 
 
 static int handle_request(struct client *c, struct reqresp *req);
@@ -54,6 +55,8 @@ int init_unix(void)
 
 	if(lsock >= 0) return 0;
 
+	sockpath = cfg.sockpath[0] ? cfg.sockpath : SOCK_NAME;
+
 	if((s = socket(PF_UNIX, SOCK_STREAM, 0)) == -1) {
 		logmsg(LOG_ERR, "failed to create socket: %s\n", strerror(errno));
 		return -1;
@@ -63,12 +66,12 @@ int init_unix(void)
 
 	memset(&addr, 0, sizeof addr);
 	addr.sun_family = AF_UNIX;
-	strcpy(addr.sun_path, SOCK_NAME);
+	strcpy(addr.sun_path, sockpath);
 
 	prev_umask = umask(0);
 
 	if(bind(s, (struct sockaddr*)&addr, sizeof addr) == -1) {
-		logmsg(LOG_ERR, "failed to bind unix socket: %s: %s\n", SOCK_NAME, strerror(errno));
+		logmsg(LOG_ERR, "failed to bind unix socket: %s: %s\n", sockpath, strerror(errno));
 		close(s);
 		return -1;
 	}
@@ -78,9 +81,11 @@ int init_unix(void)
 	if(listen(s, 8) == -1) {
 		logmsg(LOG_ERR, "listen failed: %s\n", strerror(errno));
 		close(s);
-		unlink(SOCK_NAME);
+		unlink(sockpath);
 		return -1;
 	}
+
+	logmsg(LOG_INFO, "socket path: %s\n", sockpath);
 
 	lsock = s;
 	return 0;
@@ -92,7 +97,7 @@ void close_unix(void)
 		close(lsock);
 		lsock = -1;
 
-		unlink(SOCK_NAME);
+		unlink(sockpath);
 	}
 }
 
@@ -658,6 +663,22 @@ static int handle_request(struct client *c, struct reqresp *req)
 	case REQ_GCFG_REPEAT:
 		req->data[0] = cfg.repeat_msec;
 		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_SOCKET:
+		if((res = spnav_recv_str(&c->strbuf, req)) == -1) {
+			logmsg(LOG_ERR, "SCFG_SOCKET: failed to receive string\n");
+			break;
+		}
+		if(res) {
+			strncpy(cfg.sockpath, c->strbuf.buf, sizeof cfg.sockpath - 1);
+			cfg.sockpath[sizeof cfg.sockpath - 1] = 0;
+			cfg_changed();
+		}
+		break;
+
+	case REQ_GCFG_SOCKET:
+		spnav_send_str(c->sock, req->type, cfg.sockpath);
 		break;
 
 	case REQ_CFG_SAVE:

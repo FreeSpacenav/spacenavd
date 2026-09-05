@@ -1,6 +1,6 @@
 /*
 spacenavd - a free software replacement driver for 6dof space-mice.
-Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
+Copyright (C) 2007-2026 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software: you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
@@ -48,6 +48,8 @@ enum {
 	CFG_AXISMAP_N, CFG_BNMAP_N, CFG_BNACT_N, CFG_KBMAP_N,
 	CFG_LED, CFG_GRAB,
 	CFG_SERIAL, CFG_DEVID,
+
+	CFG_SOCKPATH,
 
 	/* debug options, not part of the protocol, can change at any time */
 	CFG_KBMAP_USE_X11,
@@ -111,7 +113,7 @@ void default_cfg(struct cfg *cfg)
 	cfg->grab_device = 1;
 	cfg->kbemu_use_x11 = 0;  /* default to uinput when available */
 
-	for(i=0; i<6; i++) {
+	for(i=0; i<MAX_AXES; i++) {
 		cfg->map_axis[i] = i;
 	}
 
@@ -557,6 +559,10 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				continue;
 			}
 
+		} else if(strcmp(key_str, "socket") == 0) {
+			lptr->opt = CFG_SOCKPATH;
+			strncpy(cfg->sockpath, val_str, PATH_MAX - 1);
+
 		} else {
 			logmsg(LOG_WARNING, "unrecognized config option: %s\n", key_str);
 		}
@@ -606,6 +612,8 @@ int write_cfg(const char *fname, struct cfg *cfg)
 
 	if(cfg->sensitivity != def.sensitivity) {
 		add_cfgopt(CFG_SENS, 0, "sensitivity = %.3f", cfg->sensitivity);
+	} else {
+		rm_cfgopt("sensitivity", RMCFG_ALL);
 	}
 
 	if(cfg->sens_trans[0] == cfg->sens_trans[1] && cfg->sens_trans[1] == cfg->sens_trans[2]) {
@@ -729,6 +737,15 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		rm_cfgopt("swap-yz", RMCFG_ALL);
 	}
 
+	for(i=0; i<MAX_AXES; i++) {
+		if(cfg->map_axis[i] != i) {
+			add_cfgopt(CFG_AXISMAP_N, i, "axismap%d = %d", i, cfg->map_axis[i]);
+		} else {
+			sprintf(buf, "axismap%d", i);
+			rm_cfgopt(buf, RMCFG_ALL);
+		}
+	}
+
 	for(i=0; i<MAX_BUTTONS; i++) {
 		if(cfg->map_button[i] != i) {
 			add_cfgopt(CFG_BNMAP_N, i, "bnmap%d = %d", i, cfg->map_button[i]);
@@ -778,6 +795,12 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		if(cfg->devid[i][0] != -1 && cfg->devid[i][1] != -1) {
 			add_cfgopt_devid(cfg->devid[i][0], cfg->devid[i][1]);
 		}
+	}
+
+	if(cfg->sockpath[0]) {
+		add_cfgopt(CFG_SOCKPATH, 0, "socket = %s", cfg->sockpath);
+	} else {
+		rm_cfgopt("socket", RMCFG_ALL);
 	}
 
 	/* acquire exclusive write lock */

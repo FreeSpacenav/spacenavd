@@ -5,5 +5,137 @@ Description=3Dconnexion Input Devices Userspace Driver
 Type=exec
 ExecStart=/usr/local/bin/spacenavd -d -l /dev/stdout -p /dev/null
 
+# ── Filesystem sandboxing ────────────────────────────────────────────────────
+# Make /usr, /boot, /efi, and /etc read-only for this service.
+# "strict" also covers /etc
+ProtectSystem=strict
+
+# spacenavd both reads AND writes /etc/spnavrc.
+# The daemon can persist configuration changes back to this file via the
+# spnav_cfg_save command (sent by spnavcfg or any libspnav client calling
+# spnav_cfg_save()).  ProtectSystem=strict makes /etc read-only, so we must
+# punch a writable bind-mount specifically for this file.
+ReadWritePaths=/etc/spnavrc
+
+# The daemon writes its UNIX socket to /run/spnav.sock by default
+# (older builds used /var/run/spnav.sock → /run/spnav.sock via symlink).
+# RuntimeDirectory creates /run/spacenavd/ and grants rw access.
+RuntimeDirectory=spacenavd
+RuntimeDirectoryMode=0755
+
+# If you use the log-file path instead of /dev/stdout, add:
+# LogsDirectory=spacenavd
+# ReadWritePaths=/var/log/spnavd.log
+
+# Hide /home, /root, /run/user from the daemon entirely.
+ProtectHome=yes
+
+# Give the daemon its own private /tmp and /var/tmp.
+PrivateTmp=yes
+
+# ── Device access ────────────────────────────────────────────────────────────
+# PrivateDevices=yes would replace /dev with a minimal set (null, zero, random,
+# urandom, tty, pts) and BLOCK all real hardware — this BREAKS spacenavd
+# because it must open /dev/input/eventN nodes directly.
+# Instead, keep real /dev visible but restrict with DevicePolicy.
+#
+# DevicePolicy=closed  →  deny everything except an explicit DeviceAllow list.
+DevicePolicy=closed
+
+# Allow read+write on evdev character devices (spacenavd opens eventN r/w to
+# grab exclusive access via EVIOCGRAB ioctl).
+DeviceAllow=char-input rw
+
+# spacenavd also opens /dev/uinput to create a virtual input device for
+# injecting synthetic events (e.g. button-to-keystroke mappings).
+# /dev/uinput is a misc character device, not in the char-input class.
+DeviceAllow=/dev/uinput rw
+
+# Required pseudo-devices for logging to /dev/stdout and general libc use.
+DeviceAllow=/dev/null  rw
+DeviceAllow=/dev/zero  r
+DeviceAllow=/dev/urandom r
+DeviceAllow=/dev/random  r
+
+# ── Kernel / capability hardening ────────────────────────────────────────────
+# Prevent the process from loading or reading kernel modules.
+ProtectKernelModules=yes
+
+# Make /proc/sys, /sys, and similar tunables read-only.
+ProtectKernelTunables=yes
+
+# Protect kernel ring buffer from reads (/dev/kmsg, syslog(2)).
+ProtectKernelLogs=yes
+
+# Prevent writing to the hardware clock.
+ProtectClock=yes
+
+# Prevent the daemon from escaping its cgroup.
+ProtectControlGroups=yes
+
+# Hide other processes' /proc entries (requires kernel ≥ 5.8).
+ProtectProc=invisible
+
+# Only expose /proc entries belonging to this service's own PID namespace.
+ProcSubset=pid
+
+# ── Privilege restrictions ───────────────────────────────────────────────────
+# spacenavd starts as root in order to open /dev/input/eventN (requires
+# CAP_DAC_OVERRIDE if the device node is root-only, or membership in the
+# 'input' group).  If you add the 'spacenavd' user to the 'input' group and
+# run the service as that user, you can drop almost all capabilities.
+#
+# For a root-run service, strip everything except what is actually needed:
+#   CAP_DAC_OVERRIDE  – open /dev/input/eventN nodes owned by root
+#   CAP_SYS_RESOURCE  – raise RLIMIT_NOFILE if needed (optional; safe to drop)
+#
+# Conservative bounding set (keeps only device-open capability):
+CapabilityBoundingSet=CAP_DAC_OVERRIDE CAP_SYS_RESOURCE
+
+# No ambient caps needed (process is already root).
+AmbientCapabilities=
+
+# Prevent child processes from gaining new privileges via setuid / capabilities.
+NoNewPrivileges=yes
+
+# Prevent SUID/SGID bits from taking effect.
+RestrictSUIDSGID=yes
+
+# ── Namespace / address-family restrictions ──────────────────────────────────
+# spacenavd uses:
+#   AF_UNIX    – UNIX domain socket /run/spnav.sock (native libspnav protocol)
+#                and X11 display socket (if built with X11 support)
+#   AF_NETLINK – kernel netlink socket for udev/hotplug device change events
+#                (NETLINK_KOBJECT_UEVENT); without this the daemon logs
+#                "failed to open hotplug netlink socket: Address family not
+#                supported by protocol" and hot-plug/unplug won't be detected.
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+
+# Lock personality to the native ABI; prevents switching to e.g. PER_LINUX32.
+LockPersonality=yes
+
+# Disable real-time scheduling (spacenavd doesn't need it).
+RestrictRealtime=yes
+
+# Prevent creation of writable+executable memory mappings (JIT mitigation).
+# Comment this out if you observe crashes — some libX11/libXext versions use
+# trampolines that require W+X pages.
+MemoryDenyWriteExecute=yes
+
+# Restrict namespace creation (prevents container escape primitives).
+RestrictNamespaces=yes
+
+# ── Syscall filtering ────────────────────────────────────────────────────────
+# @system-service covers the syscalls needed by nearly all well-behaved daemons.
+# Explicitly add ioctl (required for EVIOCGRAB and EVIOCGNAME on eventN).
+SystemCallFilter=@system-service ioctl
+SystemCallFilter=~@clock @cpu-emulation @debug @module @mount @obsolete @privileged @raw-io @reboot @swap
+SystemCallArchitectures=native
+SystemCallErrorNumber=EPERM
+
+# ── Resource limits ──────────────────────────────────────────────────────────
+# spacenavd keeps one fd per connected device plus a few sockets — 256 is ample.
+LimitNOFILE=256
+
 [Install]
 WantedBy=graphical.target
