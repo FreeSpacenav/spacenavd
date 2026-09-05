@@ -51,7 +51,7 @@ struct dev_event {
 static struct dev_event *add_dev_event(struct device *dev);
 static struct dev_event *device_event_in_use(struct device *dev);
 static void handle_button_action(int act, int val);
-static void dispatch_event(struct dev_event *dev);
+static void dispatch_event(struct device *dev, spnav_event *ev);
 static void send_event(spnav_event *ev, struct client *c);
 static unsigned int msec_dif(struct timeval tv1, struct timeval tv2);
 
@@ -142,6 +142,15 @@ static INLINE int map_axis(int devaxis)
 	return axis;
 }
 
+static void update_motion_period(struct dev_event *dev_ev)
+{
+	struct timeval now;
+	gettimeofday(&now, 0);
+
+	dev_ev->event.motion.period = msec_dif(now, dev_ev->timeval);
+	dev_ev->timeval = now;
+}
+
 /* process_input processes an device input event, and dispatches
  * spacenav events to the clients by calling dispatch_event.
  * relative inputs (INP_MOTION) are accumulated, and dispatched when
@@ -229,34 +238,26 @@ void process_input(struct device *dev, struct dev_input *inp)
 
 		dev_ev = device_event_in_use(dev);
 		if(dev_ev && dev_ev->pending) {
-			dispatch_event(dev_ev);
+			update_motion_period(dev_ev);
+			dispatch_event(dev_ev->dev, &dev_ev->event);
 			dev_ev->pending = 0;
 		}
 		inp->idx = cfg.map_button[inp->idx];
 
 		/* button events are not queued */
 		{
-			struct dev_event dev_button_event;
-			dev_button_event.dev = dev;
-			dev_button_event.event.type = EVENT_BUTTON;
-			dev_button_event.event.button.press = inp->val;
-			dev_button_event.event.button.bnum = inp->idx;
-			dispatch_event(&dev_button_event);
+			ev.type = EVENT_BUTTON;
+			ev.button.press = inp->val;
+			ev.button.bnum = inp->idx;
+			dispatch_event(dev, &ev);
 		}
-
-		/* to have them replace motion events in the queue uncomment next section */
-		/* dev_ev = add_dev_event(dev);
-		 * dev_ev->event.type = EVENT_BUTTON;
-		 * dev_ev->event.button.press = inp->val;
-		 * dev_ev->event.button.bnum = inp->idx;
-		 * dispatch_event(dev_ev);
-		 */
 		break;
 
 	case INP_FLUSH:
 		dev_ev = device_event_in_use(dev);
 		if(dev_ev && dev_ev->pending) {
-			dispatch_event(dev_ev);
+			update_motion_period(dev_ev);
+			dispatch_event(dev, &dev_ev->event);
 			dev_ev->pending = 0;
 		}
 		break;
@@ -314,26 +315,21 @@ int in_deadzone(struct device *dev)
 	return 1;
 }
 
-void repeat_last_event(struct device *dev)
+void repeat_last_motion_event(struct device *dev)
 {
 	struct dev_event *dev_ev;
+
 	if((dev_ev = device_event_in_use(dev)) == NULL)
 		return;
-	dispatch_event(dev_ev);
+
+	update_motion_period(dev_ev);
+	dispatch_event(dev, &dev_ev->event);
 }
 
-static void dispatch_event(struct dev_event *dev_ev)
+static void dispatch_event(struct device *dev, spnav_event *ev)
 {
 	struct client *c, *client_iter;
 	struct device *client_dev;
-
-	if(dev_ev->event.type == EVENT_MOTION) {
-		struct timeval tv;
-		gettimeofday(&tv, 0);
-
-		dev_ev->event.motion.period = msec_dif(tv, dev_ev->timeval);
-		dev_ev->timeval = tv;
-	}
 
 	client_iter = first_client();
 	while(client_iter) {
@@ -344,8 +340,8 @@ static void dispatch_event(struct dev_event *dev_ev)
 		 * don't send the event if it originates from a different device
 		 */
 		client_dev = get_client_device(c);
-		if(!client_dev || client_dev == dev_ev->dev) {
-			send_event(&dev_ev->event, c);
+		if(!client_dev || client_dev == dev) {
+			send_event(ev, c);
 		}
 	}
 }

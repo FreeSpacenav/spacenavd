@@ -266,7 +266,7 @@ opt_pidfile:		if(!argv[++i]) {
 				dev = get_devices();
 				while(dev) {
 					if(!in_deadzone(dev)) {
-						repeat_last_event(dev);
+						repeat_last_motion_event(dev);
 					}
 					dev = dev->next;
 				}

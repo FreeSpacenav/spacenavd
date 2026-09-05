@@ -100,7 +100,7 @@ void process_input(struct device *dev, struct dev_input *inp);
 int in_deadzone(struct device *dev);
 
 /* dispatches the last event */
-void repeat_last_event(struct device *dev);
+void repeat_last_motion_event(struct device *dev);
 
 /* broadcasts an event to all clients */
 void broadcast_event(spnav_event *ev);
