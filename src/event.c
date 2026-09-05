@@ -46,6 +46,7 @@ struct dev_event {
 	struct device *dev;
 	int pending;
 	struct dev_event *next;
+	struct timeval hold_timeouts[MAX_BUTTONS];
 };
 
 static struct dev_event *add_dev_event(struct device *dev);
@@ -64,15 +65,12 @@ static int cur_axis_mag[6], cur_dom_axis;
 static struct dev_event *add_dev_event(struct device *dev)
 {
 	struct dev_event *dev_ev, *iter;
-	int i;
 
-	if((dev_ev = malloc(sizeof *dev_ev)) == NULL) {
+	if((dev_ev = calloc(1, sizeof *dev_ev)) == NULL) {
 		return NULL;
 	}
 
 	dev_ev->event.motion.data = (int*)&dev_ev->event.motion.x;
-	for(i=0; i<6; i++)
-		dev_ev->event.motion.data[i] = 0;
 	gettimeofday(&dev_ev->timeval, 0);
 	dev_ev->dev = dev;
 	dev_ev->next = NULL;
@@ -151,6 +149,44 @@ static void update_motion_period(struct dev_event *dev_ev)
 	dev_ev->timeval = now;
 }
 
+static void emit_button(struct device *dev, int idx, int val, int hold)
+{
+	spnav_event ev;
+
+	/* check to see if the button has been bound to an action */
+	if(cfg.bnact[idx] > 0) {
+		handle_button_action(cfg.bnact[idx], val);
+		return;
+	}
+
+	/* check to see if we must emulate a keyboard event instead of a
+	 * regular button event for this button
+	 */
+	if(cfg.kbmap_count[idx] == 1) {
+		/* single key */
+		unsigned int key = cfg.kbmap[idx][0];
+		kbemu_send_key(key, val);
+		return;
+	}
+
+	if(cfg.kbmap_count[idx] > 1) {
+		/* multi-key combo */
+		unsigned int *keys = cfg.kbmap[idx];
+		kbemu_send_combo(keys, cfg.kbmap_count[idx], val);
+		return;
+	}
+
+	if (hold)
+		idx = cfg.map_hold[idx];
+	else
+		idx = cfg.map_button[idx];
+
+	ev.button.type = EVENT_BUTTON;
+	ev.button.bnum = idx;
+	ev.button.press = val;
+	dispatch_event(dev, &ev);
+}
+
 /* process_input processes an device input event, and dispatches
  * spacenav events to the clients by calling dispatch_event.
  * relative inputs (INP_MOTION) are accumulated, and dispatched when
@@ -163,6 +199,15 @@ void process_input(struct device *dev, struct dev_input *inp)
 	struct dev_event *dev_ev;
 	float sens_rot, sens_trans, axis_sens;
 	spnav_event ev;
+	struct timeval now, *timeout;
+
+	dev_ev = device_event_in_use(dev);
+	if(verbose && dev_ev == NULL)
+		logmsg(LOG_INFO, "adding dev event for device: %s\n", dev->path);
+	if(dev_ev == NULL && (dev_ev = add_dev_event(dev)) == NULL) {
+		logmsg(LOG_ERR, "failed to get dev_event\n");
+		return;
+	}
 
 	switch(inp->type) {
 	case INP_MOTION:
@@ -195,13 +240,6 @@ void process_input(struct device *dev, struct dev_input *inp)
 		}
 		inp->val = (int)((float)inp->val * cfg.sensitivity * axis_sens);
 
-		dev_ev = device_event_in_use(dev);
-		if(verbose && dev_ev == NULL)
-			logmsg(LOG_INFO, "adding dev event for device: %s\n", dev->path);
-		if(dev_ev == NULL && (dev_ev = add_dev_event(dev)) == NULL) {
-			logmsg(LOG_ERR, "failed to get dev_event\n");
-			break;
-		}
 		dev_ev->event.type = EVENT_MOTION;
 		dev_ev->event.motion.data = (int*)&dev_ev->event.motion.x;
 		dev_ev->event.motion.data[axis] = sign * inp->val;
@@ -214,42 +252,40 @@ void process_input(struct device *dev, struct dev_input *inp)
 		ev.button.bnum = inp->idx;
 		broadcast_event(&ev);
 
-		/* check to see if the button has been bound to an action */
-		if(cfg.bnact[inp->idx] > 0) {
-			handle_button_action(cfg.bnact[inp->idx], inp->val);
-			break;
-		}
-
-		/* check to see if we must emulate a keyboard event instead of a
-		 * regular button event for this button
-		 */
-		if(cfg.kbmap_count[inp->idx] == 1) {
-			/* single key */
-			unsigned int key = cfg.kbmap[inp->idx][0];
-			kbemu_send_key(key, inp->val);
-			break;
-		}
-		if(cfg.kbmap_count[inp->idx] > 1) {
-			/* multi-key combo */
-			unsigned int *keys = cfg.kbmap[inp->idx];
-			kbemu_send_combo(keys, cfg.kbmap_count[inp->idx], inp->val);
-			break;
-		}
-
-		dev_ev = device_event_in_use(dev);
 		if(dev_ev && dev_ev->pending) {
 			update_motion_period(dev_ev);
 			dispatch_event(dev_ev->dev, &dev_ev->event);
 			dev_ev->pending = 0;
 		}
-		inp->idx = cfg.map_button[inp->idx];
 
-		/* button events are not queued */
-		{
-			ev.type = EVENT_BUTTON;
-			ev.button.press = inp->val;
-			ev.button.bnum = inp->idx;
-			dispatch_event(dev, &ev);
+		if (cfg.map_hold[inp->idx] == -1) {
+			emit_button(dev_ev->dev, inp->idx, inp->val, 0);
+			break;
+		}
+
+		gettimeofday(&now, NULL);
+		if (inp->val) {
+			dev_ev->hold_timeouts[inp->idx] = now;
+			timeout = &dev_ev->hold_timeouts[inp->idx];
+
+			timeout->tv_sec += cfg.hold_timeout / 1000;
+			timeout->tv_usec += cfg.hold_timeout % 1000 * 1000;
+
+			timeout->tv_sec += timeout->tv_usec / 1000000;
+			timeout->tv_usec = timeout->tv_usec % 1000000;
+		} else if (dev_ev->hold_timeouts[inp->idx].tv_sec ||
+			   dev_ev->hold_timeouts[inp->idx].tv_usec) {
+			int hold = 0;
+
+			timeout = &dev_ev->hold_timeouts[inp->idx];
+			if (TIMERCMP(timeout, <=, &now))
+				hold = 1;
+
+			emit_button(dev_ev->dev, inp->idx, 1, hold);
+			emit_button(dev_ev->dev, inp->idx, 0, hold);
+
+			timeout->tv_sec = 0;
+			timeout->tv_usec = 0;
 		}
 		break;
 
@@ -324,6 +360,86 @@ void repeat_last_motion_event(struct device *dev)
 
 	update_motion_period(dev_ev);
 	dispatch_event(dev, &dev_ev->event);
+}
+
+int next_button_timeout(struct device *head, struct timeval *timeout)
+{
+	struct dev_event *dev_ev;
+	struct timeval now, diff, *min = NULL;
+
+	while (head) {
+		unsigned int i;
+
+		if (!is_device_valid(head))
+			goto next;
+
+		dev_ev = device_event_in_use(head);
+		if (!dev_ev)
+			goto next;
+
+		for (i = 0; i < MAX_BUTTONS; i++) {
+			struct timeval *timeout = &dev_ev->hold_timeouts[i];
+
+			if (!timeout->tv_sec && !timeout->tv_usec)
+				continue;
+
+			if (!min || TIMERCMP(timeout, <, min))
+				min = timeout;
+		}
+
+next:
+		head = head->next;
+	}
+
+	if (!min)
+		return 1;
+
+	gettimeofday(&now, 0);
+	diff.tv_sec = min->tv_sec - now.tv_sec;
+	diff.tv_usec = min->tv_usec - now.tv_usec;
+	if (diff.tv_usec < 0) {
+		diff.tv_sec--;
+		diff.tv_usec += 1000000;
+	}
+	if (diff.tv_sec < 0) {
+		diff.tv_sec = 0;
+		diff.tv_usec = 0;
+	}
+
+	*timeout = diff;
+	return 0;
+}
+
+void emit_button_timeouts(struct device *head)
+{
+	struct dev_event *dev_ev;
+	struct timeval now;
+	unsigned int i;
+
+	gettimeofday(&now, 0);
+	while (head) {
+		dev_ev = device_event_in_use(head);
+		if (!dev_ev)
+			goto next;
+
+		for (i = 0; i < MAX_BUTTONS; i++) {
+			struct timeval *timeout = &dev_ev->hold_timeouts[i];
+
+			if (!timeout->tv_sec && !timeout->tv_usec)
+				continue;
+
+			if (TIMERCMP(timeout, <=, &now)) {
+				emit_button(dev_ev->dev, i, 1, 1);
+				emit_button(dev_ev->dev, i, 0, 1);
+
+				timeout->tv_sec = 0;
+				timeout->tv_usec = 0;
+			}
+		}
+
+next:
+		head = head->next;
+	}
 }
 
 static void dispatch_event(struct device *dev, spnav_event *ev)

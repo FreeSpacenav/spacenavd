@@ -34,7 +34,7 @@ struct cfg cfg, prev_cfg;
 
 /* all parsable config options... some of them might map to the same cfg field */
 enum {
-	CFG_REPEAT,
+	CFG_REPEAT, CFG_HOLD,
 	CFG_DEADZONE, CFG_DEADZONE_N,
 	CFG_DEADZONE_TX, CFG_DEADZONE_TY, CFG_DEADZONE_TZ,
 	CFG_DEADZONE_RX, CFG_DEADZONE_RY, CFG_DEADZONE_RZ,
@@ -42,7 +42,7 @@ enum {
 	CFG_SENS_TRANS, CFG_SENS_TX, CFG_SENS_TY, CFG_SENS_TZ,
 	CFG_SENS_ROT, CFG_SENS_RX, CFG_SENS_RY, CFG_SENS_RZ,
 	CFG_INVROT, CFG_INVTRANS, CFG_SWAPYZ,
-	CFG_AXISMAP_N, CFG_BNMAP_N, CFG_BNACT_N, CFG_KBMAP_N,
+	CFG_AXISMAP_N, CFG_BNMAP_N, CFG_BNHOLD_N, CFG_BNACT_N, CFG_KBMAP_N,
 	CFG_LED, CFG_GRAB,
 	CFG_SERIAL, CFG_DEVID,
 
@@ -59,7 +59,7 @@ enum { RMCFG_ALL, RMCFG_OWN };
 /* number of lines to add to the cfglines allocation, in order to allow for
  * adding any number of additional options if necessary
  */
-#define NUM_EXTRA_LINES	(NUM_CFG_OPTIONS + MAX_CUSTOM + MAX_BUTTONS * 3 + MAX_AXES + 16)
+#define NUM_EXTRA_LINES	(NUM_CFG_OPTIONS + MAX_CUSTOM + MAX_BUTTONS * 4 + MAX_AXES + 16)
 
 static int parse_bnact(const char *s);
 static const char *bnact_name(int bnact);
@@ -106,6 +106,7 @@ void default_cfg(struct cfg *cfg)
 
 	for(i=0; i<MAX_BUTTONS; i++) {
 		cfg->map_button[i] = i;
+		cfg->map_hold[i] = -1;
 		cfg->kbmap_str[i] = 0;
 		cfg->kbmap_count[i] = 0;
 		for(j=0; j<MAX_KEYS_PER_BUTTON; j++) {
@@ -114,6 +115,7 @@ void default_cfg(struct cfg *cfg)
 	}
 
 	cfg->repeat_msec = -1;
+	cfg->hold_timeout = 350;
 
 	for(i=0; i<MAX_CUSTOM; i++) {
 		cfg->devname[i] = 0;
@@ -475,6 +477,33 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			lptr->opt = CFG_SOCKPATH;
 			strncpy(cfg->sockpath, val_str, PATH_MAX - 1);
 
+		} else if(strcmp(key_str, "hold-timeout") == 0) {
+			EXPECT(isint);
+
+			if(ival < 0) {
+				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a non-negative integer\n", key_str);
+				continue;
+			}
+
+			lptr->opt = CFG_HOLD;
+			cfg->hold_timeout = ival;
+
+		} else if(sscanf(key_str, "bnhold%d", &bnidx) == 1) {
+			EXPECT(isint);
+
+			if(bnidx < 0 || bnidx >= MAX_BUTTONS || ival < 0 || ival >= MAX_BUTTONS) {
+				logmsg(LOG_WARNING, "invalid configuration value for %s, expected button numbers from 0 to %d\n", key_str, MAX_BUTTONS - 1);
+				continue;
+			}
+
+			if(cfg->map_hold[bnidx] != -1) {
+				logmsg(LOG_WARNING, "multiple secondary mappings for button %d\n", bnidx);
+			}
+
+			lptr->opt = CFG_BNHOLD_N;
+			lptr->idx = bnidx;
+			cfg->map_hold[bnidx] = ival;
+
 		} else {
 			logmsg(LOG_WARNING, "unrecognized config option: %s\n", key_str);
 		}
@@ -617,6 +646,12 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		rm_cfgopt("repeat-interval", RMCFG_ALL);
 	}
 
+	if(cfg->hold_timeout != def.hold_timeout) {
+		add_cfgopt(CFG_HOLD, 0, "hold-timeout = %d", cfg->hold_timeout);
+	} else {
+		rm_cfgopt("hold-timeout", RMCFG_OWN);
+	}
+
 	if(cfg->invert[0] || cfg->invert[1] || cfg->invert[2]) {
 		char flags[4] = {0}, *p = flags;
 		if(cfg->invert[0]) *p++ = 'x';
@@ -657,6 +692,15 @@ int write_cfg(const char *fname, struct cfg *cfg)
 			add_cfgopt(CFG_BNMAP_N, i, "bnmap%d = %d", i, cfg->map_button[i]);
 		} else {
 			sprintf(buf, "bnmap%d", i);
+			rm_cfgopt(buf, RMCFG_ALL);
+		}
+	}
+
+	for(i = 0; i < MAX_BUTTONS; i++) {
+		if(cfg->map_hold[i] >= 0) {
+			add_cfgopt(CFG_BNHOLD_N, i, "bnhold%d = %d", i, cfg->map_hold[i]);
+		} else {
+			sprintf(buf, "bnhold%d", i);
 			rm_cfgopt(buf, RMCFG_ALL);
 		}
 	}

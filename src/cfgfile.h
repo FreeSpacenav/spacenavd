@@ -51,6 +51,8 @@ struct cfg {
 	int invert[MAX_AXES];
 	int map_axis[MAX_AXES];
 	int map_button[MAX_BUTTONS];
+	int map_hold[MAX_BUTTONS];
+	int hold_timeout;
 	int bnact[MAX_BUTTONS];
 	unsigned int kbmap[MAX_BUTTONS][MAX_KEYS_PER_BUTTON];
 	int kbmap_count[MAX_BUTTONS];

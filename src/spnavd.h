@@ -47,6 +47,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 #endif
 
+#define TIMERCMP(a, cmp, b) ((a)->tv_sec == (b)->tv_sec ? \
+			    (a)->tv_usec cmp (b)->tv_usec : \
+			    (a)->tv_sec cmp (b)->tv_sec)
 
 /* defined in cfgfile.c */
 extern struct cfg cfg, prev_cfg;
