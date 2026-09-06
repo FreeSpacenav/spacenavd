@@ -55,6 +55,13 @@ static char *logfile = DEF_LOGFILE;
 static char *pidfile = DEF_PIDFILE;
 static int pfd[2];
 
+/* profile state from cfgfile.c */
+extern struct cfg default_cfg_backup;
+extern int current_profile;
+
+/* runtime event state from event.c */
+extern int disable_translation, disable_rotation, dom_axis_mode;
+
 int main(int argc, char **argv)
 {
 	int i, pid, ret, become_daemon = 1;
@@ -163,6 +170,11 @@ opt_pidfile:		if(!argv[++i]) {
 
 	read_cfg(cfgfile, &cfg);
 	prev_cfg = cfg;
+
+	/* backup default config for profile switching */
+	default_cfg_backup = cfg;
+	current_profile = -1;
+	logmsg(LOG_INFO, "loaded default config with %d profiles\n", cfg.num_profiles);
 
 	pipe(pfd);
 
@@ -430,7 +442,18 @@ static void handle_events(fd_set *rset)
 		int tmp;
 		read(pfd[0], &tmp, sizeof tmp);	/* eat up the junk char */
 
+		/* SIGHUP: reload default config and reset to default profile */
+		logmsg(LOG_INFO, "SIGHUP received: reloading default config\n");
 		read_cfg(cfgfile, &cfg);
+		prev_cfg = cfg;
+		default_cfg_backup = cfg;
+		current_profile = -1;
+
+		/* reset runtime state */
+		disable_translation = 0;
+		disable_rotation = 0;
+		dom_axis_mode = 0;
+
 		cfg_changed();
 	}
 
@@ -472,6 +495,15 @@ static void handle_events(fd_set *rset)
 
 void cfg_changed(void)
 {
+	/* log current profile status */
+	if(current_profile != -1) {
+		const char *name = get_profile_name(current_profile);
+		logmsg(LOG_INFO, "Active profile: '%s' (index %d)\n",
+			name ? name : "unknown", current_profile);
+	} else {
+		logmsg(LOG_INFO, "Active profile: DEFAULT\n");
+	}
+
 	if(cfg.led != prev_cfg.led) {
 		struct device *dev = get_devices();
 		while(dev) {
