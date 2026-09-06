@@ -18,7 +18,7 @@ int x11_get_focused_wm_class(char *buf, int size)
 #endif
 int main(void)
 {
-	cfg.sensitivity = 1;
+	cfg.sensitivity = 1; cfg.lcd_flags = 2; cfg.lcd_brightness = 35; cfg.lcd_idle_seconds = 120;
 	profiles[0].name = "Blender"; profiles[0].match_class = "blender";
 	profiles[0].pcfg.sensitivity = 2;
 	profiles[1].name = "CAD"; profiles[1].match_class = "cad";
@@ -26,6 +26,7 @@ int main(void)
 	num_profiles = 2;
 	profile_on_cfg_reload(&cfg);
 	assert(profile_set_manual(0) == 1 && cfg.sensitivity == 2);
+	assert(cfg.lcd_flags == 2 && cfg.lcd_brightness == 35 && cfg.lcd_idle_seconds == 120);
 	focused = "CAD";
 	assert(profile_refresh_active() == 0 && profile_active_index() == 0);
 	assert(profile_set_manual(50) == -1 && profile_active_index() == 0);
@@ -46,6 +47,16 @@ int main(void)
 	assert(!strcmp(profile_get_button_label(0), "Control_L+Escape"));
 	assert(!strcmp(profile_get_button_label(-1), ""));
 	assert(!strcmp(profile_get_button_label(MAX_BUTTONS), ""));
+	/* A compositor focus provider takes precedence over X11 polling. */
+	assert(profile_set_focus(&cfg, "org.blender.Blender.desktop") == 1);
+	assert(profile_active_index() == 0);
+	assert(profile_set_focus(&profiles, "CAD") == -1); /* one owner */
+	assert(profile_set_focus(&cfg, "") == 1 && profile_active_index() == -1);
+	assert(profile_set_manual(1) == 1);
+	assert(profile_set_focus(&cfg, "blender") == 0 && profile_active_index() == 1);
+	assert(profile_set_manual(-1) == 1 && profile_active_index() == 0);
+	assert(profile_clear_focus(&profiles) == 0 && profile_active_index() == 0);
+	assert(profile_clear_focus(&cfg) == 1 && profile_active_index() == -1);
 	puts("Profile tests passed");
 	return 0;
 }

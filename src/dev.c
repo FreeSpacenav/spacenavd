@@ -23,6 +23,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include <sys/stat.h>
 #include "dev.h"
+#include "lcd.h"
+#include "led_idle.h"
+#include "client.h"
 #include "dev_usb.h"
 #include "dev_serial.h"
 #include "event.h" /* remove pending events upon device removal */
@@ -211,6 +214,15 @@ int init_devices_usb(void)
 					logmsg(LOG_INFO, "%s\n", buf);
 				}
 
+				set_device_led(dev, cfg.led == LED_ON || (cfg.led == LED_AUTO && first_client()));
+				led_idle_activity(dev);
+
+				/* Reapply the configured backlight after reconnecting the Enterprise. */
+				if(dev->usbid[0] == 0x256f && dev->usbid[1] == 0xc633) {
+					lcd_idle_reset();
+					lcd_update_mappings();
+				}
+
 				/* new USB device added, send device change event */
 				ev.dev.type = EVENT_DEV;
 				ev.dev.op = DEV_ADD;
@@ -352,8 +364,9 @@ int read_device(struct device *dev, struct dev_input *inp)
 
 void set_device_led(struct device *dev, int state)
 {
+	dev->led_requested = state;
 	if(dev->set_led) {
-		dev->set_led(dev, state);
+		dev->set_led(dev, dev->led_asleep ? 0 : state);
 	}
 }
 

@@ -1,0 +1,7 @@
+{
+  "uuid": "spacenav-focus@jl1990",
+  "name": "SpaceNav application profiles",
+  "description": "Reports the focused application to the SpaceNav session helper for automatic device profiles.",
+  "shell-version": ["50"],
+  "version": 1
+}

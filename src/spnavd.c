@@ -41,6 +41,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #endif
 #include "profile.h"
 #include "lcd.h"
+#include "led_idle.h"
 
 static void print_usage(const char *argv0);
 static void cleanup(void);
@@ -267,7 +268,7 @@ opt_pidfile:		if(!argv[++i]) {
 			}
 
 			/* cap timeout to 500ms for periodic profile polling */
-			if(num_profiles > 0) {
+			if(num_profiles > 0 || (lcd_supported() && cfg.lcd_idle_seconds > 0) || cfg.led_idle_seconds > 0) {
 				if(!timeout || tv.tv_sec > 0 || tv.tv_usec > 500000) {
 					tv.tv_sec = 0;
 					tv.tv_usec = 500000;
@@ -277,6 +278,9 @@ opt_pidfile:		if(!argv[++i]) {
 
 			ret = select(max_fd + 1, &rset, 0, 0, timeout);
 		} while(ret == -1 && errno == EINTR);
+
+		lcd_idle_poll();
+		led_idle_poll();
 
 		/* periodic profile polling */
 		if(num_profiles > 0) {
@@ -511,6 +515,8 @@ static void handle_events(fd_set *rset)
 
 void cfg_changed(void)
 {
+	if(cfg.lcd_flags != prev_cfg.lcd_flags || cfg.lcd_brightness != prev_cfg.lcd_brightness ||
+			cfg.lcd_idle_seconds != prev_cfg.lcd_idle_seconds) lcd_idle_reset();
 	if(cfg.led != prev_cfg.led) {
 		struct device *dev = get_devices();
 		while(dev) {
@@ -540,6 +546,7 @@ void cfg_changed(void)
 		init_devices_serial();
 	}
 
+	if(cfg.led_idle_seconds != prev_cfg.led_idle_seconds || cfg.led != prev_cfg.led) led_idle_reset();
 	prev_cfg = cfg;
 }
 

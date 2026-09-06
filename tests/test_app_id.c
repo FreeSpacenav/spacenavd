@@ -8,6 +8,10 @@ int num_profiles;
 char *cfgfile;
 const char *(*kbemu_keyname)(unsigned int);
 static int updates;
+void lcd_idle_reset(void) {}
+void led_idle_reset(void) {}
+int lcd_supported(void) { return 1; }
+int lcd_refresh(void) { updates++; return 0; }
 void logmsg(int priority, const char *fmt, ...) { (void)priority; (void)fmt; }
 void lcd_update_mappings(void) { updates++; }
 void cfg_changed(void) {}
@@ -56,6 +60,53 @@ int main(void)
 	assert(handle_request(&a, &req) == 0);
 	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply);
 	assert(profile_active_index() == -1 && updates == 2);
+	req.type = REQ_SCFG_LCD; req.data[0] = 2;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply);
+	assert(reply.data[6] == 0 && cfg.lcd_flags == 2);
+	req.type = REQ_SCFG_LCD; req.data[0] = 4;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply);
+	assert(reply.data[6] == -1 && cfg.lcd_flags == 2);
+	req.type = REQ_GCFG_LCD;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply);
+	assert(reply.data[6] == 0 && reply.data[0] == 2);
+	req.type = REQ_SCFG_LCD_IDLE; req.data[0] = 120;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply);
+	assert(reply.data[6] == 0 && cfg.lcd_idle_seconds == 120);
+	req.data[0] = 86401;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply);
+	assert(reply.data[6] == -1 && cfg.lcd_idle_seconds == 120);
+	req.type = REQ_GCFG_LCD_IDLE;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply);
+	assert(reply.data[6] == 0 && reply.data[0] == 120);
+	req.type = REQ_SCFG_LCD_BRIGHTNESS; req.data[0] = 40;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply);
+	assert(reply.data[6] == 0 && cfg.lcd_brightness == 40);
+	req.data[0] = 101;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply);
+	assert(reply.data[6] == -1 && cfg.lcd_brightness == 40);
+	memset(&req, 0, sizeof req); req.type = REQ_SET_FOCUS;
+	memcpy(req.data, "blender", 7); req.data[6] = 7;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply && reply.data[6] == 0);
+	req.data[6] = 256;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply && reply.data[6] == -1);
+	profile_clear_focus(&a);
+	req.type = REQ_SCFG_LED_IDLE; req.data[0] = 15;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply && reply.data[6] == 0);
+	assert(cfg.led_idle_seconds == 15);
+	req.data[0] = -1;
+	assert(handle_request(&a, &req) == 0);
+	assert(read(sockets[1], &reply, sizeof reply) == sizeof reply && reply.data[6] == -1);
 	close(sockets[0]); close(sockets[1]);
 	free(a.app_id); free(b.app_id);
 	puts("Application ID tests passed");

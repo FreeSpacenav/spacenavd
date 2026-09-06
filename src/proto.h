@@ -97,6 +97,17 @@ enum {
 	REQ_SCFG_SOCKET,		/* set socket path:			Q[0-5] next 24 bytes Q[6] remaining length - R[6] status */
 	REQ_GCFG_SOCKET,		/* get socket path:			R[0-5] next 24 bytes R[6] remaining length or -1 for failure */
 	/* TODO ... more */
+	/* Experimental LCD requests shared by the daemon/library forks. */
+	REQ_SCFG_LCD = 0x3f00, /* Q[0] flags: bit 0 enabled, bit 1 profile title */
+	REQ_GCFG_LCD,         /* R[0] flags; R[6] -1 if unsupported */
+	REQ_LCD_REFRESH,      /* upload current display; R[6] status */
+	REQ_SCFG_LCD_BRIGHTNESS, /* Q[0] percentage 0..100 */
+	REQ_GCFG_LCD_BRIGHTNESS, /* R[0] percentage */
+	REQ_SCFG_LCD_IDLE, /* Q[0] seconds 0..86400; 0 disables sleep */
+	REQ_GCFG_LCD_IDLE, /* R[0] seconds */
+	REQ_SET_FOCUS = 0x3f07, /* session helper: string chunks, ACK each; max 255 bytes */
+	REQ_SCFG_LED_IDLE = 0x3f08, /* Q[0] seconds 0..86400 */
+	REQ_GCFG_LED_IDLE, /* R[0] seconds */
 	REQ_CFG_SAVE = 0x3ffe,	/* save config file:        R[6] status */
 	REQ_CFG_RESTORE,		/* load config from file:   R[6] status */
 	REQ_CFG_RESET,			/* reset to default config: R[6] status */

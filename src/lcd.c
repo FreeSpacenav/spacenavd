@@ -7,11 +7,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+extern struct cfg cfg;
+
 #ifdef HAVE_SPACELCD
 #include <stdint.h>
 #include "lcd_font.h"
 #include <libusb.h>
 #include <zlib.h>
+#include <time.h>
 
 #define LCD_WIDTH		640
 #define LCD_HEIGHT		150
@@ -70,7 +73,8 @@ static void render_bitmap(uint8_t *buffer)
 	int button;
 
 	memset(buffer, 0, LCD_BITMAP_BYTES);
-	draw_text(buffer, 10, 6, LCD_WIDTH - 10, profile_get_name(), 0xffff, 2);
+	if(!(cfg.lcd_flags & LCD_ENABLED)) return;
+	if(cfg.lcd_flags & LCD_PROFILE) draw_text(buffer, 10, 6, LCD_WIDTH - 10, profile_get_name(), 0xffff, 2);
 	for(button = 0; button < 12; button++) {
 		const char *label = profile_get_button_label(button);
 		int x = 10 + (button % 6) * (LCD_WIDTH / 6);
@@ -144,6 +148,7 @@ static int lcd_usb_send(uint8_t *data, int size)
 	libusb_context *context;
 	libusb_device_handle *handle;
 	int transferred, interface, rc, result = -1;
+	struct timespec started, now;
 
 	rc = libusb_init(&context);
 	if(rc < 0) {
@@ -154,6 +159,13 @@ static int lcd_usb_send(uint8_t *data, int size)
 	if(!handle) {
 		libusb_exit(context);
 		return -1;	/* Device absent or inaccessible. */
+	}
+	if(lcd_hid_set_brightness(libusb_get_bus_number(libusb_get_device(handle)),
+			libusb_get_device_address(libusb_get_device(handle)),
+			(cfg.lcd_flags & LCD_ENABLED) && !lcd_is_asleep() ? cfg.lcd_brightness : 0) < 0) goto close;
+	if(!(cfg.lcd_flags & LCD_ENABLED) || lcd_is_asleep()) {
+		result = 0;
+		goto close; /* Backlight off: no framebuffer upload needed. */
 	}
 	interface = lcd_usb_interface(handle);
 	if(interface < 0) {
@@ -166,10 +178,20 @@ static int lcd_usb_send(uint8_t *data, int size)
 		goto close;
 	}
 
+	if(clock_gettime(CLOCK_MONOTONIC, &started) < 0) goto release;
 	while(size > 0) {
+		long elapsed;
+		int timeout;
 		int chunk = size > LCD_USB_PACKET_MAX ? LCD_USB_PACKET_MAX : size;
+		if(clock_gettime(CLOCK_MONOTONIC, &now) < 0) goto release;
+		elapsed = (now.tv_sec - started.tv_sec) * 1000 + (now.tv_nsec - started.tv_nsec) / 1000000;
+		if(elapsed >= LCD_USB_TIMEOUT) {
+			logmsg(LOG_WARNING, "lcd: frame upload timed out\n");
+			goto release;
+		}
+		timeout = LCD_USB_TIMEOUT - elapsed;
 		transferred = 0;
-		rc = libusb_bulk_transfer(handle, 0x01, data, chunk, &transferred, LCD_USB_TIMEOUT);
+		rc = libusb_bulk_transfer(handle, 0x01, data, chunk, &transferred, timeout);
 		if(rc < 0 || transferred <= 0 || transferred > chunk) {
 			logmsg(LOG_WARNING, "lcd: USB transfer failed (%s, %d/%d bytes)\n",
 					rc < 0 ? libusb_strerror(rc) : "invalid transfer length", transferred, chunk);
@@ -194,18 +216,19 @@ close:
 
 extern struct cfg cfg;
 
-void lcd_update_mappings(void)
+int lcd_refresh(void)
 {
 #ifdef HAVE_SPACELCD
 	uint8_t *bitmap, *usbdata;
-	int compressed_size;
+	int compressed_size, result;
 
+	if(!(cfg.lcd_flags & LCD_ENABLED) || lcd_is_asleep()) return lcd_usb_send(0, 0);
 	bitmap = malloc(LCD_BITMAP_BYTES);
 	usbdata = calloc(1, LCD_DEFLATED_MAX + LCD_HEADER_SIZE);
 	if(!bitmap || !usbdata) {
 		free(bitmap);
 		free(usbdata);
-		return;
+		return -1;
 	}
 
 	render_bitmap(bitmap);
@@ -215,7 +238,7 @@ void lcd_update_mappings(void)
 	if(compressed_size < 0 || compressed_size > 65535) {
 		logmsg(LOG_WARNING, "lcd: compression failed\n");
 		free(usbdata);
-		return;
+		return -1;
 	}
 
 	/* header: effect byte, flags, compressed length (16-bit LE) */
@@ -224,7 +247,24 @@ void lcd_update_mappings(void)
 	usbdata[2] = compressed_size & 0xff;
 	usbdata[3] = (compressed_size >> 8) & 0xff;
 
-	lcd_usb_send(usbdata, compressed_size + LCD_HEADER_SIZE);
+	result = lcd_usb_send(usbdata, compressed_size + LCD_HEADER_SIZE);
 	free(usbdata);
+	return result;
+#else
+	return -1;
+#endif
+}
+
+void lcd_update_mappings(void)
+{
+	lcd_refresh();
+}
+
+int lcd_supported(void)
+{
+#if defined(HAVE_SPACELCD) && defined(__linux__)
+	return 1;
+#else
+	return 0;
 #endif
 }

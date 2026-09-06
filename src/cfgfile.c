@@ -49,7 +49,7 @@ enum {
 	CFG_LED, CFG_GRAB,
 	CFG_SERIAL, CFG_DEVID,
 
-	CFG_SOCKPATH,
+	CFG_SOCKPATH, CFG_LED_IDLE, CFG_LCD, CFG_LCD_PROFILE, CFG_LCD_BRIGHTNESS, CFG_LCD_IDLE,
 
 	/* debug options, not part of the protocol, can change at any time */
 	CFG_KBMAP_USE_X11,
@@ -77,12 +77,15 @@ struct cfgline {
 	char *str;		/* actual line text */
 	int opt;		/* CFG_* item */
 	int idx;
+	int in_profile; /* preserve profile blocks when saving global settings */
 	int own;		/* added and owned by spacenavd, not in the original user config */
 };
 
 static struct cfgline *cfglines;
 static int num_lines;
 
+
+static void init_cfg(struct cfg *cfg);
 
 void default_cfg(struct cfg *cfg)
 {
@@ -91,6 +94,7 @@ void default_cfg(struct cfg *cfg)
 	for(i = 0; i < num_profiles; i++) {
 		free(profiles[i].name);
 		free(profiles[i].match_class);
+		for(j = 0; j < MAX_CUSTOM; j++) free(profiles[i].pcfg.devname[j]);
 		for(j = 0; j < MAX_BUTTONS; j++) {
 			free(profiles[i].pcfg.kbmap_str[j]);
 		}
@@ -98,7 +102,16 @@ void default_cfg(struct cfg *cfg)
 	num_profiles = 0;
 	memset(profiles, 0, sizeof profiles);
 
+	init_cfg(cfg);
+}
+
+static void init_cfg(struct cfg *cfg)
+{
+	int i, j;
 	memset(cfg, 0, sizeof *cfg);
+	cfg->lcd_flags = LCD_ENABLED | LCD_PROFILE;
+	cfg->lcd_brightness = 100;
+	cfg->lcd_idle_seconds = 0;
 
 	cfg->sensitivity = 1.0;
 	for(i=0; i<3; i++) {
@@ -184,6 +197,9 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	flk.l_whence = SEEK_SET;
 	while(fcntl(fd, F_SETLKW, &flk) == -1);
 
+	/* Release the previously parsed strings before resetting the line count. */
+	for(i = 0; i < num_lines; i++) free(cfglines[i].str);
+
 	/* count newlines and populate lines array */
 	num_lines = 0;
 	while((c = fgetc(fp)) != -1) {
@@ -210,6 +226,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		struct cfg *target;
 
 		lptr = cfglines + num_lines++;
+		lptr->opt = -1; /* comments and profile headers are not options */
+		lptr->in_profile = cur_profile >= 0;
 
 		if((endp = strchr(buf, '\r')) || (endp = strchr(buf, '\n'))) {
 			*endp = 0;
@@ -559,6 +577,40 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				continue;
 			}
 
+		} else if(strcmp(key_str, "led-idle") == 0) {
+			if(cur_profile >= 0 || !isint || ival < 0 || ival > 86400) {
+				logmsg(LOG_WARNING, "led-idle requires global seconds (0..86400)\n");
+				continue;
+			}
+			lptr->opt = CFG_LED_IDLE;
+			cfg->led_idle_seconds = ival;
+
+		} else if(strcmp(key_str, "lcd-idle") == 0) {
+			if(cur_profile >= 0 || !isint || ival < 0 || ival > 86400) {
+				logmsg(LOG_WARNING, "lcd-idle requires global seconds (0..86400)\n");
+				continue;
+			}
+			lptr->opt = CFG_LCD_IDLE;
+			cfg->lcd_idle_seconds = ival;
+
+		} else if(strcmp(key_str, "lcd-brightness") == 0) {
+			if(cur_profile >= 0 || !isint || ival < 0 || ival > 100) {
+				logmsg(LOG_WARNING, "lcd-brightness requires a global percentage (0..100)\n");
+				continue;
+			}
+			lptr->opt = CFG_LCD_BRIGHTNESS;
+			cfg->lcd_brightness = ival;
+
+		} else if(strcmp(key_str, "lcd") == 0 || strcmp(key_str, "lcd-profile") == 0) {
+			int bit = strcmp(key_str, "lcd") == 0 ? LCD_ENABLED : LCD_PROFILE;
+			if(cur_profile >= 0 || !(isbool || (isint && (ival == 0 || ival == 1)))) {
+				logmsg(LOG_WARNING, "LCD options require a global boolean value\n");
+				continue;
+			}
+			lptr->opt = bit == LCD_ENABLED ? CFG_LCD : CFG_LCD_PROFILE;
+			if(ival) cfg->lcd_flags |= bit;
+			else cfg->lcd_flags &= ~bit;
+
 		} else if(strcmp(key_str, "socket") == 0) {
 			lptr->opt = CFG_SOCKPATH;
 			strncpy(cfg->sockpath, val_str, PATH_MAX - 1);
@@ -608,7 +660,7 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		}
 	}
 
-	default_cfg(&def);	/* default config for comparisons */
+	init_cfg(&def);	/* default config for comparisons */
 
 	if(cfg->sensitivity != def.sensitivity) {
 		add_cfgopt(CFG_SENS, 0, "sensitivity = %.3f", cfg->sensitivity);
@@ -803,6 +855,13 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		rm_cfgopt("socket", RMCFG_ALL);
 	}
 
+	add_cfgopt(CFG_LCD, 0, "lcd = %s", cfg->lcd_flags & LCD_ENABLED ? "on" : "off");
+	add_cfgopt(CFG_LCD_PROFILE, 0, "lcd-profile = %s", cfg->lcd_flags & LCD_PROFILE ? "on" : "off");
+
+	add_cfgopt(CFG_LCD_BRIGHTNESS, 0, "lcd-brightness = %d", cfg->lcd_brightness);
+	add_cfgopt(CFG_LCD_IDLE, 0, "lcd-idle = %d", cfg->lcd_idle_seconds);
+	add_cfgopt(CFG_LED_IDLE, 0, "led-idle = %d", cfg->led_idle_seconds);
+
 	/* acquire exclusive write lock */
 	flk.l_type = F_WRLCK;
 	flk.l_start = flk.l_len = 0;
@@ -913,7 +972,7 @@ static struct cfgline *find_cfgopt(int opt, int idx)
 {
 	int i;
 	for(i=0; i<num_lines; i++) {
-		if(cfglines[i].str && cfglines[i].opt == opt && cfglines[i].idx == idx) {
+		if(!cfglines[i].in_profile && cfglines[i].str && cfglines[i].opt == opt && cfglines[i].idx == idx) {
 			return cfglines + i;
 		}
 	}
@@ -954,7 +1013,7 @@ static int add_cfgopt_devid(int vid, int pid)
 	sprintf(str, "device-id = %04x:%04x", vid, pid);
 
 	for(i=0; i<num_lines; i++) {
-		if(!cfglines[i].str || cfglines[i].opt != CFG_DEVID) {
+		if(cfglines[i].in_profile || !cfglines[i].str || cfglines[i].opt != CFG_DEVID) {
 			continue;
 		}
 		if(!(val = strchr(cfglines[i].str, '='))) {
@@ -985,7 +1044,7 @@ static int rm_cfgopt(const char *name, int mode)
 	char buf[256];
 
 	for(i=0; i<num_lines; i++) {
-		if(!cfglines[i].str || !*cfglines[i].str) continue;
+		if(cfglines[i].in_profile || !cfglines[i].str || !*cfglines[i].str) continue;
 
 		strncpy(buf, cfglines[i].str, sizeof buf - 1);
 		buf[sizeof buf - 1] = 0;

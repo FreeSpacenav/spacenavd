@@ -12,6 +12,8 @@ extern struct cfg cfg;
 
 static struct cfg base_cfg;
 static int active_profile = -1;
+static const void *focus_owner;
+static char focus_id[256];
 static int manual_override;	/* when set, auto-detection is suppressed */
 
 void profile_on_cfg_reload(struct cfg *c)
@@ -21,7 +23,6 @@ void profile_on_cfg_reload(struct cfg *c)
 	manual_override = 0;
 }
 
-#ifdef USE_X11
 static int match_class(const char *str, const char *match)
 {
 	char buf1[256], buf2[256];
@@ -36,11 +37,11 @@ static int match_class(const char *str, const char *match)
 	return strstr(buf1, buf2) != NULL;
 }
 
-#endif
-
 static int activate_profile(int new_index)
 {
 	if(new_index != active_profile) {
+		int lcd_flags = cfg.lcd_flags, lcd_brightness = cfg.lcd_brightness;
+		int lcd_idle_seconds = cfg.lcd_idle_seconds, led_idle_seconds = cfg.led_idle_seconds;
 		if(new_index >= 0) {
 			logmsg(LOG_INFO, "Profile switch: %s\n", profiles[new_index].name ? profiles[new_index].name : "(unnamed)");
 			cfg = profiles[new_index].pcfg;
@@ -48,13 +49,16 @@ static int activate_profile(int new_index)
 			logmsg(LOG_INFO, "Profile switch: Default\n");
 			cfg = base_cfg;
 		}
+		cfg.lcd_flags = lcd_flags;
+		cfg.lcd_brightness = lcd_brightness;
+		cfg.lcd_idle_seconds = lcd_idle_seconds;
+		cfg.led_idle_seconds = led_idle_seconds;
 		active_profile = new_index;
 		return 1;
 	}
 	return 0;
 }
 
-#ifdef USE_X11
 static int find_profile(const char *id)
 {
 	int i;
@@ -69,11 +73,10 @@ static int find_profile(const char *id)
 	return -1;
 }
 
-#endif
-
 int profile_refresh_active(void)
 {
 	if(manual_override) return 0;
+	if(focus_owner) return activate_profile(find_profile(focus_id));
 
 #ifdef USE_X11
 	{
@@ -124,4 +127,23 @@ const char *profile_get_name(void)
 		if(profiles[active_profile].name) return profiles[active_profile].name;
 	}
 	return "Default";
+}
+
+int profile_set_focus(const void *owner, const char *app_id)
+{
+	const unsigned char *p = (const unsigned char*)app_id;
+	if(!owner || !app_id || strlen(app_id) >= sizeof focus_id ||
+			(focus_owner && focus_owner != owner)) return -1;
+	for(; *p; p++) if(*p < 32 || *p == 127) return -1;
+	focus_owner = owner;
+	strcpy(focus_id, app_id);
+	return profile_refresh_active();
+}
+
+int profile_clear_focus(const void *owner)
+{
+	if(!focus_owner || focus_owner != owner) return 0;
+	focus_owner = 0;
+	focus_id[0] = 0;
+	return profile_refresh_active();
 }

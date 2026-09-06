@@ -5,6 +5,13 @@
 #include <string.h>
 #include "../src/lcd.c"
 
+struct cfg cfg;
+int lcd_is_asleep(void) { return 0; }
+static int backlight;
+int lcd_hid_set_brightness(int bus, int address, int level)
+{ assert(bus == 5 && address == 10); backlight = level; return 0; }
+uint8_t LIBUSB_CALL libusb_get_bus_number(libusb_device *d) { (void)d; return 5; }
+uint8_t LIBUSB_CALL libusb_get_device_address(libusb_device *d) { (void)d; return 10; }
 static int mode, calls, claims, releases, closes, exits, resets, detached;
 static int init_error, absent, descriptor_error, claim_error;
 static unsigned char received[200000];
@@ -83,6 +90,7 @@ int main(int argc, char **argv)
 	int i;
 	z_stream stream;
 	(void)argc; (void)argv;
+	cfg.lcd_flags = 3; cfg.lcd_brightness = 65;
 	for(i = 0; i < (int)sizeof data; i++) data[i] = i;
 	reset(); mode = 4;
 	assert(lcd_usb_send(data, sizeof data) == 0);
@@ -109,6 +117,7 @@ int main(int argc, char **argv)
 	reset(); init_error = LIBUSB_ERROR_OTHER;
 	assert(lcd_usb_send(data, sizeof data) == -1 && !exits);
 
+	cfg.lcd_flags = 3;
 	memset(guarded, 0xa5, sizeof guarded);
 	label = "Control_L+Escape";
 	render_bitmap(guarded + 1);
@@ -162,6 +171,13 @@ int main(int argc, char **argv)
 		}
 		fclose(fp);
 	}
+	cfg.lcd_flags = 0;
+	reset(); assert(lcd_refresh() == 0 && backlight == 0 && !calls && !claims);
+	render_bitmap(decoded);
+	for(i = 0; i < LCD_BITMAP_BYTES; i++) assert(decoded[i] == 0);
+	cfg.lcd_flags = 1;
+	render_bitmap(decoded);
+	for(i = 0; i < 30 * LCD_WIDTH * 2; i++) assert(decoded[i] == 0);
 	puts("LCD tests passed");
 	return 0;
 }

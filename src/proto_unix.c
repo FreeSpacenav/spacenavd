@@ -32,6 +32,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "spnavd.h"
 #include "profile.h"
 #include "lcd.h"
+#include "led_idle.h"
 #ifdef USE_X11
 #include "kbemu.h"
 #endif
@@ -330,6 +331,24 @@ static int handle_request(struct client *c, struct reqresp *req)
 		}
 		break;
 
+	case REQ_SET_FOCUS:
+		if(req->data[6] < 0 || REQSTR_REMLEN(req) > 255 ||
+				(res = spnav_recv_str(&c->focusbuf, req)) < 0) {
+			free(c->focusbuf.buf);
+			memset(&c->focusbuf, 0, sizeof c->focusbuf);
+			sendresp(c, req, -1);
+			break;
+		}
+		if(res) {
+			if(strlen(c->focusbuf.buf) != (size_t)c->focusbuf.size - 1) res = -1;
+			else res = profile_set_focus(c, c->focusbuf.buf);
+			free(c->focusbuf.buf);
+			memset(&c->focusbuf, 0, sizeof c->focusbuf);
+		}
+		sendresp(c, req, res < 0 ? -1 : 0);
+		if(res > 0) lcd_update_mappings();
+		break;
+
 	case REQ_SET_PROFILE:
 		res = profile_set_manual(req->data[0]);
 		if(res >= 0) {
@@ -577,6 +596,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 		free(cfg.kbmap_str[idx]);
 		cfg.kbmap_str[idx] = req->data[1] > 0 ? strdup(str) : 0;
 		sendresp(c, req, 0);
+		lcd_update_mappings();
 #else
 		logmsg(LOG_WARNING, "unable to set keyboard mappings, daemon compiled without X11 support\n");
 		sendresp(c, req, -1);
@@ -612,6 +632,73 @@ static int handle_request(struct client *c, struct reqresp *req)
 	case REQ_GCFG_SWAPYZ:
 		req->data[0] = cfg.swapyz;
 		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_LCD:
+		if(!lcd_supported() || req->data[0] < 0 || (req->data[0] & ~(LCD_ENABLED | LCD_PROFILE))) {
+			sendresp(c, req, -1);
+			break;
+		}
+		cfg.lcd_flags = req->data[0];
+		lcd_idle_reset();
+		sendresp(c, req, 0); /* setting accepted; upload errors are logged */
+		lcd_update_mappings();
+		break;
+
+	case REQ_GCFG_LCD:
+		req->data[0] = cfg.lcd_flags;
+		sendresp(c, req, lcd_supported() ? 0 : -1);
+		break;
+
+	case REQ_SCFG_LCD_BRIGHTNESS:
+		if(!lcd_supported() || req->data[0] < 0 || req->data[0] > 100) {
+			sendresp(c, req, -1);
+			break;
+		}
+		cfg.lcd_brightness = req->data[0];
+		lcd_idle_reset();
+		sendresp(c, req, 0);
+		lcd_update_mappings();
+		break;
+
+	case REQ_GCFG_LCD_BRIGHTNESS:
+		req->data[0] = cfg.lcd_brightness;
+		sendresp(c, req, lcd_supported() ? 0 : -1);
+		break;
+
+	case REQ_SCFG_LED_IDLE:
+		if(req->data[0] < 0 || req->data[0] > 86400) {
+			sendresp(c, req, -1);
+			break;
+		}
+		cfg.led_idle_seconds = req->data[0];
+		led_idle_reset();
+		sendresp(c, req, 0);
+		break;
+	case REQ_GCFG_LED_IDLE:
+		req->data[0] = cfg.led_idle_seconds;
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_LCD_IDLE:
+		if(!lcd_supported() || req->data[0] < 0 || req->data[0] > 86400) {
+			sendresp(c, req, -1);
+			break;
+		}
+		cfg.lcd_idle_seconds = req->data[0];
+		lcd_idle_reset();
+		sendresp(c, req, 0);
+		lcd_update_mappings();
+		break;
+
+	case REQ_GCFG_LCD_IDLE:
+		req->data[0] = cfg.lcd_idle_seconds;
+		sendresp(c, req, lcd_supported() ? 0 : -1);
+		break;
+
+	case REQ_LCD_REFRESH:
+		lcd_idle_reset();
+		sendresp(c, req, lcd_refresh());
 		break;
 
 	case REQ_SCFG_LED:
@@ -731,6 +818,16 @@ static const char *reqstr(int req)
 		return spnav_reqnames_3000[req - 0x3000];
 	}
 	switch(req) {
+	case REQ_SCFG_LED_IDLE: return "SCFG_LED_IDLE";
+	case REQ_GCFG_LED_IDLE: return "GCFG_LED_IDLE";
+	case REQ_SET_FOCUS: return "SET_FOCUS";
+	case REQ_SCFG_LCD: return "SCFG_LCD";
+	case REQ_GCFG_LCD: return "GCFG_LCD";
+	case REQ_LCD_REFRESH: return "LCD_REFRESH";
+	case REQ_SCFG_LCD_BRIGHTNESS: return "SCFG_LCD_BRIGHTNESS";
+	case REQ_GCFG_LCD_BRIGHTNESS: return "GCFG_LCD_BRIGHTNESS";
+	case REQ_SCFG_LCD_IDLE: return "SCFG_LCD_IDLE";
+	case REQ_GCFG_LCD_IDLE: return "GCFG_LCD_IDLE";
 	case REQ_CFG_SAVE:
 		return "CFG_SAVE";
 	case REQ_CFG_RESTORE:

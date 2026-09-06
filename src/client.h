@@ -66,6 +66,7 @@ struct client {
 
 	/* protocol buffer for handling reception of strings in multiple packets */
 	struct reqresp_strbuf strbuf;
+	struct reqresp_strbuf focusbuf;
 
 	struct client *next;
 };

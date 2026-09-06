@@ -17,6 +17,11 @@ int profile_refresh_active(void);
  */
 int profile_set_manual(int index);
 
+/* A session focus provider owns updates until its connection closes. Empty ID
+ * means no focused application. Return -1 on invalid ID/another owner. */
+int profile_set_focus(const void *owner, const char *app_id);
+int profile_clear_focus(const void *owner);
+
 /* Get the active profile index, or -1 if none */
 int profile_active_index(void);
 

@@ -56,6 +56,10 @@ struct cfg {
 	int kbmap_count[MAX_BUTTONS];
 	char *kbmap_str[MAX_BUTTONS];
 	int swapyz;
+	int led_idle_seconds; /* global timeout; 0 disables LED sleep */
+	int lcd_idle_seconds; /* 0 disables automatic sleep; maximum 86400 */
+	int lcd_brightness; /* backlight percentage, 0..100 */
+	int lcd_flags; /* global display content: LCD_ENABLED | LCD_PROFILE */
 	int led, grab_device;
 	char serial_dev[PATH_MAX];
 	int repeat_msec;
@@ -68,6 +72,9 @@ struct cfg {
 	/* debug options, might change at any time */
 	int kbemu_use_x11;			/* force X11 for kbemu, instead of uinput */
 };
+
+#define LCD_ENABLED 1
+#define LCD_PROFILE 2
 
 #define MAX_PROFILES 16
 

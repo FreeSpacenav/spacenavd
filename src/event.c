@@ -21,6 +21,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdlib.h>
 #include <string.h>
 #include "event.h"
+#include "lcd.h"
+#include "led_idle.h"
 #include "client.h"
 #include "proto_unix.h"
 #include "spnavd.h"
@@ -167,6 +169,8 @@ void process_input(struct device *dev, struct dev_input *inp)
 		if(abs_val < cfg.dead_threshold[inp->idx] ) {
 			inp->val = 0;
 		}
+		if(inp->val) led_idle_activity(dev);
+		if(dev->usbid[0] == 0x256f && dev->usbid[1] == 0xc633 && inp->val) lcd_idle_activity();
 		if((axis = map_axis(inp->idx)) == -1) {
 			break;
 		}
@@ -200,6 +204,8 @@ void process_input(struct device *dev, struct dev_input *inp)
 		break;
 
 	case INP_BUTTON:
+		if(inp->val) led_idle_activity(dev);
+		if(dev->usbid[0] == 0x256f && dev->usbid[1] == 0xc633 && inp->val) lcd_idle_activity();
 		ev.type = EVENT_RAWBUTTON;
 		ev.button.press = inp->val;
 		ev.button.bnum = inp->idx;

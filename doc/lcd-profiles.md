@@ -39,16 +39,19 @@ writes fail rather than looping, short successful writes advance correctly,
 and claimed interfaces and handles are released on exit. Initialization of
 the zlib stream is checked before compression.
 
-Uploads still use synchronous transfers with a one-second timeout per transfer;
-this does not provide asynchronous rendering or an overall frame deadline.
+Uploads are synchronous, with a one-second budget across bulk transfers for a
+frame. Device opening and HID feature ioctls are outside that budget.
 The first matching Enterprise device is used, as in the original PR. Multiple
 Enterprise devices and recovery of a partially received frame need hardware
 validation and further design.
 
 On the connected Enterprise (USB device version 4.42), descriptor inspection
 confirmed interface 0 is vendor-specific with bulk OUT endpoint 0x01 and
-64-byte packets; interface 1 is HID. The session lacked permission to open
-the device, so no screen upload or simultaneous-input test was performed.
+64-byte packets; interface 1 is HID. Hardware testing confirmed that HID feature report `11 00` turns the backlight
+off and `11 64` sets 100% brightness, with the input driver still attached.
+A helper using the idle policy and HID sender also turned it off after eight
+seconds. No input arrived during that helper test, so hardware wake-on-input
+and simultaneous application input remain to be verified.
 
 ## Profile behavior change
 
@@ -59,9 +62,10 @@ unused automatic matching function is removed.
 Automatic selection uses X11 window focus. `REQ_SET_PROFILE` explicitly selects
 a profile; index -1 returns to automatic selection immediately. With no usable
 X11 focus information, automatic selection uses the default configuration.
-Native Wayland focus switching is not implemented: application identity alone
-cannot establish focus, so use explicit profile selection there. A future
-focus/activation protocol requires a separate design.
+GNOME 50 Wayland focus switching is available through the optional compositor
+extension and session helper in `contrib/gnome`. This supplies actual compositor
+focus separately from application registration. Other Wayland compositors need
+their own adapters.
 
 Socket configuration reset and restore now reset profile state and update the
 LCD, matching the intent of the existing configuration reload path.
@@ -90,3 +94,56 @@ The existing daemon has compiler warnings outside these changes.
 Before upstream submission, verify on hardware that repeated screen updates
 preserve motion and button input, that the display is legible with representative
 mappings, and that unplug/replug works. No installed daemon has been replaced.
+
+## Screen settings and idle sleep
+
+These global options apply to the Enterprise (USB `256f:c633`) on Linux:
+
+```ini
+lcd = on
+lcd-brightness = 65
+lcd-idle = 300
+lcd-profile = on
+```
+
+`lcd = off` sends a backlight-off command. Brightness is retained separately
+(0..100). `lcd-idle` is seconds without Enterprise movement outside the configured
+deadzone or a button press; 0 disables sleep (the default), maximum 86400.
+The daemon polls the monotonic timer at most every 500 ms while idle sleep is
+configured. Motion or a button press wakes automatic sleep at the chosen
+brightness. Manual off never wakes from input. Profile changes preserve these
+settings and do not wake automatic sleep. Reconnection reapplies the configuration.
+These settings are not accepted inside profile blocks.
+
+Brightness uses Linux `HIDIOCSFEATURE(2)` on the hidraw node matching the bulk
+USB device's bus and address. The report is `[0x11, brightness]`. The HID driver
+stays attached; no USB reset is performed. The daemon needs access to both the
+USB device and its hidraw node. A system service normally runs as root; custom
+service hardening or udev permissions must also allow these devices.
+Reading feature report 0x11 stalled on the tested firmware, so the daemon reports
+its configured brightness rather than claiming to read the hardware state.
+
+Protocol reference: https://github.com/TheHoodedFoot/SpaceLCD/blob/master/doc/notes.md
+Linux API: https://docs.kernel.org/hid/hidraw.html
+This establishes backlight control, not full power removal from LCD electronics.
+
+The matching libspnav and spnavcfg forks provide Screen on/off, brightness,
+idle timeout, profile title visibility, and an explicit refresh action. Settings
+apply to the running daemon; use Save config to persist them. A setter confirms
+configuration acceptance; Refresh reports the device update result. The fork
+reserves requests 0x3f00..0x3f09 for this API; upstream allocation is not agreed.
+Unsupported daemons return an error and the UI disables unsupported controls.
+
+Tests additionally cover HID report bytes and device matching, idle transitions,
+manual-off behavior, settings round trips, profile preservation, and invalid
+protocol values. General repository audits remain separate from this work.
+
+## Joystick LED idle timeout
+
+`led-idle = 300` switches each device's LED off after five minutes without that
+device's motion outside its deadzone or a button press. `0` means Never (default),
+maximum 86400 seconds. This setting is global and preserved across profiles.
+Movement or a button press restores the LED's requested On/Auto state; Off stays
+off. New application connections do not wake an already sleeping LED. The GUI
+exposes this timeout under General, independently of the screen timeout.
+The LED timer works even in builds without LCD support.

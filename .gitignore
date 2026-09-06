@@ -4,3 +4,4 @@
 Makefile
 spacenavd
 config.h
+__pycache__/
