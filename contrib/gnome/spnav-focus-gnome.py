@@ -39,6 +39,15 @@ class Forwarder:
             self.client.close()
 
 
+def install_signal_handlers(loop):
+    from gi.repository import GLib, GLibUnix
+    def stop():
+        loop.quit()
+        return GLib.SOURCE_REMOVE
+    return [GLibUnix.signal_add(GLib.PRIORITY_DEFAULT, signum, stop)
+            for signum in (signal.SIGTERM, signal.SIGINT)]
+
+
 def main():
     from gi.repository import Gio, GLib
     # A broken daemon connection must be retried, not terminate on SIGPIPE.
@@ -67,8 +76,7 @@ def main():
         return GLib.SOURCE_CONTINUE
     proxy.connect('g-properties-changed', properties_changed)
     loop = GLib.MainLoop()
-    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGTERM, lambda: (loop.quit(), False)[1])
-    GLib.unix_signal_add(GLib.PRIORITY_DEFAULT, signal.SIGINT, lambda: (loop.quit(), False)[1])
+    install_signal_handlers(loop)
     GLib.timeout_add_seconds(2, refresh)
     refresh()
     try:

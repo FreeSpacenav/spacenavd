@@ -2,6 +2,8 @@
 #include <stdio.h>
 #include <string.h>
 #include "../src/cfgfile.c"
+#include "../src/profile.c"
+const char *(*kbemu_keyname)(unsigned int);
 void logmsg(int p, const char *fmt, ...) { (void)p; (void)fmt; }
 int main(int argc, char **argv)
 {
@@ -25,6 +27,13 @@ int main(int argc, char **argv)
 	assert(read_cfg(argv[1], &cfg) == 0 && cfg.lcd_flags == 1);
 	assert(num_profiles == 1 && cfg.repeat_msec == 250 && cfg.led_idle_seconds == 180);
 	assert(cfg.lcd_idle_seconds == 300 && cfg.lcd_brightness == 40);
+	profile_on_cfg_reload(&cfg);
+	assert(profile_set_focus(&cfg, "blender.desktop") == 1);
+	assert(!strcmp(profile_get_name(), "Blender"));
+	assert(cfg.sensitivity == 2 && cfg.lcd_idle_seconds == 300 && cfg.led_idle_seconds == 180);
+	assert(profile_set_focus(&cfg, "chatgpt.desktop") == 1);
+	assert(!strcmp(profile_get_name(), "Default"));
+	profile_clear_focus(&cfg);
 	default_cfg(&cfg); assert(cfg.lcd_idle_seconds == 0); assert(cfg.lcd_flags == 3);
 	puts("LCD configuration persistence tests passed");
 	return 0;

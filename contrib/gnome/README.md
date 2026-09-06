@@ -48,8 +48,15 @@ Tests (no active GNOME session or hardware required):
 
 Daemon profile tests cover provider priority, disconnect, blank focus, and manual
 selection with both X11 build variants. Library tests cover acknowledged string
-chunks. Real GNOME extension activation must be checked after login.
+chunks. GNOME 50 activation and focus forwarding were verified after login. An application
+needs a matching configured profile to display its profile name; otherwise the
+display correctly shows Default. The Blender example above inherits global
+mappings when no overrides are specified.
 
 To disable: disable spacenav-focus@jl1990 in Extensions and remove
 ~/.config/autostart/spnav-focus-gnome.desktop. Stop the running helper to release
 its connection immediately.
+
+After building the sibling libspnav, run `timeout 10s python3
+tests/test_focus_reconnect.py` to test real library/helper reconnection against
+a fake daemon. SPNAV_TEST_LIBRARY can select a different built library.

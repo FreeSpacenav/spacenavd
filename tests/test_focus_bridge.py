@@ -18,4 +18,12 @@ class Tests(unittest.TestCase):
   c=Client();b=m.Forwarder(c);c.fail=True;b.update(True,'cad')
   self.assertEqual(c.closed,1)
   c.fail=False;b.update(True,'cad');self.assertEqual(c.ids,['cad'])
+ def test_signal_handlers_without_deprecation(self):
+  import warnings
+  from gi.repository import Gio, GLib  # Match the helper runtime import order.
+  with warnings.catch_warnings():
+   warnings.simplefilter('error')
+   ids=m.install_signal_handlers(GLib.MainLoop())
+  self.assertEqual(len(ids),2)
+  for id in ids:GLib.source_remove(id)
 if __name__=='__main__':unittest.main()
