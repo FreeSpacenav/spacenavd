@@ -27,6 +27,8 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto_unix.h"
 #include "spnavd.h"
 #include "kbemu.h"
+#include "button_keys.h"
+#include "profile_edit.h"
 
 #ifdef USE_X11
 #include "proto_x11.h"
@@ -211,27 +213,19 @@ void process_input(struct device *dev, struct dev_input *inp)
 		ev.button.bnum = inp->idx;
 		broadcast_event(&ev);
 
+		/* A learning press is swallowed through its release, even after capture expires. */
+		if(inp->idx<0 || inp->idx>=64)break;
+		if(!inp->val && dev->held_key_count[inp->idx]){button_keys_event(dev,inp->idx,0,&cfg);break;}
+		if(dev->captured_buttons[inp->idx]){if(!inp->val)dev->captured_buttons[inp->idx]=0;break;}
+		if(inp->val && profile_edit_capturing()){dev->captured_buttons[inp->idx]=1;break;}
+		if(button_keys_event(dev,inp->idx,inp->val,&cfg))break;
+
 		/* check to see if the button has been bound to an action */
 		if(cfg.bnact[inp->idx] > 0) {
 			handle_button_action(cfg.bnact[inp->idx], inp->val);
 			break;
 		}
 
-		/* check to see if we must emulate a keyboard event instead of a
-		 * regular button event for this button
-		 */
-		if(cfg.kbmap_count[inp->idx] == 1) {
-			/* single key */
-			unsigned int key = cfg.kbmap[inp->idx][0];
-			kbemu_send_key(key, inp->val);
-			break;
-		}
-		if(cfg.kbmap_count[inp->idx] > 1) {
-			/* multi-key combo */
-			unsigned int *keys = cfg.kbmap[inp->idx];
-			kbemu_send_combo(keys, cfg.kbmap_count[inp->idx], inp->val);
-			break;
-		}
 
 		dev_ev = device_event_in_use(dev);
 		if(dev_ev && dev_ev->pending) {

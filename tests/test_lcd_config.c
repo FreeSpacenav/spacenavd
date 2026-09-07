@@ -20,7 +20,7 @@ int main(int argc, char **argv)
 	assert(num_profiles == 1 && !strcmp(profiles[0].name, "Blender"));
 	fp = fopen(argv[1], "r"); assert(fp);
 	count = fread(text, 1, sizeof text - 1, fp); text[count] = 0; fclose(fp);
-	assert(strstr(text, " sensitivity = 2\n"));
+	assert(strstr(text, "editor-controls = 2000,0,1\n")); /* canonical profile override */
 	assert(read_cfg(argv[1], &cfg) == 0 && cfg.lcd_flags == 2);
 	cfg.led_idle_seconds = 180; cfg.repeat_msec = 250; cfg.lcd_flags = 1; cfg.lcd_idle_seconds = 300; cfg.lcd_brightness = 40;
 	assert(write_cfg(argv[1], &cfg) == 0);

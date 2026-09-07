@@ -40,6 +40,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto_x11.h"
 #endif
 #include "profile.h"
+#include "profile_edit.h"
 #include "lcd.h"
 #include "led_idle.h"
 
@@ -166,6 +167,7 @@ opt_pidfile:		if(!argv[++i]) {
 	logmsg(LOG_INFO, "Spacenav daemon " VERSION "\n");
 
 	read_cfg(cfgfile, &cfg);
+	profile_edit_touch();
 	profile_on_cfg_reload(&cfg);
 	profile_refresh_active();
 	lcd_update_mappings();
@@ -472,7 +474,8 @@ static void handle_events(fd_set *rset)
 		read_cfg(cfgfile, &cfg);
 		cfg_changed();
 		/* re-evaluate profiles and refresh LCD after config reload */
-		profile_on_cfg_reload(&cfg);
+		profile_edit_touch();
+	profile_on_cfg_reload(&cfg);
 		profile_refresh_active();
 		lcd_update_mappings();
 	}

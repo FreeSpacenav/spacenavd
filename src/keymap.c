@@ -81,6 +81,24 @@ static struct keymap_entry keymap[] = {
 	{0xffc8, KEY_F11},			/* XK_F11 */
 	{0xffc9, KEY_F12},			/* XK_F12 */
 
+	{0xffca, KEY_F13},
+	{0xffcb, KEY_F14},
+	{0xffcc, KEY_F15},
+	{0xffcd, KEY_F16},
+	{0xffce, KEY_F17},
+	{0xffcf, KEY_F18},
+	{0xffd0, KEY_F19},
+	{0xffd1, KEY_F20},
+	{0xffd2, KEY_F21},
+	{0xffd3, KEY_F22},
+	{0xffd4, KEY_F23},
+	{0xffd5, KEY_F24},
+
+    {0xffb0,KEY_KP0},{0xffb1,KEY_KP1},{0xffb2,KEY_KP2},{0xffb3,KEY_KP3},{0xffb4,KEY_KP4},
+    {0xffb5,KEY_KP5},{0xffb6,KEY_KP6},{0xffb7,KEY_KP7},{0xffb8,KEY_KP8},{0xffb9,KEY_KP9},
+    {0xff8d,KEY_KPENTER},{0xffaa,KEY_KPASTERISK},{0xffab,KEY_KPPLUS},{0xffad,KEY_KPMINUS},
+    {0xffae,KEY_KPDOT},{0xffaf,KEY_KPSLASH},{0xff7f,KEY_NUMLOCK},{0xff14,KEY_SCROLLLOCK},
+    {0xff13,KEY_PAUSE},{0xff61,KEY_SYSRQ},{0xff67,KEY_COMPOSE},
 	/* Modifier keys */
 	{0xffe1, KEY_LEFTSHIFT},	/* XK_Shift_L */
 	{0xffe2, KEY_RIGHTSHIFT},	/* XK_Shift_R */

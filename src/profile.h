@@ -31,4 +31,8 @@ const char *profile_get_button_label(int button);
 /* Get the current profile name (or "Default" if none) */
 const char *profile_get_name(void);
 
+struct cfg *profile_base_config(void);
+const char *profile_focus_id(void);
+void profile_replace_base(struct cfg *c);
+
 #endif

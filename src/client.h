@@ -68,6 +68,8 @@ struct client {
 	struct reqresp_strbuf strbuf;
 	struct reqresp_strbuf focusbuf;
 
+	void *profile_transfer;
+	int profile_transfer_pos, profile_transfer_write;
 	struct client *next;
 };
 

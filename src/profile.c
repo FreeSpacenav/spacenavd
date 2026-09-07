@@ -34,7 +34,7 @@ static int match_class(const char *str, const char *match)
 	buf1[i] = 0;
 	for(i = 0; i < sizeof(buf2) - 1 && match[i]; i++) buf2[i] = (char)tolower((unsigned char)match[i]);
 	buf2[i] = 0;
-	return strstr(buf1, buf2) != NULL;
+	return buf2[0] == '=' ? strcmp(buf1, buf2 + 1) == 0 : strstr(buf1, buf2) != NULL;
 }
 
 static int activate_profile(int new_index)
@@ -112,6 +112,7 @@ int profile_active_index(void)
 const char *profile_get_button_label(int button)
 {
 	if(button < 0 || button >= MAX_BUTTONS) return "";
+	if(cfg.button_label[button][0]) return cfg.button_label[button];
 	if(cfg.kbmap_count[button] <= 0) return "";
 	if(cfg.kbmap_str[button]) return cfg.kbmap_str[button];
 	if(kbemu_keyname) {
@@ -146,4 +147,26 @@ int profile_clear_focus(const void *owner)
 	focus_owner = 0;
 	focus_id[0] = 0;
 	return profile_refresh_active();
+}
+
+struct cfg *profile_base_config(void)
+{
+ if(active_profile < 0) base_cfg = cfg;
+ else profiles[active_profile].pcfg = cfg;
+ base_cfg.lcd_flags=cfg.lcd_flags; base_cfg.lcd_brightness=cfg.lcd_brightness;
+ base_cfg.lcd_idle_seconds=cfg.lcd_idle_seconds; base_cfg.led_idle_seconds=cfg.led_idle_seconds;
+ base_cfg.led=cfg.led; base_cfg.grab_device=cfg.grab_device;
+ base_cfg.repeat_msec=cfg.repeat_msec;
+ return &base_cfg;
+}
+const char *profile_focus_id(void) {
+#ifdef USE_X11
+ static char xclass[256];
+ if(!focus_owner){xclass[0]=0;x11_get_focused_wm_class(xclass,sizeof xclass);return xclass;}
+#endif
+ return focus_id;
+}
+void profile_replace_base(struct cfg *c)
+{
+ cfg=*c; profile_on_cfg_reload(&cfg); profile_refresh_active();
 }

@@ -27,6 +27,9 @@ struct dev_input;
 #define MAX_DEV_NAME	256
 
 struct device {
+	int captured_buttons[64];
+	int held_key_count[64];
+	unsigned int held_keys[64][8];
 	int id;
 	int fd;
 	void *data;

@@ -98,6 +98,9 @@ enum {
 	REQ_GCFG_SOCKET,		/* get socket path:			R[0-5] next 24 bytes R[6] remaining length or -1 for failure */
 	/* TODO ... more */
 	/* Experimental LCD requests shared by the daemon/library forks. */
+	REQ_PROFILE_BEGIN = 0x3f10,
+	REQ_PROFILE_READ, REQ_PROFILE_WRITE, REQ_PROFILE_APPLY,
+	REQ_PROFILE_ACTIVE, REQ_PROFILE_FOCUS, REQ_PROFILE_CAPTURE,
 	REQ_SCFG_LCD = 0x3f00, /* Q[0] flags: bit 0 enabled, bit 1 profile title */
 	REQ_GCFG_LCD,         /* R[0] flags; R[6] -1 if unsupported */
 	REQ_LCD_REFRESH,      /* upload current display; R[6] status */

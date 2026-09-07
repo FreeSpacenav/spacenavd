@@ -31,6 +31,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto_unix.h"
 #include "spnavd.h"
 #include "profile.h"
+#include "profile_edit.h"
 #include "lcd.h"
 #include "led_idle.h"
 #ifdef USE_X11
@@ -299,10 +300,42 @@ static int handle_request(struct client *c, struct reqresp *req)
 	struct device *dev;
 	const char *str = 0;
 
+	if((req->type & 0xffff)!=REQ_PROFILE_READ && (req->type & 0xffff)!=REQ_PROFILE_WRITE)
 	logmsg(LOG_DEBUG, "request %s - %x %x %x %x %x %x\n", reqstr(req->type), req->data[0],
 			req->data[1], req->data[2], req->data[3], req->data[4], req->data[5], req->data[6]);
 
+	/* A legacy configuration edit invalidates outstanding editor drafts. */
+	i=req->type & 0xffff;
+	if((i>=REQ_SCFG_SENS && i<=REQ_GCFG_SWAPYZ && !(i&1)) || i==REQ_CFG_RESTORE || i==REQ_CFG_RESET)profile_edit_touch();
 	switch(req->type & 0xffff) {
+	case REQ_PROFILE_BEGIN:
+		free(c->profile_transfer);c->profile_transfer=calloc(1,sizeof(struct spnav_profile_set));
+		c->profile_transfer_pos=0;c->profile_transfer_write=req->data[0]==1;
+		if(!c->profile_transfer){sendresp(c,req,-1);break;}
+		if(!c->profile_transfer_write)profile_edit_get(c->profile_transfer);
+		req->data[0]=sizeof(struct spnav_profile_set);sendresp(c,req,0);break;
+	case REQ_PROFILE_READ:
+		idx=req->data[0];
+		if(!c->profile_transfer || c->profile_transfer_write || idx<0 || idx>=(int)sizeof(struct spnav_profile_set)){sendresp(c,req,-1);break;}
+		i=sizeof(struct spnav_profile_set)-idx;if(i>24)i=24;
+		memset(req->data,0,24);memcpy(req->data,(char*)c->profile_transfer+idx,i);sendresp(c,req,0);break;
+	case REQ_PROFILE_WRITE:
+		idx=req->data[6];
+		if(!c->profile_transfer || !c->profile_transfer_write || idx!=c->profile_transfer_pos || idx<0 || idx>=(int)sizeof(struct spnav_profile_set)){sendresp(c,req,-1);break;}
+		i=sizeof(struct spnav_profile_set)-idx;if(i>24)i=24;
+		memcpy((char*)c->profile_transfer+idx,req->data,i);c->profile_transfer_pos+=i;sendresp(c,req,0);break;
+	case REQ_PROFILE_APPLY:
+		if(!c->profile_transfer || !c->profile_transfer_write || c->profile_transfer_pos!=sizeof(struct spnav_profile_set)){sendresp(c,req,-1);break;}
+		res=profile_edit_apply(c->profile_transfer);
+		if(!res){cfg_changed();lcd_update_mappings();profile_edit_get(c->profile_transfer);req->data[0]=((struct spnav_profile_set*)c->profile_transfer)->revision;}
+		free(c->profile_transfer);c->profile_transfer=0;sendresp(c,req,res);break;
+	case REQ_PROFILE_CAPTURE:
+		sendresp(c,req,profile_edit_capture(c,req->data[0]));break;
+	case REQ_PROFILE_ACTIVE:
+		req->data[0]=profile_active_index()+1;sendresp(c,req,0);break;
+	case REQ_PROFILE_FOCUS:
+		spnav_send_str(c->sock,req->type,profile_focus_id());break;
+
 	case REQ_SET_NAME:
 		if((res = spnav_recv_str(&c->strbuf, req)) == -1) {
 			logmsg(LOG_ERR, "SET_NAME: failed to receive string\n");
@@ -769,7 +802,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 		break;
 
 	case REQ_CFG_SAVE:
-		sendresp(c, req, write_cfg(cfgfile, &cfg));
+		sendresp(c, req, write_cfg(cfgfile, profile_base_config()));
 		break;
 
 	case REQ_CFG_RESTORE:

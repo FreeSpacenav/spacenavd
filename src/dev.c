@@ -23,6 +23,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <unistd.h>
 #include <sys/stat.h>
 #include "dev.h"
+#include "button_keys.h"
 #include "lcd.h"
 #include "led_idle.h"
 #include "client.h"
@@ -306,6 +307,7 @@ void remove_device(struct device *dev)
 	ev.dev.usbid[1] = dev->usbid[1];
 	broadcast_event(&ev);
 
+	button_keys_release(dev);
 	free(dev);
 }
 

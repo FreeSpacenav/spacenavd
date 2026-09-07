@@ -172,6 +172,67 @@ static const char *bool_str[] = {
 	0
 };
 
+
+static void edit_mark(struct profile *p, const char *key)
+{
+ int i,n;
+ if(!strcmp(key,"sensitivity"))p->edit_overrides|=1;
+ else if(!strcmp(key,"swap-yz"))p->edit_overrides|=2;
+ else if(sscanf(key,"kbmap%d",&n)==1 || sscanf(key,"bnmap%d",&n)==1 || sscanf(key,"bnact%d",&n)==1) {
+  if(n>=0 && n<64)p->edit_buttons[n]=1;
+ } else if(sscanf(key,"axismap%d",&n)==1 || sscanf(key,"dead-zone%d",&n)==1) {
+  if(n>=0 && n<64)p->edit_axes[n]=1;
+ } else if(!strncmp(key,"sensitivity-",12) || !strncmp(key,"invert-",7) || !strncmp(key,"dead-zone",9)) {
+  for(i=0;i<64;i++)p->edit_axes[i]=1;
+ }
+}
+static int editor_option(struct cfg *c,struct profile *p,const char *key,const char *value)
+{
+ int n,a,b,d,e,i,pos=0;unsigned int k,keys[8];char hex[129]={0};
+ if(!strcmp(key,"editor-controls")) {
+  if(sscanf(value,"%d,%d,%d",&a,&b,&d)!=3 || a<0 || a>100000 || b<0 || b>1 || d<0 || d>3)return -1;
+  if(!p || (d&1))c->sensitivity=a/1000.0f;
+  if(!p || (d&2))c->swapyz=b;
+  if(p)p->edit_overrides=d;
+  return 1;
+ }
+ if(sscanf(key,"editor-axis%d",&n)==1) {
+  if(n<0 || n>=64 || sscanf(value,"%d,%d,%d,%d",&a,&b,&d,&e)!=4 || a<0 || a>100000 || b<0 || b>32767 || d<0 || d>1 || e<0 || e>=64)return -1;
+  if(n<3)c->sens_trans[n]=a/1000.0f;else if(n<6)c->sens_rot[n-3]=a/1000.0f;
+  c->dead_threshold[n]=b;c->invert[n]=d;c->map_axis[n]=e;if(p)p->edit_axes[n]=1;
+  return 1;
+ }
+ if(sscanf(key,"editor-button%d",&n)==1) {
+  if(n<0 || n>=64 || sscanf(value,"%d,%d,%d,%n",&a,&b,&d,&pos)!=3 || !pos || a<0 || a>=64 || b<0 || b>=MAX_BNACT || d<0 || d>8)return -1;
+  value+=pos;
+  for(i=0;i<8;i++) {pos=0;if(sscanf(value,"%x,%n",&keys[i],&pos)!=1 || !pos)return -1;value+=pos;}
+  if(strlen(value)>126 || strlen(value)%2)return -1;
+  strcpy(hex,value);
+  for(i=0;hex[i];i++)if(!isxdigit((unsigned char)hex[i]))return -1;
+  memset(c->button_label[n],0,64);
+  for(i=0;hex[i*2];i++){sscanf(hex+i*2,"%2x",&k);if(k<32 || k==127)return -1;c->button_label[n][i]=(char)k;}
+  c->map_button[n]=a;c->bnact[n]=b;c->kbmap_count[n]=d;memcpy(c->kbmap[n],keys,sizeof keys);
+  free(c->kbmap_str[n]);c->kbmap_str[n]=0;if(p)p->edit_buttons[n]=1;
+  return 1;
+ }
+ return 0;
+}
+static int write_editor(FILE *fp,const struct cfg *c,const struct profile *p)
+{
+ int i,k;char hex[129];
+ fprintf(fp,"editor-controls = %d,%d,%d\n",(int)(c->sensitivity*1000),c->swapyz,p?p->edit_overrides:3);
+ for(i=0;i<64;i++)if(!p || p->edit_axes[i]) {
+  int sens=i<3?(int)(c->sens_trans[i]*1000):i<6?(int)(c->sens_rot[i-3]*1000):1000;
+  fprintf(fp,"editor-axis%d = %d,%d,%d,%d\n",i,sens,c->dead_threshold[i],c->invert[i],c->map_axis[i]);
+ }
+ for(i=0;i<64;i++)if(!p || p->edit_buttons[i]) {
+  fprintf(fp,"editor-button%d = %d,%d,%d,",i,c->map_button[i],c->bnact[i],c->kbmap_count[i]);
+  for(k=0;k<8;k++)fprintf(fp,"%x,",c->kbmap[i][k]);
+  for(k=0;k<63 && c->button_label[i][k];k++)sprintf(hex+k*2,"%02x",(unsigned char)c->button_label[i][k]);
+  hex[k*2]=0;fprintf(fp,"%s\n",hex);
+ }
+ return ferror(fp)?-1:0;
+}
 int read_cfg(const char *fname, struct cfg *cfg)
 {
 	FILE *fp;
@@ -299,6 +360,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			profiles[num_profiles].name = strdup(name_start);
 			profiles[num_profiles].match_class = strdup(class_val);
 			cur_profile = num_profiles++;
+			lptr->in_profile = 1;
 			logmsg(LOG_INFO, "profile \"%s\" class=%s\n", profiles[cur_profile].name, profiles[cur_profile].match_class);
 			continue;
 		}
@@ -325,6 +387,13 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			continue;
 		}
 
+		if(cur_profile >= 0) edit_mark(&profiles[cur_profile], key_str);
+		if(!strncmp(key_str,"editor-",7)) {
+			lptr->opt = -2;
+			if(editor_option(target,cur_profile>=0?&profiles[cur_profile]:0,key_str,val_str)<0)
+				logmsg(LOG_WARNING,"invalid profile editor option: %s\n",key_str);
+			continue;
+		}
 		ival = strtol(val_str, &endp, 10);
 		isint = (endp > val_str);
 
@@ -645,9 +714,17 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	FILE *fp;
 	struct flock flk;
 	struct cfg def;
-	char buf[128];
+	char buf[128], temporary[PATH_MAX];
+	int tempfd;
+	struct stat st;
 
-	if(!(fp = fopen(fname, "w"))) {
+	if(snprintf(temporary,sizeof temporary,"%s.XXXXXX",fname)>=(int)sizeof temporary)return -1;
+	tempfd=mkstemp(temporary);
+	if(tempfd<0)return -1;
+	if(stat(fname,&st)==0)fchmod(tempfd,st.st_mode & 0777);
+	else fchmod(tempfd,0644);
+	if(!(fp = fdopen(tempfd, "w"))) {
+		close(tempfd);unlink(temporary);
 		logmsg(LOG_ERR, "failed to write config file %s: %s\n", fname, strerror(errno));
 		return -1;
 	}
@@ -869,12 +946,25 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
 	for(i=0; i<num_lines; i++) {
-		if(!cfglines[i].str) continue;
+		if(!cfglines[i].str || cfglines[i].in_profile || cfglines[i].opt == -2) continue;
 
 		if(*cfglines[i].str) {
 			fputs(cfglines[i].str, fp);
 		}
 		fputc('\n', fp);
+	}
+
+	write_editor(fp,cfg,0);
+	for(i=0;i<num_profiles;i++) {
+		fprintf(fp,"\nprofile \"%s\" class=%s\n",profiles[i].name,profiles[i].match_class);
+		write_editor(fp,&profiles[i].pcfg,&profiles[i]);
+		/* Keep legacy per-profile options which are outside the axes/button editor. */
+		if(profiles[i].pcfg.led!=cfg->led)fprintf(fp,"led = %s\n",profiles[i].pcfg.led==2?"auto":profiles[i].pcfg.led?"on":"off");
+		if(profiles[i].pcfg.grab_device!=cfg->grab_device)fprintf(fp,"grab = %d\n",profiles[i].pcfg.grab_device);
+		if(profiles[i].pcfg.repeat_msec!=cfg->repeat_msec)fprintf(fp,"repeat-interval = %d\n",profiles[i].pcfg.repeat_msec);
+		if(profiles[i].pcfg.kbemu_use_x11!=cfg->kbemu_use_x11)fprintf(fp,"kbmap_use_x11 = %d\n",profiles[i].pcfg.kbemu_use_x11);
+		if(strcmp(profiles[i].pcfg.serial_dev,cfg->serial_dev))fprintf(fp,"serial = %s\n",profiles[i].pcfg.serial_dev);
+		fputs("end\n",fp);
 	}
 
 	/* unlock */
@@ -883,7 +973,9 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	flk.l_whence = SEEK_SET;
 	fcntl(fileno(fp), F_SETLK, &flk);
 
-	fclose(fp);
+	if(fflush(fp) || ferror(fp) || fsync(fileno(fp))) {fclose(fp);unlink(temporary);return -1;}
+	if(fclose(fp)) {unlink(temporary);return -1;}
+	if(rename(temporary,fname)) {unlink(temporary);return -1;}
 	return 0;
 }
 
