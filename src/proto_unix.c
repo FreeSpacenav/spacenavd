@@ -30,6 +30,10 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include "proto.h"
 #include "proto_unix.h"
 #include "spnavd.h"
+#include "profile.h"
+#include "profile_edit.h"
+#include "lcd.h"
+#include "led_idle.h"
 #ifdef USE_X11
 #include "kbemu.h"
 #endif
@@ -296,10 +300,42 @@ static int handle_request(struct client *c, struct reqresp *req)
 	struct device *dev;
 	const char *str = 0;
 
+	if((req->type & 0xffff)!=REQ_PROFILE_READ && (req->type & 0xffff)!=REQ_PROFILE_WRITE)
 	logmsg(LOG_DEBUG, "request %s - %x %x %x %x %x %x\n", reqstr(req->type), req->data[0],
 			req->data[1], req->data[2], req->data[3], req->data[4], req->data[5], req->data[6]);
 
+	/* A legacy configuration edit invalidates outstanding editor drafts. */
+	i=req->type & 0xffff;
+	if((i>=REQ_SCFG_SENS && i<=REQ_GCFG_SWAPYZ && !(i&1)) || i==REQ_CFG_RESTORE || i==REQ_CFG_RESET)profile_edit_touch();
 	switch(req->type & 0xffff) {
+	case REQ_PROFILE_BEGIN:
+		free(c->profile_transfer);c->profile_transfer=calloc(1,sizeof(struct spnav_profile_set));
+		c->profile_transfer_pos=0;c->profile_transfer_write=req->data[0]==1;
+		if(!c->profile_transfer){sendresp(c,req,-1);break;}
+		if(!c->profile_transfer_write)profile_edit_get(c->profile_transfer);
+		req->data[0]=sizeof(struct spnav_profile_set);sendresp(c,req,0);break;
+	case REQ_PROFILE_READ:
+		idx=req->data[0];
+		if(!c->profile_transfer || c->profile_transfer_write || idx<0 || idx>=(int)sizeof(struct spnav_profile_set)){sendresp(c,req,-1);break;}
+		i=sizeof(struct spnav_profile_set)-idx;if(i>24)i=24;
+		memset(req->data,0,24);memcpy(req->data,(char*)c->profile_transfer+idx,i);sendresp(c,req,0);break;
+	case REQ_PROFILE_WRITE:
+		idx=req->data[6];
+		if(!c->profile_transfer || !c->profile_transfer_write || idx!=c->profile_transfer_pos || idx<0 || idx>=(int)sizeof(struct spnav_profile_set)){sendresp(c,req,-1);break;}
+		i=sizeof(struct spnav_profile_set)-idx;if(i>24)i=24;
+		memcpy((char*)c->profile_transfer+idx,req->data,i);c->profile_transfer_pos+=i;sendresp(c,req,0);break;
+	case REQ_PROFILE_APPLY:
+		if(!c->profile_transfer || !c->profile_transfer_write || c->profile_transfer_pos!=sizeof(struct spnav_profile_set)){sendresp(c,req,-1);break;}
+		res=profile_edit_apply(c->profile_transfer);
+		if(!res){cfg_changed();lcd_update_mappings();profile_edit_get(c->profile_transfer);req->data[0]=((struct spnav_profile_set*)c->profile_transfer)->revision;}
+		free(c->profile_transfer);c->profile_transfer=0;sendresp(c,req,res);break;
+	case REQ_PROFILE_CAPTURE:
+		sendresp(c,req,profile_edit_capture(c,req->data[0]));break;
+	case REQ_PROFILE_ACTIVE:
+		req->data[0]=profile_active_index()+1;sendresp(c,req,0);break;
+	case REQ_PROFILE_FOCUS:
+		spnav_send_str(c->sock,req->type,profile_focus_id());break;
+
 	case REQ_SET_NAME:
 		if((res = spnav_recv_str(&c->strbuf, req)) == -1) {
 			logmsg(LOG_ERR, "SET_NAME: failed to receive string\n");
@@ -310,6 +346,56 @@ static int handle_request(struct client *c, struct reqresp *req)
 			c->strbuf.buf = 0;
 			logmsg(LOG_INFO, "client name: %s\n", c->name);
 		}
+		break;
+
+	case REQ_SET_APP_ID:
+		if((res = spnav_recv_str(&c->strbuf, req)) == -1) {
+			logmsg(LOG_ERR, "SET_APP_ID: failed to receive string\n");
+			break;
+		}
+		if(res) {
+			free(c->app_id);
+			c->app_id = c->strbuf.buf;
+			c->strbuf.buf = 0;
+			logmsg(LOG_INFO, "client app_id: %s\n", c->app_id);
+			/* Identity is not focus: a background client must not change
+			 * global mappings merely by registering its application ID.
+			 */
+		}
+		break;
+
+	case REQ_SET_FOCUS:
+		if(req->data[6] < 0 || REQSTR_REMLEN(req) > 255 ||
+				(res = spnav_recv_str(&c->focusbuf, req)) < 0) {
+			free(c->focusbuf.buf);
+			memset(&c->focusbuf, 0, sizeof c->focusbuf);
+			sendresp(c, req, -1);
+			break;
+		}
+		if(res) {
+			if(strlen(c->focusbuf.buf) != (size_t)c->focusbuf.size - 1) res = -1;
+			else res = profile_set_focus(c, c->focusbuf.buf);
+			free(c->focusbuf.buf);
+			memset(&c->focusbuf, 0, sizeof c->focusbuf);
+		}
+		sendresp(c, req, res < 0 ? -1 : 0);
+		if(res > 0) lcd_update_mappings();
+		break;
+
+	case REQ_SET_PROFILE:
+		res = profile_set_manual(req->data[0]);
+		if(res >= 0) {
+			if(res) lcd_update_mappings();
+			sendresp(c, req, 0);
+		} else {
+			sendresp(c, req, -1);
+		}
+		break;
+
+	case REQ_GET_PROFILE:
+		req->data[0] = profile_active_index();
+		req->data[1] = num_profiles;
+		sendresp(c, req, 0);
 		break;
 
 	case REQ_SET_SENS:
@@ -543,6 +629,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 		free(cfg.kbmap_str[idx]);
 		cfg.kbmap_str[idx] = req->data[1] > 0 ? strdup(str) : 0;
 		sendresp(c, req, 0);
+		lcd_update_mappings();
 #else
 		logmsg(LOG_WARNING, "unable to set keyboard mappings, daemon compiled without X11 support\n");
 		sendresp(c, req, -1);
@@ -578,6 +665,73 @@ static int handle_request(struct client *c, struct reqresp *req)
 	case REQ_GCFG_SWAPYZ:
 		req->data[0] = cfg.swapyz;
 		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_LCD:
+		if(!lcd_supported() || req->data[0] < 0 || (req->data[0] & ~(LCD_ENABLED | LCD_PROFILE))) {
+			sendresp(c, req, -1);
+			break;
+		}
+		cfg.lcd_flags = req->data[0];
+		lcd_idle_reset();
+		sendresp(c, req, 0); /* setting accepted; upload errors are logged */
+		lcd_update_mappings();
+		break;
+
+	case REQ_GCFG_LCD:
+		req->data[0] = cfg.lcd_flags;
+		sendresp(c, req, lcd_supported() ? 0 : -1);
+		break;
+
+	case REQ_SCFG_LCD_BRIGHTNESS:
+		if(!lcd_supported() || req->data[0] < 0 || req->data[0] > 100) {
+			sendresp(c, req, -1);
+			break;
+		}
+		cfg.lcd_brightness = req->data[0];
+		lcd_idle_reset();
+		sendresp(c, req, 0);
+		lcd_update_mappings();
+		break;
+
+	case REQ_GCFG_LCD_BRIGHTNESS:
+		req->data[0] = cfg.lcd_brightness;
+		sendresp(c, req, lcd_supported() ? 0 : -1);
+		break;
+
+	case REQ_SCFG_LED_IDLE:
+		if(req->data[0] < 0 || req->data[0] > 86400) {
+			sendresp(c, req, -1);
+			break;
+		}
+		cfg.led_idle_seconds = req->data[0];
+		led_idle_reset();
+		sendresp(c, req, 0);
+		break;
+	case REQ_GCFG_LED_IDLE:
+		req->data[0] = cfg.led_idle_seconds;
+		sendresp(c, req, 0);
+		break;
+
+	case REQ_SCFG_LCD_IDLE:
+		if(!lcd_supported() || req->data[0] < 0 || req->data[0] > 86400) {
+			sendresp(c, req, -1);
+			break;
+		}
+		cfg.lcd_idle_seconds = req->data[0];
+		lcd_idle_reset();
+		sendresp(c, req, 0);
+		lcd_update_mappings();
+		break;
+
+	case REQ_GCFG_LCD_IDLE:
+		req->data[0] = cfg.lcd_idle_seconds;
+		sendresp(c, req, lcd_supported() ? 0 : -1);
+		break;
+
+	case REQ_LCD_REFRESH:
+		lcd_idle_reset();
+		sendresp(c, req, lcd_refresh());
 		break;
 
 	case REQ_SCFG_LED:
@@ -648,7 +802,7 @@ static int handle_request(struct client *c, struct reqresp *req)
 		break;
 
 	case REQ_CFG_SAVE:
-		sendresp(c, req, write_cfg(cfgfile, &cfg));
+		sendresp(c, req, write_cfg(cfgfile, profile_base_config()));
 		break;
 
 	case REQ_CFG_RESTORE:
@@ -657,13 +811,19 @@ static int handle_request(struct client *c, struct reqresp *req)
 					cfgfile);
 			default_cfg(&cfg);
 		}
+		profile_on_cfg_reload(&cfg);
+		profile_refresh_active();
 		cfg_changed();
+		lcd_update_mappings();
 		sendresp(c, req, 0);
 		break;
 
 	case REQ_CFG_RESET:
 		default_cfg(&cfg);
+		profile_on_cfg_reload(&cfg);
+		profile_refresh_active();
 		cfg_changed();
+		lcd_update_mappings();
 		sendresp(c, req, 0);
 		break;
 
@@ -691,6 +851,16 @@ static const char *reqstr(int req)
 		return spnav_reqnames_3000[req - 0x3000];
 	}
 	switch(req) {
+	case REQ_SCFG_LED_IDLE: return "SCFG_LED_IDLE";
+	case REQ_GCFG_LED_IDLE: return "GCFG_LED_IDLE";
+	case REQ_SET_FOCUS: return "SET_FOCUS";
+	case REQ_SCFG_LCD: return "SCFG_LCD";
+	case REQ_GCFG_LCD: return "GCFG_LCD";
+	case REQ_LCD_REFRESH: return "LCD_REFRESH";
+	case REQ_SCFG_LCD_BRIGHTNESS: return "SCFG_LCD_BRIGHTNESS";
+	case REQ_GCFG_LCD_BRIGHTNESS: return "GCFG_LCD_BRIGHTNESS";
+	case REQ_SCFG_LCD_IDLE: return "SCFG_LCD_IDLE";
+	case REQ_GCFG_LCD_IDLE: return "GCFG_LCD_IDLE";
 	case REQ_CFG_SAVE:
 		return "CFG_SAVE";
 	case REQ_CFG_RESTORE:

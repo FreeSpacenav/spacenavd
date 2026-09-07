@@ -144,3 +144,20 @@
 # the re-centering power of the device.
 #
 #repeat-interval = -1
+
+
+# Per-application profiles
+# Profiles override global settings for specific applications.
+# The "class" value is matched (case-insensitive substring) against
+# the WM_CLASS of the currently focused window.
+#
+#profile "Blender" class=blender
+#    kbmap0 = Escape
+#    kbmap1 = Return
+#    sensitivity = 2.0
+#end
+#
+# Automatic matching uses X11 focus only. An application ID is metadata,
+# not a focus signal. On native Wayland, use explicit REQ_SET_PROFILE
+# selection; -1 restores automatic mode (default config without X11 focus).
+# See doc/lcd-profiles.md for LCD dependencies, limitations and tests.

@@ -19,6 +19,7 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #define SPNAV_DEV_H_
 
 #include <limits.h>
+#include <time.h>
 #include "config.h"
 
 struct dev_input;
@@ -26,6 +27,9 @@ struct dev_input;
 #define MAX_DEV_NAME	256
 
 struct device {
+	int captured_buttons[64];
+	int held_key_count[64];
+	unsigned int held_keys[64][8];
 	int id;
 	int fd;
 	void *data;
@@ -35,6 +39,8 @@ struct device {
 	unsigned int usbid[2];	/* vendor:product for USB devices */
 	unsigned int flags;
 
+	int led_requested, led_asleep, led_timer_valid;
+	struct timespec led_activity;
 	int num_axes, num_buttons;
 	int bnbase;				/* button base (reported number of first button) */
 	int *minval, *maxval;	/* input value range (default: -500, 500) */

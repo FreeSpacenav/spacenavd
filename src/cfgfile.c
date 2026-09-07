@@ -32,6 +32,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
 struct cfg cfg, prev_cfg;
 
+struct profile profiles[MAX_PROFILES];
+int num_profiles;
+
 /* all parsable config options... some of them might map to the same cfg field */
 enum {
 	CFG_REPEAT,
@@ -46,7 +49,7 @@ enum {
 	CFG_LED, CFG_GRAB,
 	CFG_SERIAL, CFG_DEVID,
 
-	CFG_SOCKPATH,
+	CFG_SOCKPATH, CFG_LED_IDLE, CFG_LCD, CFG_LCD_PROFILE, CFG_LCD_BRIGHTNESS, CFG_LCD_IDLE,
 
 	/* debug options, not part of the protocol, can change at any time */
 	CFG_KBMAP_USE_X11,
@@ -74,6 +77,7 @@ struct cfgline {
 	char *str;		/* actual line text */
 	int opt;		/* CFG_* item */
 	int idx;
+	int in_profile; /* preserve profile blocks when saving global settings */
 	int own;		/* added and owned by spacenavd, not in the original user config */
 };
 
@@ -81,11 +85,33 @@ static struct cfgline *cfglines;
 static int num_lines;
 
 
+static void init_cfg(struct cfg *cfg);
+
 void default_cfg(struct cfg *cfg)
 {
 	int i, j;
 
+	for(i = 0; i < num_profiles; i++) {
+		free(profiles[i].name);
+		free(profiles[i].match_class);
+		for(j = 0; j < MAX_CUSTOM; j++) free(profiles[i].pcfg.devname[j]);
+		for(j = 0; j < MAX_BUTTONS; j++) {
+			free(profiles[i].pcfg.kbmap_str[j]);
+		}
+	}
+	num_profiles = 0;
+	memset(profiles, 0, sizeof profiles);
+
+	init_cfg(cfg);
+}
+
+static void init_cfg(struct cfg *cfg)
+{
+	int i, j;
 	memset(cfg, 0, sizeof *cfg);
+	cfg->lcd_flags = LCD_ENABLED | LCD_PROFILE;
+	cfg->lcd_brightness = 100;
+	cfg->lcd_idle_seconds = 0;
 
 	cfg->sensitivity = 1.0;
 	for(i=0; i<3; i++) {
@@ -146,6 +172,67 @@ static const char *bool_str[] = {
 	0
 };
 
+
+static void edit_mark(struct profile *p, const char *key)
+{
+ int i,n;
+ if(!strcmp(key,"sensitivity"))p->edit_overrides|=1;
+ else if(!strcmp(key,"swap-yz"))p->edit_overrides|=2;
+ else if(sscanf(key,"kbmap%d",&n)==1 || sscanf(key,"bnmap%d",&n)==1 || sscanf(key,"bnact%d",&n)==1) {
+  if(n>=0 && n<64)p->edit_buttons[n]=1;
+ } else if(sscanf(key,"axismap%d",&n)==1 || sscanf(key,"dead-zone%d",&n)==1) {
+  if(n>=0 && n<64)p->edit_axes[n]=1;
+ } else if(!strncmp(key,"sensitivity-",12) || !strncmp(key,"invert-",7) || !strncmp(key,"dead-zone",9)) {
+  for(i=0;i<64;i++)p->edit_axes[i]=1;
+ }
+}
+static int editor_option(struct cfg *c,struct profile *p,const char *key,const char *value)
+{
+ int n,a,b,d,e,i,pos=0;unsigned int k,keys[8];char hex[129]={0};
+ if(!strcmp(key,"editor-controls")) {
+  if(sscanf(value,"%d,%d,%d",&a,&b,&d)!=3 || a<0 || a>100000 || b<0 || b>1 || d<0 || d>3)return -1;
+  if(!p || (d&1))c->sensitivity=a/1000.0f;
+  if(!p || (d&2))c->swapyz=b;
+  if(p)p->edit_overrides=d;
+  return 1;
+ }
+ if(sscanf(key,"editor-axis%d",&n)==1) {
+  if(n<0 || n>=64 || sscanf(value,"%d,%d,%d,%d",&a,&b,&d,&e)!=4 || a<0 || a>100000 || b<0 || b>32767 || d<0 || d>1 || e<0 || e>=64)return -1;
+  if(n<3)c->sens_trans[n]=a/1000.0f;else if(n<6)c->sens_rot[n-3]=a/1000.0f;
+  c->dead_threshold[n]=b;c->invert[n]=d;c->map_axis[n]=e;if(p)p->edit_axes[n]=1;
+  return 1;
+ }
+ if(sscanf(key,"editor-button%d",&n)==1) {
+  if(n<0 || n>=64 || sscanf(value,"%d,%d,%d,%n",&a,&b,&d,&pos)!=3 || !pos || a<0 || a>=64 || b<0 || b>=MAX_BNACT || d<0 || d>8)return -1;
+  value+=pos;
+  for(i=0;i<8;i++) {pos=0;if(sscanf(value,"%x,%n",&keys[i],&pos)!=1 || !pos)return -1;value+=pos;}
+  if(strlen(value)>126 || strlen(value)%2)return -1;
+  strcpy(hex,value);
+  for(i=0;hex[i];i++)if(!isxdigit((unsigned char)hex[i]))return -1;
+  memset(c->button_label[n],0,64);
+  for(i=0;hex[i*2];i++){sscanf(hex+i*2,"%2x",&k);if(k<32 || k==127)return -1;c->button_label[n][i]=(char)k;}
+  c->map_button[n]=a;c->bnact[n]=b;c->kbmap_count[n]=d;memcpy(c->kbmap[n],keys,sizeof keys);
+  free(c->kbmap_str[n]);c->kbmap_str[n]=0;if(p)p->edit_buttons[n]=1;
+  return 1;
+ }
+ return 0;
+}
+static int write_editor(FILE *fp,const struct cfg *c,const struct profile *p)
+{
+ int i,k;char hex[129];
+ fprintf(fp,"editor-controls = %d,%d,%d\n",(int)(c->sensitivity*1000),c->swapyz,p?p->edit_overrides:3);
+ for(i=0;i<64;i++)if(!p || p->edit_axes[i]) {
+  int sens=i<3?(int)(c->sens_trans[i]*1000):i<6?(int)(c->sens_rot[i-3]*1000):1000;
+  fprintf(fp,"editor-axis%d = %d,%d,%d,%d\n",i,sens,c->dead_threshold[i],c->invert[i],c->map_axis[i]);
+ }
+ for(i=0;i<64;i++)if(!p || p->edit_buttons[i]) {
+  fprintf(fp,"editor-button%d = %d,%d,%d,",i,c->map_button[i],c->bnact[i],c->kbmap_count[i]);
+  for(k=0;k<8;k++)fprintf(fp,"%x,",c->kbmap[i][k]);
+  for(k=0;k<63 && c->button_label[i][k];k++)sprintf(hex+k*2,"%02x",(unsigned char)c->button_label[i][k]);
+  hex[k*2]=0;fprintf(fp,"%s\n",hex);
+ }
+ return ferror(fp)?-1:0;
+}
 int read_cfg(const char *fname, struct cfg *cfg)
 {
 	FILE *fp;
@@ -154,6 +241,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	struct flock flk;
 	int num_devid = 0;
 	struct cfgline *lptr;
+	int cur_profile = -1;
 
 	default_cfg(cfg);
 
@@ -169,6 +257,9 @@ int read_cfg(const char *fname, struct cfg *cfg)
 	flk.l_start = flk.l_len = 0;
 	flk.l_whence = SEEK_SET;
 	while(fcntl(fd, F_SETLKW, &flk) == -1);
+
+	/* Release the previously parsed strings before resetting the line count. */
+	for(i = 0; i < num_lines; i++) free(cfglines[i].str);
 
 	/* count newlines and populate lines array */
 	num_lines = 0;
@@ -193,8 +284,11 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		int isint, isfloat, isbool, ival, bnidx, axisidx;
 		float fval;
 		char *endp, *key_str, *val_str, *line = buf;
+		struct cfg *target;
 
 		lptr = cfglines + num_lines++;
+		lptr->opt = -1; /* comments and profile headers are not options */
+		lptr->in_profile = cur_profile >= 0;
 
 		if((endp = strchr(buf, '\r')) || (endp = strchr(buf, '\n'))) {
 			*endp = 0;
@@ -210,6 +304,80 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			continue;	/* ignore comments and empty lines */
 		}
 
+		/* check for profile block start: profile "Name" class=match */
+		if(strncmp(line, "profile", 7) == 0 && (line[7] == ' ' || line[7] == '\t' || line[7] == '"')) {
+			char *p, *name_start, *name_end, *class_val;
+
+			if(num_profiles >= MAX_PROFILES) {
+				logmsg(LOG_WARNING, "too many profiles (max %d), ignoring\n", MAX_PROFILES);
+				continue;
+			}
+
+			/* parse quoted name */
+			p = line + 7;
+			while(*p == ' ' || *p == '\t') p++;
+			if(*p == '"') {
+				name_start = ++p;
+				name_end = strchr(p, '"');
+				if(!name_end) {
+					logmsg(LOG_WARNING, "unterminated profile name string\n");
+					continue;
+				}
+				*name_end = 0;
+				p = name_end + 1;
+			} else {
+				name_start = p;
+				while(*p && *p != ' ' && *p != '\t') p++;
+				if(*p) *p++ = 0;
+			}
+
+			/* parse class=value */
+			while(*p == ' ' || *p == '\t') p++;
+			class_val = 0;
+			if(strncmp(p, "class=", 6) == 0) {
+				class_val = p + 6;
+				/* trim trailing whitespace */
+				endp = class_val + strlen(class_val) - 1;
+				while(endp > class_val && (*endp == ' ' || *endp == '\t' || *endp == '\n' || *endp == '\r')) {
+					*endp-- = 0;
+				}
+			}
+			if(!class_val || !*class_val) {
+				logmsg(LOG_WARNING, "profile missing class= specifier, ignoring\n");
+				continue;
+			}
+
+			/* initialize profile with a copy of the current global config */
+			profiles[num_profiles].pcfg = *cfg;
+			/* deep copy kbmap_str pointers */
+			for(i = 0; i < MAX_BUTTONS; i++) {
+				profiles[num_profiles].pcfg.kbmap_str[i] = cfg->kbmap_str[i] ? strdup(cfg->kbmap_str[i]) : 0;
+			}
+			/* deep copy devname pointers */
+			for(i = 0; i < MAX_CUSTOM; i++) {
+				profiles[num_profiles].pcfg.devname[i] = cfg->devname[i] ? strdup(cfg->devname[i]) : 0;
+			}
+			profiles[num_profiles].name = strdup(name_start);
+			profiles[num_profiles].match_class = strdup(class_val);
+			cur_profile = num_profiles++;
+			lptr->in_profile = 1;
+			logmsg(LOG_INFO, "profile \"%s\" class=%s\n", profiles[cur_profile].name, profiles[cur_profile].match_class);
+			continue;
+		}
+
+		/* check for end of profile block */
+		if(strcmp(line, "end") == 0) {
+			if(cur_profile >= 0) {
+				cur_profile = -1;
+			} else {
+				logmsg(LOG_WARNING, "unexpected 'end' outside profile block\n");
+			}
+			continue;
+		}
+
+		/* select target config: profile or global */
+		target = (cur_profile >= 0) ? &profiles[cur_profile].pcfg : cfg;
+
 		if(!(key_str = strtok(line, " =\n\t\r"))) {
 			logmsg(LOG_WARNING, "invalid config line: %s, skipping.\n", line);
 			continue;
@@ -219,6 +387,13 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			continue;
 		}
 
+		if(cur_profile >= 0) edit_mark(&profiles[cur_profile], key_str);
+		if(!strncmp(key_str,"editor-",7)) {
+			lptr->opt = -2;
+			if(editor_option(target,cur_profile>=0?&profiles[cur_profile]:0,key_str,val_str)<0)
+				logmsg(LOG_WARNING,"invalid profile editor option: %s\n",key_str);
+			continue;
+		}
 		ival = strtol(val_str, &endp, 10);
 		isint = (endp > val_str);
 
@@ -238,13 +413,13 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		if(strcmp(key_str, "repeat-interval") == 0) {
 			lptr->opt = CFG_REPEAT;
 			EXPECT(isint);
-			cfg->repeat_msec = ival;
+			target->repeat_msec = ival;
 
 		} else if(strcmp(key_str, "dead-zone") == 0) {
 			lptr->opt = CFG_DEADZONE;
 			EXPECT(isint);
 			for(i=0; i<MAX_AXES; i++) {
-				cfg->dead_threshold[i] = ival;
+				target->dead_threshold[i] = ival;
 			}
 
 		} else if(sscanf(key_str, "dead-zone%d", &axisidx) == 1) {
@@ -254,117 +429,117 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			lptr->opt = CFG_DEADZONE_N;
 			lptr->idx = axisidx;
-			cfg->dead_threshold[axisidx] = ival;
+			target->dead_threshold[axisidx] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-x") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_TX;
 			EXPECT(isint);
-			cfg->dead_threshold[0] = ival;
+			target->dead_threshold[0] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-y") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_TY;
 			EXPECT(isint);
-			cfg->dead_threshold[1] = ival;
+			target->dead_threshold[1] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-translation-z") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_TZ;
 			EXPECT(isint);
-			cfg->dead_threshold[2] = ival;
+			target->dead_threshold[2] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-x") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_RX;
 			EXPECT(isint);
-			cfg->dead_threshold[3] = ival;
+			target->dead_threshold[3] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-y") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_RY;
 			EXPECT(isint);
-			cfg->dead_threshold[4] = ival;
+			target->dead_threshold[4] = ival;
 
 		} else if(strcmp(key_str, "dead-zone-rotation-z") == 0) {
 			logmsg(LOG_WARNING, "Deprecated option: %s. You are encouraged to use dead-zoneN instead\n", key_str);
 			lptr->opt = CFG_DEADZONE_RZ;
 			EXPECT(isint);
-			cfg->dead_threshold[5] = ival;
+			target->dead_threshold[5] = ival;
 
 		} else if(strcmp(key_str, "sensitivity") == 0) {
 			lptr->opt = CFG_SENS;
 			EXPECT(isfloat);
-			cfg->sensitivity = fval;
+			target->sensitivity = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation") == 0) {
 			lptr->opt = CFG_SENS_TRANS;
 			EXPECT(isfloat);
-			cfg->sens_trans[0] = cfg->sens_trans[1] = cfg->sens_trans[2] = fval;
+			target->sens_trans[0] = target->sens_trans[1] = target->sens_trans[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-x") == 0) {
 			lptr->opt = CFG_SENS_TX;
 			EXPECT(isfloat);
-			cfg->sens_trans[0] = fval;
+			target->sens_trans[0] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-y") == 0) {
 			lptr->opt = CFG_SENS_TY;
 			EXPECT(isfloat);
-			cfg->sens_trans[1] = fval;
+			target->sens_trans[1] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-translation-z") == 0) {
 			lptr->opt = CFG_SENS_TZ;
 			EXPECT(isfloat);
-			cfg->sens_trans[2] = fval;
+			target->sens_trans[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation") == 0) {
 			lptr->opt = CFG_SENS_ROT;
 			EXPECT(isfloat);
-			cfg->sens_rot[0] = cfg->sens_rot[1] = cfg->sens_rot[2] = fval;
+			target->sens_rot[0] = target->sens_rot[1] = target->sens_rot[2] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-x") == 0) {
 			lptr->opt = CFG_SENS_RX;
 			EXPECT(isfloat);
-			cfg->sens_rot[0] = fval;
+			target->sens_rot[0] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-y") == 0) {
 			lptr->opt = CFG_SENS_RY;
 			EXPECT(isfloat);
-			cfg->sens_rot[1] = fval;
+			target->sens_rot[1] = fval;
 
 		} else if(strcmp(key_str, "sensitivity-rotation-z") == 0) {
 			lptr->opt = CFG_SENS_RZ;
 			EXPECT(isfloat);
-			cfg->sens_rot[2] = fval;
+			target->sens_rot[2] = fval;
 
 		} else if(strcmp(key_str, "invert-rot") == 0) {
 			lptr->opt = CFG_INVROT;
 			if(strchr(val_str, 'x')) {
-				cfg->invert[RX] = 1;
+				target->invert[RX] = 1;
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[RY] = 1;
+				target->invert[RY] = 1;
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[RZ] = 1;
+				target->invert[RZ] = 1;
 			}
 
 		} else if(strcmp(key_str, "invert-trans") == 0) {
 			lptr->opt = CFG_INVTRANS;
 			if(strchr(val_str, 'x')) {
-				cfg->invert[TX] = 1;
+				target->invert[TX] = 1;
 			}
 			if(strchr(val_str, 'y')) {
-				cfg->invert[TY] = 1;
+				target->invert[TY] = 1;
 			}
 			if(strchr(val_str, 'z')) {
-				cfg->invert[TZ] = 1;
+				target->invert[TZ] = 1;
 			}
 
 		} else if(strcmp(key_str, "swap-yz") == 0) {
 			lptr->opt = CFG_SWAPYZ;
 			if(isint || isbool) {
-				cfg->swapyz = ival;
+				target->swapyz = ival;
 			} else {
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
 				continue;
@@ -382,7 +557,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			lptr->opt = CFG_AXISMAP_N;
 			lptr->idx = axisidx;
-			cfg->map_axis[axisidx] = ival;
+			target->map_axis[axisidx] = ival;
 
 		} else if(sscanf(key_str, "bnmap%d", &bnidx) == 1) {
 			EXPECT(isint);
@@ -390,12 +565,12 @@ int read_cfg(const char *fname, struct cfg *cfg)
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a number from 0 to %d\n", key_str, MAX_BUTTONS);
 				continue;
 			}
-			if(cfg->map_button[bnidx] != bnidx) {
+			if(target->map_button[bnidx] != bnidx) {
 				logmsg(LOG_WARNING, "warning: multiple mappings for button %d\n", bnidx);
 			}
 			lptr->opt = CFG_BNMAP_N;
 			lptr->idx = bnidx;
-			cfg->map_button[bnidx] = ival;
+			target->map_button[bnidx] = ival;
 
 		} else if(sscanf(key_str, "bnact%d", &bnidx) == 1) {
 			if(bnidx < 0 || bnidx >= MAX_BUTTONS) {
@@ -404,8 +579,8 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			lptr->opt = CFG_BNACT_N;
 			lptr->idx = bnidx;
-			if((cfg->bnact[bnidx] = parse_bnact(val_str)) == -1) {
-				cfg->bnact[bnidx] = BNACT_NONE;
+			if((target->bnact[bnidx] = parse_bnact(val_str)) == -1) {
+				target->bnact[bnidx] = BNACT_NONE;
 				logmsg(LOG_WARNING, "invalid button action: \"%s\"\n", val_str);
 				continue;
 			}
@@ -417,20 +592,20 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			}
 			lptr->opt = CFG_KBMAP_N;
 			lptr->idx = bnidx;
-			if(cfg->kbmap_str[bnidx]) {
-				logmsg(LOG_WARNING, "warning: multiple keyboard mappings for button %d: %s -> %s\n", bnidx, cfg->kbmap_str[bnidx], val_str);
-				free(cfg->kbmap_str[bnidx]);
+			if(target->kbmap_str[bnidx]) {
+				logmsg(LOG_WARNING, "warning: multiple keyboard mappings for button %d: %s -> %s\n", bnidx, target->kbmap_str[bnidx], val_str);
+				free(target->kbmap_str[bnidx]);
 			}
-			cfg->kbmap_str[bnidx] = strdup(val_str);
-			cfg->kbmap_count[bnidx] = parse_kbmap(val_str, cfg->kbmap[bnidx], MAX_KEYS_PER_BUTTON);
+			target->kbmap_str[bnidx] = strdup(val_str);
+			target->kbmap_count[bnidx] = parse_kbmap(val_str, target->kbmap[bnidx], MAX_KEYS_PER_BUTTON);
 
 		} else if(strcmp(key_str, "led") == 0) {
 			lptr->opt = CFG_LED;
 			if(isint || isbool) {
-				cfg->led = ival;
+				target->led = ival;
 			} else {
 				if(strcmp(val_str, "auto") == 0) {
-					cfg->led = LED_AUTO;
+					target->led = LED_AUTO;
 				} else {
 					logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value or \"auto\".\n", key_str);
 					continue;
@@ -440,7 +615,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "kbmap_use_x11") == 0) {
 			lptr->opt = CFG_KBMAP_USE_X11;
 			if(isint || isbool) {
-				cfg->kbemu_use_x11 = ival;
+				target->kbemu_use_x11 = ival;
 			} else {
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
 				continue;
@@ -449,7 +624,7 @@ int read_cfg(const char *fname, struct cfg *cfg)
 		} else if(strcmp(key_str, "grab") == 0) {
 			lptr->opt = CFG_GRAB;
 			if(isint || isbool) {
-				cfg->grab_device = ival;
+				target->grab_device = ival;
 			} else {
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a boolean value.\n", key_str);
 				continue;
@@ -457,19 +632,53 @@ int read_cfg(const char *fname, struct cfg *cfg)
 
 		} else if(strcmp(key_str, "serial") == 0) {
 			lptr->opt = CFG_SERIAL;
-			strncpy(cfg->serial_dev, val_str, PATH_MAX - 1);
+			strncpy(target->serial_dev, val_str, PATH_MAX - 1);
 
 		} else if(strcmp(key_str, "device-id") == 0) {
 			unsigned int vendor, prod;
 			lptr->opt = CFG_DEVID;
 			if(sscanf(val_str, "%x:%x", &vendor, &prod) == 2) {
-				cfg->devid[num_devid][0] = (int)vendor;
-				cfg->devid[num_devid][1] = (int)prod;
+				target->devid[num_devid][0] = (int)vendor;
+				target->devid[num_devid][1] = (int)prod;
 				num_devid++;
 			} else {
 				logmsg(LOG_WARNING, "invalid configuration value for %s, expected a vendorid:productid pair\n", key_str);
 				continue;
 			}
+
+		} else if(strcmp(key_str, "led-idle") == 0) {
+			if(cur_profile >= 0 || !isint || ival < 0 || ival > 86400) {
+				logmsg(LOG_WARNING, "led-idle requires global seconds (0..86400)\n");
+				continue;
+			}
+			lptr->opt = CFG_LED_IDLE;
+			cfg->led_idle_seconds = ival;
+
+		} else if(strcmp(key_str, "lcd-idle") == 0) {
+			if(cur_profile >= 0 || !isint || ival < 0 || ival > 86400) {
+				logmsg(LOG_WARNING, "lcd-idle requires global seconds (0..86400)\n");
+				continue;
+			}
+			lptr->opt = CFG_LCD_IDLE;
+			cfg->lcd_idle_seconds = ival;
+
+		} else if(strcmp(key_str, "lcd-brightness") == 0) {
+			if(cur_profile >= 0 || !isint || ival < 0 || ival > 100) {
+				logmsg(LOG_WARNING, "lcd-brightness requires a global percentage (0..100)\n");
+				continue;
+			}
+			lptr->opt = CFG_LCD_BRIGHTNESS;
+			cfg->lcd_brightness = ival;
+
+		} else if(strcmp(key_str, "lcd") == 0 || strcmp(key_str, "lcd-profile") == 0) {
+			int bit = strcmp(key_str, "lcd") == 0 ? LCD_ENABLED : LCD_PROFILE;
+			if(cur_profile >= 0 || !(isbool || (isint && (ival == 0 || ival == 1)))) {
+				logmsg(LOG_WARNING, "LCD options require a global boolean value\n");
+				continue;
+			}
+			lptr->opt = bit == LCD_ENABLED ? CFG_LCD : CFG_LCD_PROFILE;
+			if(ival) cfg->lcd_flags |= bit;
+			else cfg->lcd_flags &= ~bit;
 
 		} else if(strcmp(key_str, "socket") == 0) {
 			lptr->opt = CFG_SOCKPATH;
@@ -479,6 +688,12 @@ int read_cfg(const char *fname, struct cfg *cfg)
 			logmsg(LOG_WARNING, "unrecognized config option: %s\n", key_str);
 		}
 	}
+
+	if(cur_profile >= 0) {
+		logmsg(LOG_WARNING, "unterminated profile block at end of config file\n");
+	}
+
+	logmsg(LOG_INFO, "%d profiles loaded\n", num_profiles);
 
 	unlock_cfgfile(fd);
 	fclose(fp);
@@ -499,9 +714,17 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	FILE *fp;
 	struct flock flk;
 	struct cfg def;
-	char buf[128];
+	char buf[128], temporary[PATH_MAX];
+	int tempfd;
+	struct stat st;
 
-	if(!(fp = fopen(fname, "w"))) {
+	if(snprintf(temporary,sizeof temporary,"%s.XXXXXX",fname)>=(int)sizeof temporary)return -1;
+	tempfd=mkstemp(temporary);
+	if(tempfd<0)return -1;
+	if(stat(fname,&st)==0)fchmod(tempfd,st.st_mode & 0777);
+	else fchmod(tempfd,0644);
+	if(!(fp = fdopen(tempfd, "w"))) {
+		close(tempfd);unlink(temporary);
 		logmsg(LOG_ERR, "failed to write config file %s: %s\n", fname, strerror(errno));
 		return -1;
 	}
@@ -514,7 +737,7 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		}
 	}
 
-	default_cfg(&def);	/* default config for comparisons */
+	init_cfg(&def);	/* default config for comparisons */
 
 	if(cfg->sensitivity != def.sensitivity) {
 		add_cfgopt(CFG_SENS, 0, "sensitivity = %.3f", cfg->sensitivity);
@@ -709,6 +932,13 @@ int write_cfg(const char *fname, struct cfg *cfg)
 		rm_cfgopt("socket", RMCFG_ALL);
 	}
 
+	add_cfgopt(CFG_LCD, 0, "lcd = %s", cfg->lcd_flags & LCD_ENABLED ? "on" : "off");
+	add_cfgopt(CFG_LCD_PROFILE, 0, "lcd-profile = %s", cfg->lcd_flags & LCD_PROFILE ? "on" : "off");
+
+	add_cfgopt(CFG_LCD_BRIGHTNESS, 0, "lcd-brightness = %d", cfg->lcd_brightness);
+	add_cfgopt(CFG_LCD_IDLE, 0, "lcd-idle = %d", cfg->lcd_idle_seconds);
+	add_cfgopt(CFG_LED_IDLE, 0, "led-idle = %d", cfg->led_idle_seconds);
+
 	/* acquire exclusive write lock */
 	flk.l_type = F_WRLCK;
 	flk.l_start = flk.l_len = 0;
@@ -716,12 +946,25 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	while(fcntl(fileno(fp), F_SETLKW, &flk) == -1);
 
 	for(i=0; i<num_lines; i++) {
-		if(!cfglines[i].str) continue;
+		if(!cfglines[i].str || cfglines[i].in_profile || cfglines[i].opt == -2) continue;
 
 		if(*cfglines[i].str) {
 			fputs(cfglines[i].str, fp);
 		}
 		fputc('\n', fp);
+	}
+
+	write_editor(fp,cfg,0);
+	for(i=0;i<num_profiles;i++) {
+		fprintf(fp,"\nprofile \"%s\" class=%s\n",profiles[i].name,profiles[i].match_class);
+		write_editor(fp,&profiles[i].pcfg,&profiles[i]);
+		/* Keep legacy per-profile options which are outside the axes/button editor. */
+		if(profiles[i].pcfg.led!=cfg->led)fprintf(fp,"led = %s\n",profiles[i].pcfg.led==2?"auto":profiles[i].pcfg.led?"on":"off");
+		if(profiles[i].pcfg.grab_device!=cfg->grab_device)fprintf(fp,"grab = %d\n",profiles[i].pcfg.grab_device);
+		if(profiles[i].pcfg.repeat_msec!=cfg->repeat_msec)fprintf(fp,"repeat-interval = %d\n",profiles[i].pcfg.repeat_msec);
+		if(profiles[i].pcfg.kbemu_use_x11!=cfg->kbemu_use_x11)fprintf(fp,"kbmap_use_x11 = %d\n",profiles[i].pcfg.kbemu_use_x11);
+		if(strcmp(profiles[i].pcfg.serial_dev,cfg->serial_dev))fprintf(fp,"serial = %s\n",profiles[i].pcfg.serial_dev);
+		fputs("end\n",fp);
 	}
 
 	/* unlock */
@@ -730,7 +973,9 @@ int write_cfg(const char *fname, struct cfg *cfg)
 	flk.l_whence = SEEK_SET;
 	fcntl(fileno(fp), F_SETLK, &flk);
 
-	fclose(fp);
+	if(fflush(fp) || ferror(fp) || fsync(fileno(fp))) {fclose(fp);unlink(temporary);return -1;}
+	if(fclose(fp)) {unlink(temporary);return -1;}
+	if(rename(temporary,fname)) {unlink(temporary);return -1;}
 	return 0;
 }
 
@@ -819,7 +1064,7 @@ static struct cfgline *find_cfgopt(int opt, int idx)
 {
 	int i;
 	for(i=0; i<num_lines; i++) {
-		if(cfglines[i].str && cfglines[i].opt == opt && cfglines[i].idx == idx) {
+		if(!cfglines[i].in_profile && cfglines[i].str && cfglines[i].opt == opt && cfglines[i].idx == idx) {
 			return cfglines + i;
 		}
 	}
@@ -860,7 +1105,7 @@ static int add_cfgopt_devid(int vid, int pid)
 	sprintf(str, "device-id = %04x:%04x", vid, pid);
 
 	for(i=0; i<num_lines; i++) {
-		if(!cfglines[i].str || cfglines[i].opt != CFG_DEVID) {
+		if(cfglines[i].in_profile || !cfglines[i].str || cfglines[i].opt != CFG_DEVID) {
 			continue;
 		}
 		if(!(val = strchr(cfglines[i].str, '='))) {
@@ -891,7 +1136,7 @@ static int rm_cfgopt(const char *name, int mode)
 	char buf[256];
 
 	for(i=0; i<num_lines; i++) {
-		if(!cfglines[i].str || !*cfglines[i].str) continue;
+		if(cfglines[i].in_profile || !cfglines[i].str || !*cfglines[i].str) continue;
 
 		strncpy(buf, cfglines[i].str, sizeof buf - 1);
 		buf[sizeof buf - 1] = 0;

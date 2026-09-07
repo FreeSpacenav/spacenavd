@@ -6,8 +6,8 @@ bin = spacenavd
 ctl = spnavd_ctl
 
 CC ?= gcc
-CFLAGS = $(cc_cflags) $(dbg) $(opt) -I$(srcdir)/src $(xinc) $(add_cflags)
-LDFLAGS = $(xlib) $(add_ldflags) -lm
+CFLAGS = $(cc_cflags) $(dbg) $(opt) -I$(srcdir)/src $(xinc) $(lcd_cflags) $(add_cflags)
+LDFLAGS = $(xlib) $(lcd_ldflags) $(add_ldflags) -lm
 
 $(bin): $(obj)
 	$(CC) -o $@ $(obj) $(LDFLAGS)
@@ -39,3 +39,7 @@ install: $(bin)
 uninstall:
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(bin)
 	rm -f $(DESTDIR)$(PREFIX)/bin/$(ctl)
+
+.PHONY: test
+test:
+	cd $(srcdir) && ./tests/run.sh

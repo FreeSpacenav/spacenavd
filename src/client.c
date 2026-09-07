@@ -20,6 +20,9 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <stdio.h>
 #include <stdlib.h>
 #include "client.h"
+#include "profile.h"
+#include "profile_edit.h"
+#include "lcd.h"
 #include "dev.h"
 #include "spnavd.h"
 
@@ -109,7 +112,12 @@ void remove_client(struct client *client)
 void free_client(struct client *client)
 {
 	if(client) {
+		if(profile_clear_focus(client)) lcd_update_mappings();
+		profile_edit_capture(client,0);
+		free(client->profile_transfer);
+		free(client->focusbuf.buf);
 		free(client->name);
+		free(client->app_id);
 		free(client->strbuf.buf);
 		free(client);
 	}

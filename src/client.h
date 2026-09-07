@@ -58,6 +58,7 @@ struct client {
 	struct device *dev;
 
 	char *name;				/* client name (not unique) */
+	char *app_id;			/* application identifier (metadata, not focus) */
 	unsigned int evmask;	/* event selection mask */
 
 	char reqbuf[64];
@@ -65,7 +66,10 @@ struct client {
 
 	/* protocol buffer for handling reception of strings in multiple packets */
 	struct reqresp_strbuf strbuf;
+	struct reqresp_strbuf focusbuf;
 
+	void *profile_transfer;
+	int profile_transfer_pos, profile_transfer_write;
 	struct client *next;
 };
 
