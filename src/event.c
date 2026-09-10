@@ -50,7 +50,7 @@ struct dev_event {
 };
 
 static struct dev_event *add_dev_event(struct device *dev);
-static struct dev_event *device_event_in_use(struct device *dev);
+static struct dev_event *get_dev_event(struct device *dev);
 static void handle_button_action(int act, int val);
 static void dispatch_event(struct device *dev, spnav_event *ev);
 static void send_event(spnav_event *ev, struct client *c);
@@ -113,7 +113,7 @@ void remove_dev_event(struct device *dev)
 	dev_ev_list = dummy.next;
 }
 
-static struct dev_event *device_event_in_use(struct device *dev)
+static struct dev_event *get_dev_event(struct device *dev)
 {
 	struct dev_event *iter = dev_ev_list;
 	while(iter) {
@@ -203,7 +203,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 	spnav_event ev;
 	struct timeval now, *timeout;
 
-	dev_ev = device_event_in_use(dev);
+	dev_ev = get_dev_event(dev);
 	if(verbose && dev_ev == NULL) {
 		logmsg(LOG_INFO, "adding dev event for device: %s\n", dev->path);
 	}
@@ -294,7 +294,7 @@ void process_input(struct device *dev, struct dev_input *inp)
 		break;
 
 	case INP_FLUSH:
-		dev_ev = device_event_in_use(dev);
+		dev_ev = get_dev_event(dev);
 		if(dev_ev && dev_ev->pending) {
 			update_motion_period(dev_ev);
 			dispatch_event(dev, &dev_ev->event);
@@ -346,7 +346,7 @@ int in_deadzone(struct device *dev)
 {
 	int i;
 	struct dev_event *dev_ev;
-	if((dev_ev = device_event_in_use(dev)) == NULL)
+	if((dev_ev = get_dev_event(dev)) == NULL)
 		return -1;
 	for(i=0; i<6; i++) {
 		if(dev_ev->event.motion.data[i] != 0)
@@ -359,7 +359,7 @@ void repeat_last_motion_event(struct device *dev)
 {
 	struct dev_event *dev_ev;
 
-	if((dev_ev = device_event_in_use(dev)) == NULL)
+	if((dev_ev = get_dev_event(dev)) == NULL)
 		return;
 
 	update_motion_period(dev_ev);
@@ -375,7 +375,7 @@ int next_button_timeout(struct device *head, struct timeval *timeout)
 	while(head) {
 		if(!is_device_valid(head)) goto next;
 
-		if(!(dev_ev = device_event_in_use(head))) {
+		if(!(dev_ev = get_dev_event(head))) {
 			goto next;
 		}
 
@@ -420,7 +420,7 @@ void emit_button_timeouts(struct device *head)
 
 	gettimeofday(&now, 0);
 	while(head) {
-		if(!(dev_ev = device_event_in_use(head))) {
+		if(!(dev_ev = get_dev_event(head))) {
 			goto next;
 		}
 

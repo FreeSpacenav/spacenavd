@@ -26,7 +26,7 @@ For more info on the spacenav project, visit: http://spacenav.sourceforge.net
 
 License
 -------
-Copyright (C) 2007-2025 John Tsiombikas <nuclear@mutantstargoat.com>
+Copyright (C) 2007-2026 John Tsiombikas <nuclear@mutantstargoat.com>
 
 This program is free software. Feel free to copy, modify and/or redistribute it
 under the terms of the GNU General Public License version 3, or at your option,
@@ -43,7 +43,7 @@ In order to compile the spacenavd daemon, you'll need the following:
  - Xtest (libXtst, optional)
 
 You can compile the daemon without Xlib, but it won't be compatible with
-applications that where written for the original proprietary 3Dconnexion driver
+applications that were written for the original proprietary 3Dconnexion driver
 (e.g. maya, houdini, etc). The 3dxsrv compatibility interface needs to
 communicate with clients through the X window system. Programs designed to work
 with the alternative spacenavd-specific interface however (e.g. blender) will
