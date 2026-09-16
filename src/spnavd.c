@@ -529,7 +529,13 @@ static void sig_handler(int s)
 		break;
 
 	case SIGSEGV:
+		/* exit(), unlike _exit(), is not async-signal-safe: it runs the
+		 * atexit(cleanup) handler below, which after a real segfault may
+		 * itself operate on corrupted state (X11/socket/device teardown).
+		 * Skip it and exit as directly as possible instead. */
 		logmsg(LOG_ERR, "Segmentation fault caught, trying to exit gracefully\n");
+		_exit(0);
+
 	case SIGINT:
 	case SIGTERM:
 		exit(0);
