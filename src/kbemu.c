@@ -81,10 +81,15 @@ int kbemu_active(void)
 
 static void dummy_sendkey(unsigned int key, int press)
 {
+	(void)key;
+	(void)press;
 	logmsg(LOG_DEBUG, "dummy_sendkey\n");
 }
 
 static void dummy_sendcombo(unsigned int *keys, int count, int press)
 {
+	(void)keys;
+	(void)count;
+	(void)press;
 	logmsg(LOG_DEBUG, "dummy_sendcombo\n");
 }

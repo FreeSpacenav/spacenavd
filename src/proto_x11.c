@@ -420,6 +420,7 @@ static int xerr(Display *dpy, XErrorEvent *err)
  */
 static int xioerr(Display *display)
 {
+	(void)display;
 	logmsg(LOG_ERR, "Lost the X server!\n");
 	dpy = 0;
 	close_x11();

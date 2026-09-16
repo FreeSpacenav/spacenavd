@@ -270,7 +270,7 @@ if [ "$X11" = 'yes' ]; then
 fi
 
 if $cc_is_gcc; then
-	echo 'cc_cflags = -pedantic -Wall -MMD' >>Makefile
+	echo 'cc_cflags = -pedantic -Wall -Wextra -MMD' >>Makefile
 fi
 
 if [ -n "$CFLAGS" ]; then

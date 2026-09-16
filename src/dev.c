@@ -82,7 +82,7 @@ static struct usbdb_entry {
 	{{0x256f, 0xc636}, DEV_SMMOD,		DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse module */
 	{{0x256f, 0xc638}, DEV_SMPROW,		DF_SWAPYZ | DF_INVYZ,	bnhack_smpro},	/* spacemouse pro wireless BT (USB) */
 	{{0x256f, 0xc63a}, DEV_SMW,			DF_SWAPYZ | DF_INVYZ,	0},				/* spacemouse wireless (bluetooth) */
-	{{-1, -1}, DEV_UNKNOWN, 0}
+	{{-1, -1}, DEV_UNKNOWN, 0, 0}
 };
 
 /* 3Dconnexion devices which we don't want to match, because they are
@@ -378,8 +378,8 @@ static int match_usbdev(const struct usb_dev_info *devinfo)
 	/* match any USB devices listed in the config file */
 	for(i=0; i<MAX_CUSTOM; i++) {
 		if(cfg.devid[i][0] != -1 && cfg.devid[i][1] != -1 &&
-				(unsigned int)cfg.devid[i][0] == devinfo->vendorid &&
-				(unsigned int)cfg.devid[i][1] == devinfo->productid) {
+				cfg.devid[i][0] == devinfo->vendorid &&
+				cfg.devid[i][1] == devinfo->productid) {
 			return 1;
 		}
 		if(cfg.devname[i] && devinfo->name && strcmp(cfg.devname[i], devinfo->name) == 0) {
@@ -429,7 +429,7 @@ static struct usbdb_entry *find_usbdb_entry(unsigned int vid, unsigned int pid)
 {
 	int i;
 	for(i=0; usbdb[i].usbid[0] != -1; i++) {
-		if(usbdb[i].usbid[0] == vid && usbdb[i].usbid[1] == pid) {
+		if((unsigned int)usbdb[i].usbid[0] == vid && (unsigned int)usbdb[i].usbid[1] == pid) {
 			return usbdb + i;
 		}
 	}

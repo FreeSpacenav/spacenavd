@@ -127,7 +127,7 @@ static struct dev_event *get_dev_event(struct device *dev)
 
 static INLINE int map_axis(int devaxis)
 {
-	const static int swaptab[] = {0, 2, 1, 3, 5, 4};
+	static const int swaptab[] = {0, 2, 1, 3, 5, 4};
 
 	int axis = cfg.map_axis[devaxis];
 	if(axis < 0 || axis >= 6) {

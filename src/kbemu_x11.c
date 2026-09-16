@@ -157,6 +157,7 @@ unsigned int kbemu_x11_keysym(const char *str)
 
 const char *kbemu_x11_keyname(unsigned int sym)
 {
+	(void)sym;
 	return 0;
 }
 #endif	/* USE_X11 */

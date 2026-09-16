@@ -262,7 +262,7 @@ int handle_uevents(fd_set *rset)
 						continue;
 					}
 					c->reqbytes += rdbytes;
-					if(c->reqbytes >= sizeof *req) {
+					if((size_t)c->reqbytes >= sizeof *req) {
 						req = (struct reqresp*)c->reqbuf;
 						c->reqbytes = 0;
 						if(handle_request(c, req) == -1) {
@@ -295,6 +295,12 @@ static int handle_request(struct client *c, struct reqresp *req)
 	float fval, fvec[6];
 	struct device *dev;
 	const char *str = 0;
+#ifndef USE_X11
+	/* idx/str are only touched by the REQ_SCFG_KBMAP/REQ_GCFG_KBMAP cases
+	 * below, which are themselves #ifdef USE_X11 */
+	(void)idx;
+	(void)str;
+#endif
 
 	logmsg(LOG_DEBUG, "request %s - %x %x %x %x %x %x\n", reqstr(req->type), req->data[0],
 			req->data[1], req->data[2], req->data[3], req->data[4], req->data[5], req->data[6]);

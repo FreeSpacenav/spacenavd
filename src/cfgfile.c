@@ -816,6 +816,11 @@ static const char *bnact_name(int bnact)
 
 static int parse_kbmap(const char *str, unsigned int *kbmap, int max_keys)
 {
+#ifndef USE_X11
+	(void)str;
+	(void)kbmap;
+	(void)max_keys;
+#endif
 #ifdef USE_X11
 	char buf[256], *ptr, *start;
 	int count = 0;
@@ -910,7 +915,7 @@ static int add_cfgopt_devid(int vid, int pid)
 		if(!(val = strchr(cfglines[i].str, '='))) {
 			continue;
 		}
-		if(sscanf(val + 1, "%x:%x", dev, dev + 1) == 2 && dev[0] == vid && dev[1] == pid) {
+		if(sscanf(val + 1, "%x:%x", dev, dev + 1) == 2 && dev[0] == (unsigned int)vid && dev[1] == (unsigned int)pid) {
 			lptr = cfglines + i;
 			break;
 		}
