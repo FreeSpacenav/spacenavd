@@ -28,7 +28,7 @@ details.
 Dependencies
 ------------
 In order to compile the spacenavd daemon, you'll need the following:
- - GNU C Compiler
+ - C compiler
  - GNU make
  - Xlib (libX11, optional)
  - XInput2 (libXi, optional)
@@ -44,7 +44,7 @@ work fine even when spacenavd is built without X11 support.
 Installation
 ------------
 If you have the dependencies installed, just run `./configure` and then `make`
-to compile the daemon, and then `make install`, to install it.The default
+to compile the daemon, and then `make install`, to install it. The default
 installation prefix is `/usr/local`. If you wish to install somewhere else, you
 may pass `--prefix=/whatever` to the configure script.
 
