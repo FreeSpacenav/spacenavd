@@ -1,17 +1,20 @@
 Main author and maintainer:
-	John Tsiombikas <nuclear@member.fsf.org>
+	John Tsiombikas <nuclear@mutantstargoat.com>
 
 Contributors:
 	Doug LaRue
 	Krister Svanlun
 	Hans Meine
 	Jaroslaw Bulat
-	Pavel Frolov,
+	Pavel Frolov
 	Robert Haschke
 	David Lister
 	Stephen Hurd
 	Gaël Écorchard
 	Alberto Fanjul
+	Rickard Lind
+	Wren Turkal
+	Allin Demopolis
 
 Serial device support in early versions (before the v0.8 rewrite):
 	John E. Stone <j.stone@acm.org>	
