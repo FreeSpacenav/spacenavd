@@ -605,6 +605,12 @@ static int guess_num_buttons(struct device *dev, const char *verstr)
 		}
 	}
 
+	if(strstr(verstr, "SpaceExpl")) {
+		dev->type = DEV_SEXP;
+		strcpy(dev->name, "SpaceExplorer (serial)");
+		return 15;	/* serial SpaceExplorer (3DX-700027) */
+	}
+
 	if(strstr(verstr, "MAGELLAN")) {
 		dev->type = DEV_SM;
 		strcpy(dev->name, "Magellan SpaceMouse");
